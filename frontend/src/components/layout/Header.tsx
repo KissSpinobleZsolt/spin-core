@@ -3,6 +3,7 @@ import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../context/AuthContext'
 import { useTheme } from '../../context/ThemeContext'
+import { useHealth } from '../../context/HealthContext'
 
 const ROUTE_KEYS: Record<string, string> = {
   '/': 'nav.dashboard',
@@ -25,7 +26,17 @@ export default function Header() {
   const { t, i18n } = useTranslation()
   const { user } = useAuth()
   const { theme, setTheme } = useTheme()
+  const health = useHealth()
   const [notifOpen, setNotifOpen] = useState(false)
+
+  const degraded = health.checkedAt !== null && (!health.api || !health.postgres || !health.clickhouse || !health.mongo)
+  const statusLabel = !health.api
+    ? 'API unreachable'
+    : [
+        !health.postgres && 'PostgreSQL',
+        !health.clickhouse && 'ClickHouse',
+        !health.mongo && 'MongoDB',
+      ].filter(Boolean).join(', ') + ' unreachable'
 
   const titleKey = ROUTE_KEYS[location.pathname] ?? 'nav.dashboard'
   const initials = user ? getInitials(user.name) : '??'
@@ -56,6 +67,17 @@ export default function Header() {
 
       {/* Right actions */}
       <div className="flex items-center gap-4">
+        {/* API / DB health indicator — only visible when degraded */}
+        {degraded && (
+          <div
+            title={statusLabel}
+            className="flex items-center gap-1.5 px-2 py-1 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-xs font-medium cursor-default"
+          >
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse inline-block" />
+            {!health.api ? 'API offline' : 'DB degraded'}
+          </div>
+        )}
+
         {/* Language switcher */}
         <button
           onClick={toggleLang}

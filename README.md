@@ -41,7 +41,7 @@ All three databases start unconditionally. Each has a fixed, non-configurable ro
 docker compose up --build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) — on first run you are redirected to the **setup wizard**.
+Open [http://localhost:3000](http://localhost:3000) — on first run go to `/login` and sign in with the `ADMIN_EMAIL` / `ADMIN_PASSWORD` credentials configured in `docker-compose.yml`.
 
 ### Development (hot reload)
 
@@ -99,6 +99,17 @@ Admins can edit every translation string live at `/translations` — a side-by-s
 
 To add a new language: seed a document in `system__i18n` and extend `LANGS` in `Translations.tsx`.
 
+## Health monitoring
+
+A Web Worker (`src/workers/healthWorker.ts`) polls `GET /api/health` every 30 s off the main thread. The endpoint checks all three database connections and returns:
+
+```json
+{ "api": true, "postgres": true, "clickhouse": true, "mongo": true }
+```
+
+- **Header**: shows a red "API offline" or "DB degraded" pill only when something is down — invisible when all services are healthy.
+- **Settings → Databases**: each DB row shows a live status badge (grey pulsing while checking, green "online", red pulsing "unreachable") with a "Last checked HH:MM:SS" timestamp.
+
 ## Environment variables
 
 | Variable | Default | Description |
@@ -137,16 +148,18 @@ spin-core/
 │           ├── logs.py          # /api/logs (admin)
 │           ├── module_data.py   # /api/module-data/*
 │           ├── i18n.py          # /api/i18n/{lang} (GET public, PUT admin)
+│           ├── health.py        # /api/health (GET public — DB liveness checks)
 │           └── ingestion.py     # /api/data-ingestion (WebSocket)
 ├── frontend/
 │   └── src/
 │       ├── pages/           # Login, Dashboard, Settings, Logs, Translations
 │       ├── components/
 │       │   ├── guards/      # AuthGuard, RoleGuard
-│       │   ├── layout/      # Sidebar (collapsible), Header, Footer, Layout
+│       │   ├── layout/      # Sidebar (collapsible), Header (health indicator), Footer, Layout
 │       │   └── modules/     # FederatedPage
-│       ├── context/         # AuthContext, ThemeContext, SettingsContext, UIPrefsContext
+│       ├── context/         # AuthContext, ThemeContext, SettingsContext, UIPrefsContext, HealthContext
 │       ├── services/        # apiService, settingsService, logsService, i18nService
+│       ├── workers/         # healthWorker.ts — polls /api/health every 30 s off the main thread
 │       └── utils/           # federationLoader (webpack container protocol)
 ├── k8s/                     # Kubernetes manifests (kustomize)
 │   ├── kustomization.yaml

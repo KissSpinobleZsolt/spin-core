@@ -2,6 +2,7 @@ import { type InputHTMLAttributes, type ReactNode, useState } from 'react'
 import { settingsService, type ModuleConfig } from '../services/settingsService'
 import { useSettings } from '../context/SettingsContext'
 import { useTheme } from '../context/ThemeContext'
+import { useHealth } from '../context/HealthContext'
 
 // ---------------------------------------------------------------------------
 // Shared UI
@@ -273,28 +274,61 @@ function AppearanceSection() {
 // Database info section
 // ---------------------------------------------------------------------------
 
-const DB_ROLES = [
-  { icon: '🐘', name: 'PostgreSQL', role: 'Users & application data' },
-  { icon: '🏠', name: 'ClickHouse', role: 'Event logs & audit trail' },
-  { icon: '🍃', name: 'MongoDB',    role: 'Module data store' },
+type DbKey = 'postgres' | 'clickhouse' | 'mongo'
+
+const DB_ROWS: { key: DbKey; icon: string; name: string; role: string }[] = [
+  { key: 'postgres',   icon: '🐘', name: 'PostgreSQL', role: 'Users & application data' },
+  { key: 'clickhouse', icon: '🏠', name: 'ClickHouse',  role: 'Event logs & audit trail' },
+  { key: 'mongo',      icon: '🍃', name: 'MongoDB',     role: 'Module data store' },
 ]
 
+function StatusBadge({ up, checkedAt }: { up: boolean; checkedAt: Date | null }) {
+  const label = checkedAt === null ? 'checking…' : up ? 'online' : 'unreachable'
+  const dot = checkedAt === null
+    ? 'bg-slate-400 animate-pulse'
+    : up
+    ? 'bg-green-500'
+    : 'bg-red-500 animate-pulse'
+  const text = checkedAt === null
+    ? 'text-slate-400'
+    : up
+    ? 'text-green-600 dark:text-green-400'
+    : 'text-red-500 dark:text-red-400'
+
+  return (
+    <span className={`ml-auto flex items-center gap-1.5 text-xs font-medium ${text}`}>
+      <span className={`w-1.5 h-1.5 rounded-full inline-block ${dot}`} />
+      {label}
+    </span>
+  )
+}
+
 function DatabaseSection() {
+  const health = useHealth()
+
   return (
     <Section title="Databases">
+      {!health.api && health.checkedAt !== null && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-400 text-sm">
+          <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse inline-block shrink-0" />
+          API unreachable — database status unavailable
+        </div>
+      )}
       <div className="space-y-3">
-        {DB_ROLES.map(({ icon, name, role }) => (
+        {DB_ROWS.map(({ key, icon, name, role }) => (
           <div key={name} className="flex items-center gap-3 text-sm">
             <span className="text-xl w-7 shrink-0">{icon}</span>
             <span className="font-medium text-slate-800 dark:text-white w-28 shrink-0">{name}</span>
             <span className="text-slate-500 dark:text-slate-400">{role}</span>
-            <span className="ml-auto flex items-center gap-1.5 text-green-600 dark:text-green-400 text-xs font-medium">
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
-              always active
-            </span>
+            <StatusBadge up={health[key]} checkedAt={health.checkedAt} />
           </div>
         ))}
       </div>
+      {health.checkedAt && (
+        <p className="text-[11px] text-slate-400 text-right">
+          Last checked {health.checkedAt.toLocaleTimeString()}
+        </p>
+      )}
     </Section>
   )
 }

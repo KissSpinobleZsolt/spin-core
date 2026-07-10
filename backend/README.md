@@ -71,23 +71,18 @@ Default i18n translations (EN + RO) are also seeded into MongoDB on first run in
 
 All routes are prefixed with `/api`.
 
-### Setup (no auth)
+### Health (no auth)
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/setup/status` | `{ setup_complete: bool }` |
-| `POST` | `/api/setup/complete` | Create admin user, write settings, mark complete |
+| `GET` | `/api/health` | Returns liveness of the API and all three databases |
 
-`POST /api/setup/complete` body:
+Response:
 ```json
-{
-  "admin_name": "Jane Doe",
-  "admin_email": "admin@example.com",
-  "admin_password": "securepassword",
-  "default_theme": "dark",
-  "modules": []
-}
+{ "api": true, "postgres": true, "clickhouse": true, "mongo": false }
 ```
+
+Each field is `true` if the connection check passed, `false` otherwise. `api` is always `true` when the endpoint itself responds. Used by the frontend Web Worker to drive the status indicator in the header and the per-DB badges in Settings.
 
 ### Auth
 
@@ -168,13 +163,13 @@ backend/
 │       ├── clickhouse.py # ClickHouseLogAdapter — MergeTree log table
 │       └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
 ├── routes/
-│   ├── setup.py          # /api/setup/*
 │   ├── auth.py           # /api/auth/login
 │   ├── dashboard.py      # /api/dashboard, /api/user/theme
 │   ├── settings.py       # /api/settings/*
 │   ├── logs.py           # /api/logs
 │   ├── module_data.py    # /api/module-data/*
 │   ├── i18n.py           # /api/i18n/{lang}
+│   ├── health.py         # /api/health — DB liveness checks
 │   └── ingestion.py      # /api/data-ingestion + WebSocket
 ├── requirements.txt
 └── Dockerfile

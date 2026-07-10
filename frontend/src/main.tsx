@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext'
 import { ThemeProvider } from './context/ThemeContext'
 import { SettingsProvider } from './context/SettingsContext'
 import { UIPrefsProvider } from './context/UIPrefsContext'
+import { HealthProvider } from './context/HealthContext'
 import './i18n'
 import './index.css'
 import App from './App.tsx'
@@ -25,7 +26,9 @@ createRoot(document.getElementById('root')!).render(
         <ThemeProvider>
           <UIPrefsProvider>
             <SettingsProvider>
-              <App />
+              <HealthProvider>
+                <App />
+              </HealthProvider>
             </SettingsProvider>
           </UIPrefsProvider>
         </ThemeProvider>

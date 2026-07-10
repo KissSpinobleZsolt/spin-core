@@ -10,7 +10,7 @@ from app.database import init_db, get_pg, get_ch, get_mongo
 from app.settings import read_settings
 from app.state import set_settings
 
-from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router
+from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router, health
 
 
 @asynccontextmanager
@@ -97,3 +97,4 @@ app.include_router(ingestion.router)
 app.include_router(logs.router)
 app.include_router(module_data.router)
 app.include_router(i18n_router.router)
+app.include_router(health.router)

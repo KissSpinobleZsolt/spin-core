@@ -10,7 +10,7 @@ export default defineConfig({
   server: {
     port: 3000,
     proxy: {
-      '/api': process.env.API_PROXY_TARGET ?? 'http://localhost:6000',
+      '/api': process.env.API_PROXY_TARGET ?? 'http://localhost:8000',
     },
   },
 })

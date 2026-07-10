@@ -1,12 +1,10 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useTranslation } from 'react-i18next'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
   const { user, login } = useAuth()
   const navigate = useNavigate()
-  const { t } = useTranslation()
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -23,7 +21,7 @@ export default function Login() {
       await login({ email, password })
       navigate('/')
     } catch {
-      setError(t('login.error'))
+      setError('Invalid email or password')
     } finally {
       setLoading(false)
     }
@@ -40,33 +38,33 @@ export default function Login() {
         </div>
 
         <div className="text-center">
-          <h1 className="text-xl font-bold text-slate-800">{t('login.title')}</h1>
-          <p className="text-sm text-slate-500 mt-1">{t('login.subtitle')}</p>
+          <h1 className="text-xl font-bold text-slate-800">Spin Core</h1>
+          <p className="text-sm text-slate-500 mt-1">Sign in to your account</p>
         </div>
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">{t('login.email')}</label>
+            <label className="text-xs font-medium text-slate-600">Email</label>
             <input
               type="email"
               required
               autoComplete="email"
               value={email}
               onChange={e => setEmail(e.target.value)}
-              placeholder={t('login.emailPlaceholder')}
+              placeholder="you@example.com"
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
             />
           </div>
 
           <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">{t('login.password')}</label>
+            <label className="text-xs font-medium text-slate-600">Password</label>
             <input
               type="password"
               required
               autoComplete="current-password"
               value={password}
               onChange={e => setPassword(e.target.value)}
-              placeholder={t('login.passwordPlaceholder')}
+              placeholder="••••••••"
               className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
             />
           </div>
@@ -80,7 +78,7 @@ export default function Login() {
             disabled={loading}
             className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
           >
-            {loading ? '…' : t('login.button')}
+            {loading ? '…' : 'Sign in'}
           </button>
         </form>
       </div>

@@ -18,7 +18,7 @@ React 19 SPA for the spin-core platform.
 |-------|------|------|-------|
 | `/login` | Login | No | |
 | `/` | Dashboard | Yes | |
-| `/settings` | Settings | Admin | Tri-DB panel + modules |
+| `/settings` | Settings | Admin | Tri-DB panel with live health badges + modules |
 | `/logs` | Logs | Admin | ClickHouse event log viewer |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/modules/:id` | Federated module | Yes | Webpack container protocol |
@@ -33,6 +33,14 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 | `ThemeContext` | `theme` (localStorage) | Dark / light, cross-tab sync |
 | `SettingsContext` | — | Polls `GET /api/settings` |
 | `UIPrefsContext` | `ui_prefs` (localStorage) | Sidebar collapsed state, cross-tab sync |
+| `HealthContext` | — | Receives DB liveness updates from the health Web Worker |
+
+## Health monitoring
+
+`src/workers/healthWorker.ts` is a **Web Worker** that runs off the main thread. It pings `GET /api/health` immediately on startup, then every 30 s (5 s timeout). Results are sent back via `postMessage` and consumed by `HealthContext`.
+
+- **Header**: shows a red "API offline" or "DB degraded" pill when any service is down; invisible when everything is healthy.
+- **Settings → Databases**: each row shows a live badge — grey pulsing "checking…" before the first result, green "online", or red pulsing "unreachable" — plus a "Last checked" timestamp.
 
 ## Local development (without Docker)
 
