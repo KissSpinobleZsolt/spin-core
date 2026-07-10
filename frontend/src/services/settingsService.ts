@@ -1,7 +1,7 @@
 import { apiService } from './apiService'
 import type { ModuleInput } from './setupService'
 
-export type { DbType, Theme } from './setupService'
+export type { Theme } from './setupService'
 
 export interface ModuleConfig {
   id: string
@@ -17,7 +17,6 @@ export interface ModuleConfig {
 
 export interface AppSettings {
   setup_complete: boolean
-  db_type: string
   theme: { default_theme: string }
   modules: ModuleConfig[]
 }

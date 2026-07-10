@@ -1,4 +1,4 @@
-import { type InputHTMLAttributes, type ReactNode, useEffect, useState } from 'react'
+import { type InputHTMLAttributes, type ReactNode, useState } from 'react'
 import { settingsService, type ModuleConfig } from '../services/settingsService'
 import { useSettings } from '../context/SettingsContext'
 import { useTheme } from '../context/ThemeContext'
@@ -273,23 +273,27 @@ function AppearanceSection() {
 // Database info section
 // ---------------------------------------------------------------------------
 
+const DB_ROLES = [
+  { icon: '🐘', name: 'PostgreSQL', role: 'Users & application data' },
+  { icon: '🏠', name: 'ClickHouse', role: 'Event logs & audit trail' },
+  { icon: '🍃', name: 'MongoDB',    role: 'Module data store' },
+]
+
 function DatabaseSection() {
-  const [dbType, setDbType] = useState<string | null>(null)
-
-  useEffect(() => {
-    settingsService.getSettings().then(s => setDbType(s.db_type)).catch(() => {})
-  }, [])
-
   return (
-    <Section title="Database">
-      <div className="flex items-center gap-3 text-sm text-slate-600 dark:text-slate-300">
-        <span className="text-xl">
-          {dbType === 'postgres' ? '🐘' : dbType === 'mongodb' ? '🍃' : dbType === 'clickhouse' ? '🏠' : '…'}
-        </span>
-        <span>
-          {dbType === 'postgres' ? 'PostgreSQL' : dbType === 'mongodb' ? 'MongoDB' : dbType === 'clickhouse' ? 'ClickHouse' : 'Loading…'}
-        </span>
-        <span className="text-slate-400 dark:text-slate-500 text-xs">(read-only — set during initial setup)</span>
+    <Section title="Databases">
+      <div className="space-y-3">
+        {DB_ROLES.map(({ icon, name, role }) => (
+          <div key={name} className="flex items-center gap-3 text-sm">
+            <span className="text-xl w-7 shrink-0">{icon}</span>
+            <span className="font-medium text-slate-800 dark:text-white w-28 shrink-0">{name}</span>
+            <span className="text-slate-500 dark:text-slate-400">{role}</span>
+            <span className="ml-auto flex items-center gap-1.5 text-green-600 dark:text-green-400 text-xs font-medium">
+              <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block" />
+              always active
+            </span>
+          </div>
+        ))}
       </div>
     </Section>
   )

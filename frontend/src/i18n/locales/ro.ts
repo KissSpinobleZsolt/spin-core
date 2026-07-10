@@ -15,6 +15,8 @@ const ro = {
     signOut: 'Deconectare',
     collapse: 'Restrânge bara laterală',
     expand: 'Extinde bara laterală',
+    logs: 'Jurnale',
+    translations: 'Traduceri',
   },
   header: {
     toggleTheme: 'Schimbă tema',
@@ -74,6 +76,26 @@ const ro = {
     failedToLoad: 'Eroare la încărcarea modulului',
     notFound: 'Modul negăsit.',
     loading: 'Se încarcă {{name}}…',
+  },
+  logs: {
+    title: 'Jurnale',
+    eventType: 'Tip eveniment',
+    userEmail: 'Email utilizator',
+    path: 'Cale',
+    method: 'Metodă',
+    status: 'Status',
+    duration: 'Durată (ms)',
+    noLogs: 'Nicio intrare găsită.',
+    filter: 'Filtrează',
+  },
+  translations: {
+    title: 'Traduceri',
+    search: 'Caută chei…',
+    save: 'Salvează',
+    saving: 'Se salvează…',
+    saved: 'Salvat',
+    unsavedChanges: 'Modificări nesalvate',
+    noResults: 'Nicio cheie nu corespunde căutării.',
   },
 } as const
 

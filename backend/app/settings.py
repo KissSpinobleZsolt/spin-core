@@ -32,9 +32,6 @@ class ThemeConfig:
 
 @dataclass
 class AppSettings:
-    setup_complete: bool = False
-    db_type: Literal["postgres", "mongodb", "clickhouse"] = "postgres"
-    db_url: str = DEFAULT_POSTGRES_URL
     theme: ThemeConfig = field(default_factory=ThemeConfig)
     modules: list[ModuleConfig] = field(default_factory=list)
 
@@ -46,13 +43,7 @@ def read_settings() -> AppSettings:
         raw = json.loads(SETTINGS_PATH.read_text())
         theme = ThemeConfig(**raw.get("theme", {}))
         modules = [ModuleConfig(**m) for m in raw.get("modules", [])]
-        return AppSettings(
-            setup_complete=raw.get("setup_complete", False),
-            db_type=raw.get("db_type", "postgres"),
-            db_url=raw.get("db_url", DEFAULT_POSTGRES_URL),
-            theme=theme,
-            modules=modules,
-        )
+        return AppSettings(theme=theme, modules=modules)
     except Exception:
         return AppSettings()
 

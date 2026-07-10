@@ -11,7 +11,7 @@ class UserRecord:
     default_theme: str
 
 
-class DBAdapter(Protocol):
+class AppAdapter(Protocol):
     def get_user_by_email(self, email: str) -> UserRecord | None: ...
     def create_user(
         self,

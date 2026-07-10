@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: spin-core-config
+  namespace: spin-core
+data:
+  SETTINGS_PATH: "/app/data/settings.json"
+  POSTGRES_URL: "postgresql://core-postgres:core-postgres@postgres:5432/core-postgres"
+  MONGO_URL: "mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin"
+  CLICKHOUSE_URL: "clickhouse://core-ch:core-ch@clickhouse:9000/core"

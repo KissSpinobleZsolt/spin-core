@@ -1,96 +1,75 @@
+import json
 import time
 from clickhouse_driver import Client
 
-from app.db.interface import UserRecord
-
-# DDL — ReplacingMergeTree deduplicates on the ORDER BY key, keeping the row
-# with the highest _ver value. Reads use FINAL to get the merged result.
-_DDL = [
-    """
-    CREATE TABLE IF NOT EXISTS users (
-        email       String,
-        name        String,
-        hashed_password String,
-        roles       Array(String),
-        default_theme String,
-        _ver        UInt64
-    ) ENGINE = ReplacingMergeTree(_ver)
-    ORDER BY email
-    """,
-    """
-    CREATE TABLE IF NOT EXISTS pages (
-        page_key String,
-        content  String,
-        _ver     UInt64
-    ) ENGINE = ReplacingMergeTree(_ver)
-    ORDER BY page_key
-    """,
-]
+_DDL = """
+CREATE TABLE IF NOT EXISTS app_logs (
+    event_time   DateTime64(3) DEFAULT now64(),
+    level        LowCardinality(String),
+    event_type   LowCardinality(String),
+    user_email   String,
+    path         String,
+    method       LowCardinality(String),
+    status_code  Int16,
+    duration_ms  Float32,
+    details      String
+) ENGINE = MergeTree()
+ORDER BY event_time
+TTL toDateTime(event_time) + INTERVAL 30 DAY
+"""
 
 
-def _now() -> int:
-    return int(time.time() * 1_000)
-
-
-class ClickHouseAdapter:
+class ClickHouseLogAdapter:
     def __init__(self, db_url: str) -> None:
         self._client = Client.from_url(db_url)
-        for stmt in _DDL:
-            self._client.execute(stmt)
+        self._client.execute(_DDL)
 
     def test_connection(self) -> None:
         self._client.execute("SELECT 1")
 
-    def get_user_by_email(self, email: str) -> UserRecord | None:
-        rows = self._client.execute(
-            "SELECT email, name, hashed_password, roles, default_theme "
-            "FROM users FINAL WHERE email = %(email)s",
-            {"email": email},
-        )
-        if not rows:
-            return None
-        email_, name, hashed_password, roles, default_theme = rows[0]
-        return UserRecord(
-            email=email_,
-            name=name,
-            hashed_password=hashed_password,
-            roles=list(roles),
-            default_theme=default_theme,
-        )
-
-    def create_user(
+    def write_log(
         self,
-        email: str,
-        name: str,
-        hashed_password: str,
-        roles: list[str],
-        default_theme: str,
-    ) -> UserRecord:
+        level: str,
+        event_type: str,
+        user_email: str,
+        path: str,
+        method: str,
+        status_code: int,
+        duration_ms: float,
+        details: dict,
+    ) -> None:
         self._client.execute(
-            "INSERT INTO users (email, name, hashed_password, roles, default_theme, _ver) VALUES",
-            [(email, name, hashed_password, roles, default_theme, _now())],
+            "INSERT INTO app_logs "
+            "(level, event_type, user_email, path, method, status_code, duration_ms, details) VALUES",
+            [(level, event_type, user_email, path, method, status_code, duration_ms, json.dumps(details))],
         )
-        return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)
 
-    def update_user_theme(self, email: str, theme: str) -> None:
-        # Re-insert with a fresh _ver so ReplacingMergeTree will keep this row.
-        # We fetch current data first to preserve all other fields.
-        user = self.get_user_by_email(email)
-        if user:
-            self._client.execute(
-                "INSERT INTO users (email, name, hashed_password, roles, default_theme, _ver) VALUES",
-                [(user.email, user.name, user.hashed_password, user.roles, theme, _now())],
-            )
-
-    def get_page(self, key: str) -> str | None:
+    def query_logs(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        event_type: str | None = None,
+        user_email: str | None = None,
+    ) -> list[dict]:
+        where_parts = []
+        params: dict = {}
+        if event_type:
+            where_parts.append("event_type = %(event_type)s")
+            params["event_type"] = event_type
+        if user_email:
+            where_parts.append("user_email = %(user_email)s")
+            params["user_email"] = user_email
+        where = ("WHERE " + " AND ".join(where_parts)) if where_parts else ""
+        params["limit"] = limit
+        params["offset"] = offset
         rows = self._client.execute(
-            "SELECT content FROM pages FINAL WHERE page_key = %(key)s",
-            {"key": key},
+            f"SELECT event_time, level, event_type, user_email, path, method, "
+            f"status_code, duration_ms, details "
+            f"FROM app_logs {where} "
+            f"ORDER BY event_time DESC "
+            f"LIMIT %(limit)s OFFSET %(offset)s",
+            params,
         )
-        return rows[0][0] if rows else None
-
-    def upsert_page(self, key: str, content: str) -> None:
-        self._client.execute(
-            "INSERT INTO pages (page_key, content, _ver) VALUES",
-            [(key, content, _now())],
-        )
+        keys = ["event_time", "level", "event_type", "user_email", "path", "method",
+                "status_code", "duration_ms", "details"]
+        return [dict(zip(keys, row)) for row in rows]

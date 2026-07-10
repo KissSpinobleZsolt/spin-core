@@ -1,62 +1,60 @@
-import pymongo
+from bson import ObjectId
 from pymongo import MongoClient
 
-from app.db.interface import UserRecord
+_I18N_MODULE = "system"
+_I18N_COLLECTION = "i18n"
 
 
-class MongoAdapter:
+class MongoDataAdapter:
     def __init__(self, db_url: str) -> None:
         self._client = MongoClient(db_url, serverSelectionTimeoutMS=5000)
-        db_name = self._client.get_default_database().name if "?" not in db_url else db_url.split("/")[-1].split("?")[0]
+        db_name = db_url.split("/")[-1].split("?")[0]
         self._db = self._client[db_name]
-        self._users = self._db["users"]
-        self._pages = self._db["pages"]
-        self._users.create_index("email", unique=True)
 
     def test_connection(self) -> None:
         self._client.admin.command("ping")
 
-    def get_user_by_email(self, email: str) -> UserRecord | None:
-        doc = self._users.find_one({"email": email})
-        if not doc:
-            return None
-        return UserRecord(
-            email=doc["email"],
-            name=doc["name"],
-            hashed_password=doc["hashed_password"],
-            roles=doc.get("roles", []),
-            default_theme=doc.get("default_theme", "dark"),
+    def _col(self, module_id: str, collection: str):
+        return self._db[f"{module_id}__{collection}"]
+
+    # i18n helpers — stored in system__i18n collection
+    def get_i18n_data(self, lang: str) -> dict | None:
+        doc = self._col(_I18N_MODULE, _I18N_COLLECTION).find_one({"lang": lang})
+        return doc.get("data") if doc else None
+
+    def set_i18n_data(self, lang: str, data: dict) -> None:
+        self._col(_I18N_MODULE, _I18N_COLLECTION).update_one(
+            {"lang": lang}, {"$set": {"lang": lang, "data": data}}, upsert=True
         )
 
-    def create_user(
+    def get_documents(
         self,
-        email: str,
-        name: str,
-        hashed_password: str,
-        roles: list[str],
-        default_theme: str,
-    ) -> UserRecord:
-        self._users.insert_one(
-            {
-                "email": email,
-                "name": name,
-                "hashed_password": hashed_password,
-                "roles": roles,
-                "default_theme": default_theme,
-            }
+        module_id: str,
+        collection: str,
+        filter_dict: dict,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> list[dict]:
+        cursor = self._col(module_id, collection).find(filter_dict).skip(skip).limit(limit)
+        return [_serialise(doc) for doc in cursor]
+
+    def insert_document(self, module_id: str, collection: str, doc: dict) -> str:
+        result = self._col(module_id, collection).insert_one(doc)
+        return str(result.inserted_id)
+
+    def update_document(self, module_id: str, collection: str, doc_id: str, update: dict) -> bool:
+        result = self._col(module_id, collection).update_one(
+            {"_id": ObjectId(doc_id)}, {"$set": update}
         )
-        return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)
+        return result.matched_count > 0
 
-    def update_user_theme(self, email: str, theme: str) -> None:
-        self._users.update_one({"email": email}, {"$set": {"default_theme": theme}})
+    def delete_document(self, module_id: str, collection: str, doc_id: str) -> bool:
+        result = self._col(module_id, collection).delete_one({"_id": ObjectId(doc_id)})
+        return result.deleted_count > 0
 
-    def get_page(self, key: str) -> str | None:
-        doc = self._pages.find_one({"key": key})
-        return doc["content"] if doc else None
 
-    def upsert_page(self, key: str, content: str) -> None:
-        self._pages.update_one(
-            {"key": key},
-            {"$set": {"key": key, "content": content}},
-            upsert=True,
-        )
+def _serialise(doc: dict) -> dict:
+    out = dict(doc)
+    if "_id" in out:
+        out["_id"] = str(out["_id"])
+    return out

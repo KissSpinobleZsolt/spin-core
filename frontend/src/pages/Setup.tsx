@@ -1,6 +1,6 @@
-import { type Dispatch, type InputHTMLAttributes, type ReactNode, useReducer, useState } from 'react'
+import { type InputHTMLAttributes, type ReactNode, useReducer, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { setupService, type DbType, type ModuleInput, type SetupPayload, type Theme } from '../services/setupService'
+import { setupService, type ModuleInput, type SetupPayload, type Theme } from '../services/setupService'
 
 // ---------------------------------------------------------------------------
 // State
@@ -8,8 +8,6 @@ import { setupService, type DbType, type ModuleInput, type SetupPayload, type Th
 
 interface WizardState {
   step: number
-  db_type: DbType
-  db_url: string
   admin_name: string
   admin_email: string
   admin_password: string
@@ -25,16 +23,11 @@ type WizardAction =
   | { type: 'ADD_MODULE'; module: ModuleInput }
   | { type: 'REMOVE_MODULE'; index: number }
 
-const DEFAULT_POSTGRES_URL = 'postgresql://core-postgres:core-postgres@db:5432/core-postgres'
-const DEFAULT_MONGO_URL = 'mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin'
-const DEFAULT_CLICKHOUSE_URL = 'clickhouse://core-ch:core-ch@clickhouse:9000/core'
-const TOTAL_STEPS = 6
+const TOTAL_STEPS = 5
 
 function initialState(): WizardState {
   return {
     step: 1,
-    db_type: 'postgres',
-    db_url: DEFAULT_POSTGRES_URL,
     admin_name: '',
     admin_email: '',
     admin_password: '',
@@ -47,15 +40,6 @@ function initialState(): WizardState {
 function reducer(state: WizardState, action: WizardAction): WizardState {
   switch (action.type) {
     case 'SET_FIELD':
-      if (action.field === 'db_type') {
-        const newType = action.value as DbType
-        const urlMap: Record<DbType, string> = {
-          postgres: DEFAULT_POSTGRES_URL,
-          mongodb: DEFAULT_MONGO_URL,
-          clickhouse: DEFAULT_CLICKHOUSE_URL,
-        }
-        return { ...state, db_type: newType, db_url: urlMap[newType] }
-      }
       return { ...state, [action.field]: action.value }
     case 'NEXT':
       return { ...state, step: Math.min(state.step + 1, TOTAL_STEPS) }
@@ -133,93 +117,7 @@ function StepWelcome({ onNext }: { onNext: () => void }) {
 }
 
 // ---------------------------------------------------------------------------
-// Step 2 — Database
-// ---------------------------------------------------------------------------
-
-function StepDatabase({
-  state,
-  dispatch,
-  onNext,
-  onBack,
-}: {
-  state: WizardState
-  dispatch: Dispatch<WizardAction>
-  onNext: () => void
-  onBack: () => void
-}) {
-  const [testing, setTesting] = useState(false)
-  const [result, setResult] = useState<{ ok: boolean; error?: string } | null>(null)
-
-  async function handleTest() {
-    setTesting(true)
-    setResult(null)
-    const r = await setupService.testConnection(state.db_type, state.db_url)
-    setResult(r)
-    setTesting(false)
-  }
-
-  return (
-    <div className="space-y-5">
-      <div>
-        <h2 className="text-xl font-bold text-white mb-1">Database</h2>
-        <p className="text-slate-400 text-sm">Choose which database the platform will use.</p>
-      </div>
-
-      <div className="grid grid-cols-3 gap-3">
-        {(
-          [
-            { type: 'postgres',    icon: '🐘', label: 'PostgreSQL',  sub: 'Relational · port 5432' },
-            { type: 'mongodb',     icon: '🍃', label: 'MongoDB',     sub: 'Document · port 27017' },
-            { type: 'clickhouse',  icon: '🏠', label: 'ClickHouse',  sub: 'Columnar · port 9000' },
-          ] as { type: DbType; icon: string; label: string; sub: string }[]
-        ).map(({ type, icon, label, sub }) => (
-          <button
-            key={type}
-            type="button"
-            onClick={() => { dispatch({ type: 'SET_FIELD', field: 'db_type', value: type }); setResult(null) }}
-            className={`p-4 rounded-lg border-2 text-left transition-colors ${
-              state.db_type === type
-                ? 'border-blue-500 bg-blue-500/10'
-                : 'border-slate-600 bg-slate-700/50 hover:border-slate-500'
-            }`}
-          >
-            <div className="text-2xl mb-1">{icon}</div>
-            <div className="font-semibold text-white text-sm">{label}</div>
-            <div className="text-xs text-slate-400 mt-1">{sub}</div>
-          </button>
-        ))}
-      </div>
-
-      <div>
-        <Label>Connection URL</Label>
-        <Input
-          value={state.db_url}
-          onChange={e => { dispatch({ type: 'SET_FIELD', field: 'db_url', value: e.target.value }); setResult(null) }}
-          placeholder="Connection string…"
-        />
-      </div>
-
-      <div className="flex items-center gap-3">
-        <Btn variant="secondary" onClick={handleTest} disabled={testing || !state.db_url}>
-          {testing ? 'Testing…' : 'Test connection'}
-        </Btn>
-        {result && (
-          <span className={`text-sm font-medium ${result.ok ? 'text-green-400' : 'text-red-400'}`}>
-            {result.ok ? '✓ Connected' : `✗ ${result.error}`}
-          </span>
-        )}
-      </div>
-
-      <div className="flex justify-between pt-2">
-        <Btn variant="secondary" onClick={onBack}>Back</Btn>
-        <Btn onClick={onNext} disabled={!result?.ok}>Next</Btn>
-      </div>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Step 3 — Admin account
+// Step 2 — Admin account
 // ---------------------------------------------------------------------------
 
 function StepAdmin({
@@ -229,7 +127,7 @@ function StepAdmin({
   onBack,
 }: {
   state: WizardState
-  dispatch: Dispatch<WizardAction>
+  dispatch: (action: WizardAction) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -304,7 +202,7 @@ function StepTheme({
   onBack,
 }: {
   state: WizardState
-  dispatch: Dispatch<WizardAction>
+  dispatch: (action: WizardAction) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -366,7 +264,7 @@ function StepModules({
   onBack,
 }: {
   state: WizardState
-  dispatch: Dispatch<WizardAction>
+  dispatch: (action: WizardAction) => void
   onNext: () => void
   onBack: () => void
 }) {
@@ -479,7 +377,6 @@ function StepReview({
       </div>
 
       <div className="space-y-3 text-sm">
-        <Row label="Database" value={state.db_type === 'postgres' ? '🐘 PostgreSQL' : '🍃 MongoDB'} />
         <Row label="Admin email" value={state.admin_email} />
         <Row label="Admin name" value={state.admin_name} />
         <Row label="Default theme" value={state.default_theme === 'dark' ? '🌙 Dark' : '☀️ Light'} />
@@ -507,7 +404,7 @@ function Row({ label, value }: { label: string; value: string }) {
 // Progress indicator
 // ---------------------------------------------------------------------------
 
-const STEP_LABELS = ['Welcome', 'Database', 'Admin', 'Theme', 'Modules', 'Review']
+const STEP_LABELS = ['Welcome', 'Admin', 'Theme', 'Modules', 'Review']
 
 function ProgressBar({ step }: { step: number }) {
   return (
@@ -554,8 +451,6 @@ export default function Setup() {
     setSubmitError(null)
     try {
       const payload: SetupPayload = {
-        db_type: state.db_type,
-        db_url: state.db_url,
         admin_name: state.admin_name,
         admin_email: state.admin_email,
         admin_password: state.admin_password,
@@ -584,11 +479,10 @@ export default function Setup() {
           <ProgressBar step={state.step} />
 
           {state.step === 1 && <StepWelcome onNext={next} />}
-          {state.step === 2 && <StepDatabase state={state} dispatch={dispatch} onNext={next} onBack={back} />}
-          {state.step === 3 && <StepAdmin state={state} dispatch={dispatch} onNext={next} onBack={back} />}
-          {state.step === 4 && <StepTheme state={state} dispatch={dispatch} onNext={next} onBack={back} />}
-          {state.step === 5 && <StepModules state={state} dispatch={dispatch} onNext={next} onBack={back} />}
-          {state.step === 6 && (
+          {state.step === 2 && <StepAdmin state={state} dispatch={dispatch} onNext={next} onBack={back} />}
+          {state.step === 3 && <StepTheme state={state} dispatch={dispatch} onNext={next} onBack={back} />}
+          {state.step === 4 && <StepModules state={state} dispatch={dispatch} onNext={next} onBack={back} />}
+          {state.step === 5 && (
             <>
               <StepReview state={state} onBack={back} onLaunch={handleLaunch} />
               {submitting && (

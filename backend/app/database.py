@@ -1,23 +1,35 @@
-from app.db.interface import DBAdapter
-from app.settings import AppSettings
+import os
 
-_adapter: DBAdapter | None = None
+from app.settings import DEFAULT_POSTGRES_URL, DEFAULT_MONGO_URL, DEFAULT_CLICKHOUSE_URL
 
-
-def init_db(settings: AppSettings) -> None:
-    global _adapter
-    if settings.db_type == "postgres":
-        from app.db.postgres import PostgresAdapter
-        _adapter = PostgresAdapter(settings.db_url)
-    elif settings.db_type == "mongodb":
-        from app.db.mongo import MongoAdapter
-        _adapter = MongoAdapter(settings.db_url)
-    else:
-        from app.db.clickhouse import ClickHouseAdapter
-        _adapter = ClickHouseAdapter(settings.db_url)
+_pg = None
+_ch = None
+_mongo = None
 
 
-def get_adapter() -> DBAdapter:
-    if _adapter is None:
-        raise RuntimeError("Database not initialised — complete setup first")
-    return _adapter
+def init_db() -> None:
+    global _pg, _ch, _mongo
+    from app.db.postgres import PostgresAdapter
+    from app.db.clickhouse import ClickHouseLogAdapter
+    from app.db.mongo import MongoDataAdapter
+    _pg = PostgresAdapter(os.getenv("POSTGRES_URL", DEFAULT_POSTGRES_URL))
+    _ch = ClickHouseLogAdapter(os.getenv("CLICKHOUSE_URL", DEFAULT_CLICKHOUSE_URL))
+    _mongo = MongoDataAdapter(os.getenv("MONGO_URL", DEFAULT_MONGO_URL))
+
+
+def get_pg():
+    if _pg is None:
+        raise RuntimeError("Database not initialised")
+    return _pg
+
+
+def get_ch():
+    if _ch is None:
+        raise RuntimeError("Database not initialised")
+    return _ch
+
+
+def get_mongo():
+    if _mongo is None:
+        raise RuntimeError("Database not initialised")
+    return _mongo

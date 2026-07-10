@@ -15,6 +15,8 @@ const en = {
     signOut: 'Sign Out',
     collapse: 'Collapse sidebar',
     expand: 'Expand sidebar',
+    logs: 'Logs',
+    translations: 'Translations',
   },
   header: {
     toggleTheme: 'Toggle theme',
@@ -74,6 +76,26 @@ const en = {
     failedToLoad: 'Failed to load module',
     notFound: 'Module not found.',
     loading: 'Loading {{name}}…',
+  },
+  logs: {
+    title: 'Logs',
+    eventType: 'Event type',
+    userEmail: 'User email',
+    path: 'Path',
+    method: 'Method',
+    status: 'Status',
+    duration: 'Duration (ms)',
+    noLogs: 'No logs found.',
+    filter: 'Filter',
+  },
+  translations: {
+    title: 'Translations',
+    search: 'Search keys…',
+    save: 'Save',
+    saving: 'Saving…',
+    saved: 'Saved',
+    unsavedChanges: 'Unsaved changes',
+    noResults: 'No keys match your search.',
   },
 } as const
 

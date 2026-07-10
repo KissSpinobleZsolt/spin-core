@@ -30,9 +30,7 @@ class ModuleInput(BaseModel):
 @router.get("")
 async def get_settings_route(authorization: str = Header(default="")):
     require_admin(authorization)
-    data = asdict(get_settings())
-    data.pop("db_url", None)
-    return data
+    return asdict(get_settings())
 
 
 @router.patch("/theme", status_code=204)

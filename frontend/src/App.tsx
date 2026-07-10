@@ -2,37 +2,22 @@ import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 
 import Layout from './components/layout/Layout'
 import { AuthGuard } from './components/guards/AuthGuard'
-import { SetupGuard } from './components/guards/SetupGuard'
 import { RoleGuard } from './components/guards/RoleGuard'
 import { FederatedPage } from './components/modules/FederatedPage'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
-import Setup from './pages/Setup'
 import Settings from './pages/Settings'
+import Logs from './pages/Logs'
+import Translations from './pages/Translations'
+import { useI18nSync } from './i18n/useI18nSync'
 
 const router = createBrowserRouter([
   {
-    path: '/setup',
-    element: (
-      <SetupGuard>
-        <Setup />
-      </SetupGuard>
-    ),
-  },
-  {
     path: '/login',
-    element: (
-      <SetupGuard>
-        <Login />
-      </SetupGuard>
-    ),
+    element: <Login />,
   },
   {
-    element: (
-      <SetupGuard>
-        <AuthGuard />
-      </SetupGuard>
-    ),
+    element: <AuthGuard />,
     children: [
       {
         path: '/',
@@ -47,6 +32,22 @@ const router = createBrowserRouter([
               </RoleGuard>
             ),
           },
+          {
+            path: 'logs',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <Logs />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'translations',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <Translations />
+              </RoleGuard>
+            ),
+          },
           { path: 'modules/:moduleId', element: <FederatedPage /> },
         ],
       },
@@ -55,6 +56,7 @@ const router = createBrowserRouter([
 ])
 
 function App() {
+  useI18nSync()
   return <RouterProvider router={router} />
 }
 
