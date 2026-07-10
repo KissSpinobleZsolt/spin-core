@@ -1,0 +1,21 @@
+FROM node:20-alpine
+
+RUN npm install -g pnpm@9
+
+WORKDIR /app
+
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install
+
+# Source code is mounted as a volume at runtime — no COPY . . here.
+
+# Required for reliable file-watching inside Docker (especially on WSL2/Windows).
+ENV CHOKIDAR_USEPOLLING=true
+ENV CHOKIDAR_INTERVAL=300
+
+# Point the Vite dev proxy at the backend container.
+ENV API_PROXY_TARGET=http://backend:8000
+
+EXPOSE 3000
+
+CMD ["pnpm", "dev", "--host", "0.0.0.0"]

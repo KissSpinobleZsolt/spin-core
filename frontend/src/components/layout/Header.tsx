@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { useAuth } from '../../context/AuthContext'
@@ -31,6 +31,17 @@ export default function Header() {
   const initials = user ? getInitials(user.name) : '??'
   const displayName = user?.name ?? t('header.guest')
   const displayRole = user?.roles[0] ?? ''
+
+  // Sync language when it changes in another tab
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'lang' && e.newValue && e.newValue !== i18n.language) {
+        i18n.changeLanguage(e.newValue)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [i18n])
 
   function toggleLang() {
     const next = i18n.language === 'en' ? 'ro' : 'en'

@@ -1,20 +1,23 @@
-import os
-from dotenv import load_dotenv
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker, declarative_base
+from app.db.interface import DBAdapter
+from app.settings import AppSettings
 
-load_dotenv()
-
-DATABASE_URL = os.environ["DATABASE_URL"]
-
-engine = create_engine(DATABASE_URL)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-Base = declarative_base()
+_adapter: DBAdapter | None = None
 
 
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+def init_db(settings: AppSettings) -> None:
+    global _adapter
+    if settings.db_type == "postgres":
+        from app.db.postgres import PostgresAdapter
+        _adapter = PostgresAdapter(settings.db_url)
+    elif settings.db_type == "mongodb":
+        from app.db.mongo import MongoAdapter
+        _adapter = MongoAdapter(settings.db_url)
+    else:
+        from app.db.clickhouse import ClickHouseAdapter
+        _adapter = ClickHouseAdapter(settings.db_url)
+
+
+def get_adapter() -> DBAdapter:
+    if _adapter is None:
+        raise RuntimeError("Database not initialised — complete setup first")
+    return _adapter

@@ -1,77 +1,66 @@
-# React + TypeScript + Vite
+# spin-core / frontend
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+React 19 SPA for the spin-core platform.
 
-Currently, two official plugins are available:
+## Tech
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- **Framework**: React 19 + TypeScript
+- **Build tool**: Vite 8 with React Compiler enabled
+- **Styling**: Tailwind CSS v4
+- **Routing**: React Router v7
+- **Data fetching**: TanStack React Query v5
+- **i18n**: i18next + react-i18next
+- **Package manager**: pnpm 9
 
-## React Compiler
+## Pages
 
-The React Compiler is enabled on this template. See [this documentation](https://react.dev/learn/react-compiler) for more information.
+| Route | Page | Auth required |
+|-------|------|--------------|
+| `/login` | Login | No |
+| `/dashboard` | Dashboard | Yes |
+| `/reports` | Reports | Yes |
+| `/chat` | Chat | Yes |
 
-Note: This will impact Vite dev & build performances.
+## Local development (without Docker)
 
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
-
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
-
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
-
+```bash
+pnpm install
+pnpm dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Runs on [http://localhost:3000](http://localhost:3000). Requires the backend running on port 6000 locally (or set `API_PROXY_TARGET`).
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+## Development with Docker (hot reload)
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+From the project root:
 
+```bash
+docker compose --profile dev up frontend-dev backend db
+```
+
+Source files are mounted into the container — edits are reflected immediately via Vite HMR.
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `API_PROXY_TARGET` | `http://localhost:6000` | Backend URL for Vite dev proxy |
+| `VITE_API_BASE_URL` | `/api` | API base URL (build-time) |
+| `VITE_USE_MOCK` | `false` | Use mock API responses (build-time) |
+
+`API_PROXY_TARGET` is set to `http://backend:8000` automatically when running via Docker Compose.
+
+## Production build
+
+```bash
+pnpm build       # outputs to dist/
+pnpm preview     # preview the production build locally
+```
+
+The Docker production image (`Dockerfile`) builds the SPA and serves it via nginx. nginx also proxies `/api/*` to the backend container.
+
+## Linting
+
+```bash
+pnpm lint
 ```

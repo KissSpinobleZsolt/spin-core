@@ -1,0 +1,18 @@
+from fastapi import HTTPException
+
+from app.auth import decode_token
+from app.database import get_adapter
+
+
+def require_token(authorization: str) -> str:
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing token")
+    return decode_token(authorization.removeprefix("Bearer "))
+
+
+def require_admin(authorization: str) -> str:
+    email = require_token(authorization)
+    user = get_adapter().get_user_by_email(email)
+    if not user or "admin" not in user.roles:
+        raise HTTPException(status_code=403, detail="Admin role required")
+    return email

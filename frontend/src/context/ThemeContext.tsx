@@ -23,6 +23,17 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     document.documentElement.classList.toggle('dark', theme === 'dark')
   }, [theme])
 
+  // Sync theme when it changes in another tab
+  useEffect(() => {
+    function onStorage(e: StorageEvent) {
+      if (e.key === 'theme' && (e.newValue === 'dark' || e.newValue === 'light')) {
+        setThemeState(e.newValue)
+      }
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
   // Apply user's defaultTheme on first login if no explicit preference is stored
   useEffect(() => {
     if (user?.defaultTheme && !localStorage.getItem('theme')) {
