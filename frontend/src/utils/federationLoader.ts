@@ -1,8 +1,12 @@
 import type { ComponentType } from 'react'
+import * as React from 'react'
+import * as ReactDOM from 'react-dom'
 
 declare global {
   interface Window {
     [key: string]: FederationContainer | undefined
+    React: typeof React
+    ReactDOM: typeof ReactDOM
   }
 }
 
@@ -35,6 +39,12 @@ export async function loadFederatedModule(
   scope: string,
   component: string,
 ): Promise<ComponentType> {
+  // Expose the host's React on window BEFORE the remote script loads.
+  // Remotes declare react / react-dom as webpack externals ('React', 'ReactDOM')
+  // so they read these globals instead of bundling their own copy — one React instance.
+  window.React = React
+  window.ReactDOM = ReactDOM
+
   if (!loadedScripts.has(scope)) {
     await injectScript(remoteUrl)
     loadedScripts.add(scope)
@@ -45,7 +55,6 @@ export async function loadFederatedModule(
     throw new Error(`Federation scope "${scope}" not found after loading ${remoteUrl}`)
   }
 
-  // Pass an empty share scope — each remote is self-contained with its own deps
   await container.init({})
 
   const factory = await container.get(component)

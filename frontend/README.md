@@ -42,6 +42,33 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 - **Header**: shows a red "API offline" or "DB degraded" pill when any service is down; invisible when everything is healthy.
 - **Settings → Databases**: each row shows a live badge — grey pulsing "checking…" before the first result, green "online", or red pulsing "unreachable" — plus a "Last checked" timestamp.
 
+## Module federation loader
+
+`src/utils/federationLoader.ts` implements the webpack container protocol for a **Vite host**.
+
+### How it works
+
+1. Sets `window.React` and `window.ReactDOM` to the host's running instances.
+2. Injects a `<script>` tag for the remote's `remoteEntry.js` (deduplicated by scope name).
+3. Calls `container.init({})` then `container.get(component)` to obtain the component factory.
+
+### React singleton contract
+
+Every remote **must** declare react as a webpack external so it reads from the host's globals rather than bundling its own copy:
+
+```js
+// remote webpack.config.js
+externals: {
+  react: 'React',
+  'react-dom': 'ReactDOM',
+  'react-dom/client': 'ReactDOM',
+}
+```
+
+Bundling a second React alongside the host's renderer causes the `Invalid hook call` / `Cannot read properties of null (reading 'useState')` error.
+
+For standalone testing of a remote at its own port, add the React 18 UMD scripts to the remote's `public/index.html` — they set `window.React` and `window.ReactDOM` automatically. See `modules/hello-world/` for a working example.
+
 ## Local development (without Docker)
 
 ```bash

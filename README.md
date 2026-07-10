@@ -87,6 +87,41 @@ Each registered module:
 - Stores and retrieves data via `GET|POST|PUT|DELETE /api/module-data/{moduleId}/{collection}`
 - Can be scoped to specific roles and toggled from **Settings → Modules**
 
+### React singleton — externals contract
+
+The host exposes `window.React` and `window.ReactDOM` before injecting each remote script. Every remote **must** declare these as webpack externals so it uses the host's React instance rather than bundling its own:
+
+```js
+// remote's webpack.config.js
+externals: {
+  react: 'React',
+  'react-dom': 'ReactDOM',
+  'react-dom/client': 'ReactDOM',
+}
+```
+
+This prevents the "two React instances" hook error that occurs when a remote bundles its own copy alongside the host's renderer.
+
+### Example module
+
+`modules/hello-world/` is a working reference remote:
+
+```bash
+cd modules/hello-world
+npm install
+npm start          # serves remoteEntry.js at http://localhost:3001
+```
+
+Register it in **Settings → Modules**:
+
+| Field | Value |
+|-------|-------|
+| Remote URL | `http://localhost:3001/remoteEntry.js` |
+| Scope | `helloWorld` |
+| Component | `./App` |
+
+Open `localhost:3001` directly to test the component standalone (CDN React scripts are included in the template HTML).
+
 ## Event logging
 
 Every HTTP request is automatically appended to ClickHouse (`app_logs` table, `MergeTree`, 30-day TTL). Admins can browse, filter, and paginate logs at `/logs`.
@@ -160,7 +195,12 @@ spin-core/
 │       ├── context/         # AuthContext, ThemeContext, SettingsContext, UIPrefsContext, HealthContext
 │       ├── services/        # apiService, settingsService, logsService, i18nService
 │       ├── workers/         # healthWorker.ts — polls /api/health every 30 s off the main thread
-│       └── utils/           # federationLoader (webpack container protocol)
+│       └── utils/           # federationLoader — injects remoteEntry, exposes window.React/ReactDOM
+├── modules/
+│   └── hello-world/         # Reference webpack-federation remote (React 18, externals)
+│       ├── webpack.config.js
+│       ├── src/App.jsx       # Exposed component — uses window.React via externals
+│       └── public/index.html # Standalone shell with CDN React for local testing
 ├── k8s/                     # Kubernetes manifests (kustomize)
 │   ├── kustomization.yaml
 │   ├── postgres/ mongo/ clickhouse/   # StatefulSet + Service + PVC per DB
