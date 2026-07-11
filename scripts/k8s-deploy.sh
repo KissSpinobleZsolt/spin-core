@@ -10,6 +10,12 @@ docker build -t spin-core-backend:latest ./backend
 echo "→ Building frontend image..."
 docker build -t spin-core-frontend:latest ./frontend
 
+echo "→ Building hello-world image..."
+docker build -t spin-core-hello-world:latest ./modules/hello-world
+
+echo "→ Building chatbot image..."
+docker build -t spin-core-chatbot:latest ./modules/chatbot
+
 echo "→ Applying Kubernetes manifests..."
 kubectl apply -k k8s/
 

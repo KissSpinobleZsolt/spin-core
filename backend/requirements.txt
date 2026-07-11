@@ -7,3 +7,4 @@ clickhouse-driver
 python-jose[cryptography]
 bcrypt
 python-dotenv
+httpx

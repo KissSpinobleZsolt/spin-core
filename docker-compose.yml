@@ -52,6 +52,42 @@ services:
         soft: 262144
         hard: 262144
 
+  ollama:
+    image: ollama/ollama
+    # Start the server, wait until it accepts requests, pull the model, then keep serving.
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "ollama serve &
+      until ollama list > /dev/null 2>&1; do sleep 2; done &&
+      ollama pull ${OLLAMA_MODEL:-llama3.2:3b} &&
+      wait"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+
+  hello-world:
+    build: ./modules/hello-world
+    ports:
+      - "3001:80"
+    restart: unless-stopped
+
+  chatbot:
+    build: ./modules/chatbot
+    ports:
+      - "3002:80"
+    restart: unless-stopped
+
   backend:
     build: ./backend
     ports:
@@ -62,6 +98,9 @@ services:
       ADMIN_EMAIL: admin@spin.local
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
+      OLLAMA_URL: http://ollama:11434
+      CHATBOT_REMOTE_URL: http://localhost:3002/remoteEntry.js
+      MODULE_REGISTRY_URLS: http://hello-world,http://chatbot
     volumes:
       - app_data:/app/data
     depends_on:
@@ -74,7 +113,10 @@ services:
     restart: unless-stopped
 
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      args:
+        VITE_CHATBOT_REMOTE_URL: http://localhost:3002/remoteEntry.js
     ports:
       - "3000:80"
     depends_on:
@@ -102,3 +144,4 @@ volumes:
   mongo_data:
   clickhouse_data:
   app_data:
+  ollama_data:

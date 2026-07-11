@@ -18,7 +18,7 @@ React 19 SPA for the spin-core platform.
 |-------|------|------|-------|
 | `/login` | Login | No | |
 | `/` | Dashboard | Yes | |
-| `/settings` | Settings | Admin | Tri-DB panel with live health badges + modules |
+| `/settings` | Settings | Admin | Tri-DB panel with live health badges + modules; includes "Scan for modules" discovery panel |
 | `/logs` | Logs | Admin | ClickHouse event log viewer |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/modules/:id` | Federated module | Yes | Webpack container protocol |
@@ -69,6 +69,33 @@ Bundling a second React alongside the host's renderer causes the `Invalid hook c
 
 For standalone testing of a remote at its own port, add the React 18 UMD scripts to the remote's `public/index.html` — they set `window.React` and `window.ReactDOM` automatically. See `modules/hello-world/` for a working example.
 
+### Built-in chatbot remote
+
+`modules/chatbot/` is a built-in MF remote that exposes two components:
+
+| Component | Used by | Purpose |
+|-----------|---------|---------|
+| `./ChatPage` | `FederatedPage` (sidebar link) | Full-page chat interface |
+| `./ChatWidget` | `ChatBubble` in Layout | Floating bubble on every authenticated page |
+
+```bash
+cd modules/chatbot && npm install && npm start   # http://localhost:3002
+```
+
+**Settings-aware bubble** — `ChatBubble.tsx` reads the chatbot module entry from `SettingsContext`. It uses `mod.remote_url` when available (admin-configurable), and falls back to `VITE_CHATBOT_REMOTE_URL` for non-admin users whose modules list is empty. Disabling the module in Settings hides the bubble entirely. The active model is controlled server-side via `OLLAMA_MODEL` — the frontend has no knowledge of which model is running.
+
+**Auto-seeded** — the backend seeds the chatbot as a default module on first run. No manual registration in Settings is required.
+
+### Module discovery
+
+`src/services/settingsService.ts` exposes `discoverModules()` which calls `GET /api/settings/modules/discover`. The backend concurrently fetches `manifest.json` from every URL in `MODULE_REGISTRY_URLS` and returns a `DiscoveredModule[]` with an `already_registered` flag per entry.
+
+**Settings → Modules** surfaces this via a **🔍 Scan for modules** button. After a scan:
+- Modules whose `scope` is already registered show a green **Registered** badge.
+- New modules show an **Add** button that opens the module form pre-filled from the manifest — the admin adjusts the `remote_url` if needed (e.g. NodePort URL in K8s) and clicks Save.
+
+The scan is on-demand (no background polling) and requires admin auth.
+
 ## Local development (without Docker)
 
 ```bash
@@ -94,6 +121,7 @@ Source files are mounted into the container — edits are reflected immediately 
 |----------|---------|-------------|
 | `API_PROXY_TARGET` | `http://localhost:8000` | Backend URL for Vite dev proxy |
 | `VITE_API_BASE_URL` | `/api` | API base URL (build-time) |
+| `VITE_CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Chatbot MF remote entry URL (build-time) |
 
 `API_PROXY_TARGET` is set to `http://backend:8000` automatically when running via Docker Compose.
 
