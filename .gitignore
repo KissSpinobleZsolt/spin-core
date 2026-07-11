@@ -1,0 +1,15 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Root-level env file (should never exist, but guard it)
+.env
+.tmp/

@@ -32,6 +32,8 @@ All three databases start unconditionally. Each has a fixed, non-configurable ro
 | `db` | 5432 | PostgreSQL |
 | `mongo` | 27017 | MongoDB |
 | `clickhouse` | 8123 / 9000 | ClickHouse HTTP + native |
+| `hello-world` | 3001 | Reference MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
+| `chatbot` | 3002 | AI chatbot MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
 
 ## Quick start
 
@@ -61,7 +63,14 @@ bash scripts/k8s-deploy.sh
 # Prints the app URL when ready
 ```
 
-Deploys to the `spin-core` namespace. Frontend on NodePort **30080**, backend on **30800**.
+Deploys to the `spin-core` namespace. NodePort assignments:
+
+| Service | NodePort | URL |
+|---------|----------|-----|
+| frontend | 30080 | `http://$(minikube ip):30080` |
+| backend | 30800 | `http://$(minikube ip):30800` |
+| hello-world | 30001 | `http://$(minikube ip):30001` |
+| chatbot | 30002 | `http://$(minikube ip):30002` |
 
 ## First-time login
 
@@ -102,17 +111,45 @@ externals: {
 
 This prevents the "two React instances" hook error that occurs when a remote bundles its own copy alongside the host's renderer.
 
-### Example module
+### Module discovery (on-demand scan)
+
+Each module publishes a `manifest.json` that describes itself. The backend fetches these concurrently when an admin clicks **Scan for modules** in Settings.
+
+**How it works:**
+
+1. Every module's `public/manifest.json` is copied into `dist/` at build time (via `CopyWebpackPlugin`) and served by nginx at `http://<host>/manifest.json`.
+2. The backend reads `MODULE_REGISTRY_URLS` (comma-separated base URLs) and fetches `{url}/manifest.json` from each concurrently (5 s timeout, failures don't block the others).
+3. The Settings UI renders a discovery panel showing: icon, name, description, remote URL, and either a **Registered** badge (scope already registered) or an **Add** button that pre-fills the module form.
+4. The admin confirms/edits fields (especially `remote_url` for K8s NodePort URLs) and clicks Save — the existing `POST /api/settings/modules` flow registers it.
+
+**Manifest format** (`public/manifest.json` in each module):
+
+```json
+{
+  "name": "Hello World",
+  "scope": "helloWorld",
+  "component": "./App",
+  "route": "hello-world",
+  "icon": "👋",
+  "roles": ["user", "admin"],
+  "description": "Short description shown in the discovery panel.",
+  "remote_entry": "http://localhost:3001/remoteEntry.js"
+}
+```
+
+`remote_entry` is the **browser-accessible** URL. The backend fetches the manifest via the internal Docker/K8s URL but stores `remote_entry` as `remote_url` in settings — so the browser-side URL and the service-mesh URL are decoupled.
+
+### Example module (hello-world)
 
 `modules/hello-world/` is a working reference remote:
 
 ```bash
 cd modules/hello-world
 npm install
-npm start          # serves remoteEntry.js at http://localhost:3001
+npm start          # serves remoteEntry.js + manifest.json at http://localhost:3001
 ```
 
-Register it in **Settings → Modules**:
+Register it via **Settings → Modules → 🔍 Scan for modules** (when `MODULE_REGISTRY_URLS` includes `http://localhost:3001`), or manually:
 
 | Field | Value |
 |-------|-------|
@@ -121,6 +158,94 @@ Register it in **Settings → Modules**:
 | Component | `./App` |
 
 Open `localhost:3001` directly to test the component standalone (CDN React scripts are included in the template HTML).
+
+## AI chatbot (Ollama)
+
+A self-hosted AI chatbot built on [Ollama](https://ollama.com) — no external API keys or costs required. It is a **default seeded module**: on first backend start it is automatically registered in Settings so it appears in the sidebar and can be managed (URL, roles, toggle) like any other module.
+
+### How it works
+
+```
+Sidebar nav "💬 Chatbot" → /modules/:id → FederatedPage → loads ./ChatPage
+Layout (all pages) → ChatBubble → loads ./ChatWidget (floating bubble)
+Both →  POST /api/chat  ──►  FastAPI (streams NDJSON)
+                                  └─ Ollama HTTP API ($OLLAMA_MODEL)
+```
+
+- **`modules/chatbot/`** — Webpack 5 MF remote, independently buildable. Exposes two components:
+  - `./ChatPage` — full-page chat UI, loaded by the sidebar link
+  - `./ChatWidget` — floating bubble, loaded by the persistent `ChatBubble` in the Layout
+- **`backend/app/routes/chat.py`** — `POST /api/chat`, JWT-protected, streams NDJSON from Ollama.
+- **Auto-seeding** — on first run the backend lifespan seeds a `ModuleConfig` (scope `chatbot`, component `./ChatPage`) into `settings.json`. The seed is idempotent; subsequent restarts skip it.
+- **Settings-aware bubble** — `ChatBubble.tsx` reads the chatbot module from `SettingsContext`. If an admin changes the remote URL in Settings, the bubble reloads from the new URL without a page refresh. Disabling the module hides the bubble.
+
+### GPU acceleration (recommended)
+
+The Ollama service is configured to use an NVIDIA GPU when available — inference goes from ~5 tok/s (CPU) to ~30–50 tok/s (GPU). Requires the NVIDIA Container Toolkit installed once per machine:
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+curl -sL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+sudo apt-get update && sudo apt-get install -y nvidia-container-toolkit
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+If no GPU is available Docker falls back to CPU automatically (the `deploy` block is silently ignored).
+
+### Changing the model
+
+The model is controlled by a single env var — no code change needed:
+
+```bash
+# Use a smaller/faster model
+OLLAMA_MODEL=llama3.2:1b docker compose up ollama backend
+
+# Use a larger model (needs more VRAM / RAM)
+OLLAMA_MODEL=llama3.1:8b docker compose up ollama backend
+```
+
+Default: `llama3.2:3b`. The model name is stored in `settings.json` when the chatbot module is seeded, so changing it after first run requires updating the module entry in **Settings → Modules** or deleting `settings.json` and restarting.
+
+### Docker Compose (multi-terminal dev workflow)
+
+Run each service in its own terminal so logs stay separate:
+
+```bash
+# Terminal 1 — Ollama (pulls model on first start, cached in ollama_data volume)
+docker compose up --build ollama
+
+# Terminal 2 — MF remotes (chatbot on port 3002, hello-world on port 3001)
+docker compose up --build chatbot hello-world
+
+# Terminal 3 — Backend + databases
+docker compose up --build backend db mongo clickhouse
+
+# Terminal 4 — Frontend dev server with HMR (port 3000)
+docker compose --profile dev up --build frontend-dev
+```
+
+Open [http://localhost:3000](http://localhost:3000) once all are healthy. See **[What to do after the services start](#what-to-do-after-the-services-start)** below.
+
+### Minikube
+
+The Ollama pod is included in the Kustomize manifest — `kubectl apply -k k8s/` deploys it alongside everything else. The first pod start may take several minutes while the model downloads:
+
+```bash
+kubectl logs -n spin-core -l app=ollama -f
+```
+
+### What to do after the services start
+
+1. **Wait for Ollama** — terminal 1 shows `pulling dde5aa3f…`. Wait until it prints `success` (≈ 10–15 min on first run; instant on subsequent starts because models are cached in the `ollama_data` volume).
+2. **Open the app** — [http://localhost:3000](http://localhost:3000), log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
+3. **Chatbot in sidebar** — a "💬 Chatbot" link appears automatically under **Modules**. Click it to open the full-page chat. The floating bubble is also visible on every page.
+4. **If the sidebar link is missing** — the chatbot module was already seeded with a different scope. Go to **Settings → Modules**, delete any stale Chatbot entry, then restart the backend (`docker compose restart backend`). The correct entry is re-seeded automatically.
+5. **Send a message** — type in the chat and press Enter. You get a streamed reply once the model has finished loading (Ollama logs show `llm server loaded` when ready).
+6. **Discover modules** — go to **Settings → Modules** and click **🔍 Scan for modules**. The backend fetches `manifest.json` from `hello-world` and `chatbot`. The chatbot shows a "Registered" badge; hello-world shows an **Add** button that pre-fills the registration form.
 
 ## Event logging
 
@@ -157,7 +282,12 @@ A Web Worker (`src/workers/healthWorker.ts`) polls `GET /api/health` every 30 s 
 | `POSTGRES_URL` | `postgresql://core-postgres:core-postgres@db:5432/core-postgres` | PostgreSQL connection string |
 | `MONGO_URL` | `mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin` | MongoDB connection string |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | ClickHouse connection string |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: set via ConfigMap) |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Model pulled by Ollama and used as the chat default |
+| `CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Chatbot remote URL seeded into settings on first run |
+| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs the backend scans for `manifest.json` on `/api/settings/modules/discover` |
 | `VITE_API_BASE_URL` | `/api` | API base URL (build-time) |
+| `VITE_CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Chatbot MF remote entry URL — build-time fallback for non-admin users |
 
 ## Project structure
 
@@ -184,7 +314,8 @@ spin-core/
 │           ├── module_data.py   # /api/module-data/*
 │           ├── i18n.py          # /api/i18n/{lang} (GET public, PUT admin)
 │           ├── health.py        # /api/health (GET public — DB liveness checks)
-│           └── ingestion.py     # /api/data-ingestion (WebSocket)
+│           ├── ingestion.py     # /api/data-ingestion (WebSocket)
+│           └── chat.py          # /api/chat — JWT-protected streaming proxy to Ollama
 ├── frontend/
 │   └── src/
 │       ├── pages/           # Login, Dashboard, Settings, Logs, Translations
@@ -197,14 +328,24 @@ spin-core/
 │       ├── workers/         # healthWorker.ts — polls /api/health every 30 s off the main thread
 │       └── utils/           # federationLoader — injects remoteEntry, exposes window.React/ReactDOM
 ├── modules/
-│   └── hello-world/         # Reference webpack-federation remote (React 18, externals)
-│       ├── webpack.config.js
-│       ├── src/App.jsx       # Exposed component — uses window.React via externals
-│       └── public/index.html # Standalone shell with CDN React for local testing
+│   ├── hello-world/         # Reference webpack-federation remote (React 18, externals)
+│   │   ├── webpack.config.js
+│   │   ├── public/manifest.json   # Module descriptor — served at /manifest.json
+│   │   ├── src/App.jsx       # Exposed component — uses window.React via externals
+│   │   └── public/index.html # Standalone shell with CDN React for local testing
+│   └── chatbot/             # AI chat widget MF remote (port 3002)
+│       ├── webpack.config.js # Exposes ./ChatWidget and ./ChatPage as scope "chatbot"
+│       ├── public/manifest.json   # Module descriptor — served at /manifest.json
+│       ├── src/ChatWidget.jsx # Floating bubble + streaming chat panel
+│       ├── src/ChatPage.jsx  # Full-page chat interface
+│       └── public/index.html # Standalone shell for local testing
 ├── k8s/                     # Kubernetes manifests (kustomize)
 │   ├── kustomization.yaml
 │   ├── postgres/ mongo/ clickhouse/   # StatefulSet + Service + PVC per DB
+│   ├── ollama/              # Ollama Deployment + Service + PVC (llama3.2:3b)
 │   ├── backend/ frontend/             # Deployment + Service
+│   ├── chatbot/             # Chatbot MF remote Deployment + NodePort 30002
+│   ├── hello-world/         # Hello-world MF remote Deployment + NodePort 30001
 │   └── secret.yaml / configmap.yaml
 ├── scripts/
 │   └── k8s-deploy.sh        # One-command minikube build + deploy
@@ -257,7 +398,7 @@ bash scripts/k8s-deploy.sh
 
 This script:
 1. Points Docker at minikube's daemon (`eval $(minikube docker-env)`)
-2. Builds `spin-core-backend:latest` and `spin-core-frontend:latest` inside minikube
+2. Builds `spin-core-backend:latest`, `spin-core-frontend:latest`, `spin-core-hello-world:latest`, and `spin-core-chatbot:latest` inside minikube
 3. Applies all manifests via `kubectl apply -k k8s/`
 4. Waits for backend and frontend rollouts to complete
 5. Prints the app URL

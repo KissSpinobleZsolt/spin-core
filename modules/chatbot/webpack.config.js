@@ -9,12 +9,10 @@ module.exports = {
   output: {
     path: path.resolve(__dirname, 'dist'),
     publicPath: 'auto',
-    uniqueName: 'helloWorld',
+    uniqueName: 'chatbot',
     clean: true,
   },
-  // React is provided by the spin-core host via window.React / window.ReactDOM.
-  // This prevents a second React copy from being bundled — one React instance = hooks work.
-  // For standalone testing (localhost:3001), the UMD scripts in public/index.html set these globals.
+  // React provided by the spin-core host via window.React / window.ReactDOM.
   externals: {
     react: 'React',
     'react-dom': 'ReactDOM',
@@ -34,10 +32,11 @@ module.exports = {
   },
   plugins: [
     new ModuleFederationPlugin({
-      name: 'helloWorld',        // → window.helloWorld  (scope in spin-core)
+      name: 'chatbot',
       filename: 'remoteEntry.js',
       exposes: {
-        './App': './src/App',    // → component: "./App" in spin-core
+        './ChatWidget': './src/ChatWidget',
+        './ChatPage':   './src/ChatPage',
       },
     }),
     new HtmlWebpackPlugin({
@@ -46,7 +45,7 @@ module.exports = {
     new CopyPlugin({ patterns: [{ from: 'public/manifest.json', to: 'manifest.json' }] }),
   ],
   devServer: {
-    port: 3001,
+    port: 3002,
     headers: {
       'Access-Control-Allow-Origin': '*',
     },

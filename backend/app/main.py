@@ -10,7 +10,9 @@ from app.database import init_db, get_pg, get_ch, get_mongo
 from app.settings import read_settings
 from app.state import set_settings
 
-from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router, health
+from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router, health, chat
+from app.settings import ModuleConfig, new_module_id, write_settings
+from app.state import get_settings
 
 
 @asynccontextmanager
@@ -46,6 +48,24 @@ async def lifespan(app: FastAPI):
     for lang, data in DEFAULT_TRANSLATIONS.items():
         if mongo.get_i18n_data(lang) is None:
             mongo.set_i18n_data(lang, data)
+
+    # Seed built-in chatbot module on first run
+    s = get_settings()
+    if not any(m.scope == "chatbot" for m in s.modules):
+        chatbot_url = os.getenv("CHATBOT_REMOTE_URL", "http://localhost:3002/remoteEntry.js")
+        s.modules.append(ModuleConfig(
+            id=new_module_id(),
+            name="Chatbot",
+            remote_url=chatbot_url,
+            scope="chatbot",
+            component="./ChatPage",
+            route="chatbot",
+            icon="💬",
+            enabled=True,
+            roles=["user", "admin"],
+        ))
+        write_settings(s)
+        print("[spin-core] Chatbot module seeded", file=sys.stderr)
 
     yield
 
@@ -98,3 +118,4 @@ app.include_router(logs.router)
 app.include_router(module_data.router)
 app.include_router(i18n_router.router)
 app.include_router(health.router)
+app.include_router(chat.router)

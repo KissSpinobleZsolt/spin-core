@@ -21,6 +21,20 @@ export interface AppSettings {
   modules: ModuleConfig[]
 }
 
+export interface DiscoveredModule {
+  source_url: string
+  name?: string
+  scope?: string
+  component?: string
+  route?: string
+  icon?: string
+  roles?: string[]
+  description?: string
+  remote_url?: string
+  already_registered: boolean
+  error?: string
+}
+
 export const settingsService = {
   async getSettings(): Promise<AppSettings> {
     return apiService.get('/settings')
@@ -44,5 +58,9 @@ export const settingsService = {
 
   async deleteModule(id: string): Promise<void> {
     await apiService.delete(`/settings/modules/${id}`)
+  },
+
+  async discoverModules(): Promise<DiscoveredModule[]> {
+    return apiService.get('/settings/modules/discover')
   },
 }

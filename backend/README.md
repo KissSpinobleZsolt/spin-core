@@ -9,6 +9,7 @@ FastAPI backend for the spin-core platform.
 - **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log)
 - **Module DB**: MongoDB 7 via pymongo (generic document store for installed modules)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
+- **AI proxy**: httpx — async streaming proxy to Ollama for the `/api/chat` endpoint
 - **Config**: `/app/data/settings.json` on a Docker / Kubernetes volume
 
 ## Architecture
@@ -55,17 +56,22 @@ docker compose up backend db mongo clickhouse
 | `POSTGRES_URL` | `postgresql://core-postgres:core-postgres@db:5432/core-postgres` | Primary DB |
 | `MONGO_URL` | `mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin` | Module data store |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
+| `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
+| `OLLAMA_MODEL` | `llama3.2:3b` | Model used as the default for `POST /api/chat`. Override to switch models without a code change. |
+| `CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Browser-accessible URL of the chatbot MF remote, stored in settings on first run |
+| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` by `GET /api/settings/modules/discover` |
 
 ## Admin bootstrap
 
-There is no setup wizard. On startup the lifespan hook checks whether a user with `ADMIN_EMAIL` exists in PostgreSQL. If not, it creates one using `ADMIN_PASSWORD` and `ADMIN_NAME`. Subsequent restarts skip the seed.
+There is no setup wizard. The lifespan hook seeds the following on first run (all checks are idempotent — subsequent restarts skip already-present data):
 
-Log output on first run:
-```
-[spin-core] Admin user created: admin@spin.local
-```
+| What | Guard | Log line |
+|------|-------|----------|
+| Admin user | email not in PostgreSQL | `[spin-core] Admin user created: …` |
+| i18n translations (EN + RO) | language key absent in MongoDB | _(silent)_ |
+| Chatbot module | no module with `scope == "chatbot"` in `settings.json` | `[spin-core] Chatbot module seeded` |
 
-Default i18n translations (EN + RO) are also seeded into MongoDB on first run in the same way.
+If you need to re-seed the chatbot module (e.g. after manually deleting a stale entry in Settings), restart the backend — the guard will trigger and insert the correct entry.
 
 ## API reference
 
@@ -107,6 +113,7 @@ Each field is `true` if the connection check passed, `false` otherwise. `api` is
 | `POST` | `/api/settings/modules` | Add a module |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
+| `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |
 
 ### Logs (admin)
 
@@ -136,6 +143,26 @@ Namespaced MongoDB collections for installed modules. Collections are stored as 
 | `PUT` | `/api/module-data/{moduleId}/{collection}/{docId}` | Update document |
 | `DELETE` | `/api/module-data/{moduleId}/{collection}/{docId}` | Delete document |
 
+### Chat (AI assistant)
+
+Streams responses from a local Ollama instance. Requires `OLLAMA_URL` to point at a running Ollama server.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/chat` | Bearer | Send a message list, receive a streaming NDJSON response from Ollama |
+
+Request body:
+```json
+{
+  "messages": [{ "role": "user", "content": "Hello" }],
+  "model": "llama3.2:3b"
+}
+```
+
+`model` defaults to the value of `OLLAMA_MODEL` (env var). Callers can override it per-request by passing a different model name in the body.
+
+Each streamed line is a raw Ollama NDJSON chunk — the frontend reads `chunk.message.content` and appends it to the current reply. If Ollama is unreachable the stream yields `{"error": "..."}` and closes.
+
 ### Data ingestion (WebSocket)
 
 | Method | Path | Description |
@@ -156,21 +183,21 @@ backend/
 │   ├── deps.py           # require_token / require_admin
 │   ├── state.py          # In-process AppSettings singleton
 │   ├── i18n_defaults.py  # Default EN + RO translations (seeded into MongoDB on first run)
-│   ├── models.py         # (placeholder — SQLAlchemy models live in db/postgres.py)
-│   └── db/
-│       ├── interface.py  # AppAdapter protocol + UserRecord dataclass
-│       ├── postgres.py   # PostgresAdapter — users + pages via SQLAlchemy
-│       ├── clickhouse.py # ClickHouseLogAdapter — MergeTree log table
-│       └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
-├── routes/
-│   ├── auth.py           # /api/auth/login
-│   ├── dashboard.py      # /api/dashboard, /api/user/theme
-│   ├── settings.py       # /api/settings/*
-│   ├── logs.py           # /api/logs
-│   ├── module_data.py    # /api/module-data/*
-│   ├── i18n.py           # /api/i18n/{lang}
-│   ├── health.py         # /api/health — DB liveness checks
-│   └── ingestion.py      # /api/data-ingestion + WebSocket
+│   ├── db/
+│   │   ├── interface.py  # AppAdapter protocol + UserRecord dataclass
+│   │   ├── postgres.py   # PostgresAdapter — users + pages via SQLAlchemy
+│   │   ├── clickhouse.py # ClickHouseLogAdapter — MergeTree log table
+│   │   └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
+│   └── routes/
+│       ├── auth.py           # /api/auth/login
+│       ├── dashboard.py      # /api/dashboard, /api/user/theme
+│       ├── settings.py       # /api/settings/* (modules CRUD + concurrent manifest discovery)
+│       ├── logs.py           # /api/logs
+│       ├── module_data.py    # /api/module-data/*
+│       ├── i18n.py           # /api/i18n/{lang}
+│       ├── health.py         # /api/health — DB liveness checks
+│       ├── ingestion.py      # /api/data-ingestion + WebSocket
+│       └── chat.py           # /api/chat — JWT-protected streaming proxy to Ollama
 ├── requirements.txt
 └── Dockerfile
 ```

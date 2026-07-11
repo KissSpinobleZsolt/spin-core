@@ -15,7 +15,14 @@ resources:
   - clickhouse/pvc.yaml
   - clickhouse/service.yaml
   - clickhouse/statefulset.yaml
+  - ollama/pvc.yaml
+  - ollama/service.yaml
+  - ollama/deployment.yaml
   - backend/service.yaml
   - backend/deployment.yaml
+  - chatbot/service.yaml
+  - chatbot/deployment.yaml
+  - hello-world/service.yaml
+  - hello-world/deployment.yaml
   - frontend/service.yaml
   - frontend/deployment.yaml
