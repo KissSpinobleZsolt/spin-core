@@ -1,5 +1,5 @@
 services:
-  db:
+  postgres:
     image: postgres:16-alpine
     environment:
       POSTGRES_USER: core-postgres
@@ -52,6 +52,15 @@ services:
         soft: 262144
         hard: 262144
 
+  model-downloader:
+    image: ollama/ollama
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "ollama pull llama3.1:8b &&
+      ollama pull qwen2.5-coder:1.5b-base &&
+      ollama pull nomic-embed-text:latest"
+    restart: unless-stopped
+    
   ollama:
     image: ollama/ollama
     # Start the server, wait until it accepts requests, pull the model, then keep serving.
@@ -74,6 +83,8 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
+    depends_on:
+      - model-downloader
     restart: unless-stopped
 
   hello-world:
@@ -104,7 +115,7 @@ services:
     volumes:
       - app_data:/app/data
     depends_on:
-      db:
+      postgres:
         condition: service_healthy
       mongo:
         condition: service_healthy

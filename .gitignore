@@ -13,3 +13,4 @@ Thumbs.db
 # Root-level env file (should never exist, but guard it)
 .env
 .tmp/
+*.code-workspace
