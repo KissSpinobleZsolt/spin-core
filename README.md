@@ -28,12 +28,17 @@ All three databases start unconditionally. Each has a fixed, non-configurable ro
 | Service | Port | Description |
 |---------|------|-------------|
 | `frontend` | 3000 | React SPA (nginx in production, proxies `/api/*` to backend) |
+| `frontend-dev` | 3000 | Vite dev server with HMR (profile: `dev`) |
 | `backend` | 8000 | FastAPI REST + WebSocket API |
-| `db` | 5432 | PostgreSQL |
+| `postgres` | 5432 | PostgreSQL |
 | `mongo` | 27017 | MongoDB |
 | `clickhouse` | 8123 / 9000 | ClickHouse HTTP + native |
+| `ollama` | 11434 | Self-hosted LLM server (pulls `$OLLAMA_MODEL` on first start) |
+| `model-downloader` | — | One-shot container that pre-pulls extra Ollama models into the shared volume |
 | `hello-world` | 3001 | Reference MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
 | `chatbot` | 3002 | AI chatbot MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
+
+All services expose Docker healthchecks. Dependent services wait for `service_healthy` (or `service_completed_successfully` for `model-downloader`) before starting, so startup order is fully enforced.
 
 ## Quick start
 
@@ -47,11 +52,13 @@ Open [http://localhost:3000](http://localhost:3000) — on first run go to `/log
 
 ### Development (hot reload)
 
-Frontend source is volume-mounted; edits reflect instantly via Vite HMR.
+Frontend source is volume-mounted; edits reflect instantly via Vite HMR. A single command brings up the full dependency graph in the correct order (health checks enforce sequencing):
 
 ```bash
-docker compose --profile dev up --build frontend-dev backend db mongo clickhouse
+docker compose up --build frontend-dev
 ```
+
+This starts: `model-downloader` → `ollama` → `chatbot` + `hello-world` + (`postgres` + `mongo` + `clickhouse` → `backend`) → `frontend-dev`.
 
 ### Kubernetes (minikube)
 
@@ -212,20 +219,26 @@ Default: `llama3.2:3b`. The model name is stored in `settings.json` when the cha
 
 ### Docker Compose (multi-terminal dev workflow)
 
-Run each service in its own terminal so logs stay separate:
+One command is enough (health checks enforce ordering automatically):
 
 ```bash
-# Terminal 1 — Ollama (pulls model on first start, cached in ollama_data volume)
-docker compose up --build ollama
+docker compose up --build frontend-dev
+```
 
-# Terminal 2 — MF remotes (chatbot on port 3002, hello-world on port 3001)
+If you prefer to watch each tier's logs separately, split across terminals:
+
+```bash
+# Terminal 1 — model pre-pull + Ollama server
+docker compose up --build model-downloader ollama
+
+# Terminal 2 — MF remotes (waits for ollama to be healthy)
 docker compose up --build chatbot hello-world
 
-# Terminal 3 — Backend + databases
-docker compose up --build backend db mongo clickhouse
+# Terminal 3 — Databases + backend
+docker compose up --build postgres mongo clickhouse backend
 
 # Terminal 4 — Frontend dev server with HMR (port 3000)
-docker compose --profile dev up --build frontend-dev
+docker compose up --build frontend-dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) once all are healthy. See **[What to do after the services start](#what-to-do-after-the-services-start)** below.
@@ -364,6 +377,9 @@ docker compose logs -f backend
 
 # Rebuild a single service
 docker compose up --build backend
+
+# Check health status of all running services
+docker compose ps
 ```
 
 ## Kubernetes deploy guide
