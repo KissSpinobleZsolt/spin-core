@@ -54,7 +54,7 @@ services:
 
   model-downloader:
     image: ollama/ollama
-    command: "ollama pull ${OLLAMA_MODEL: -llama3.2:3b}"
+    command: "ollama pull ${OLLAMA_MODEL:-llama3.2:3b}"
     restart: unless-stopped
     
   ollama:
