@@ -176,7 +176,14 @@ You should see your GPU listed inside the container output. If you get a version
 docker compose up ollama
 ```
 
-Ollama starts on **http://localhost:11434** and automatically pulls `llama3.2:3b` on first run (≈ 2 GB download, takes a few minutes).
+Ollama starts on **http://localhost:11434**. Pull the models required by the Continue config:
+
+```bash
+# Option A (with repo)
+docker compose exec ollama ollama pull llama3.1:8b
+docker compose exec ollama ollama pull qwen2.5-coder:1.5b-base
+docker compose exec ollama ollama pull nomic-embed-text:latest
+```
 
 ### Option B — Standalone Docker (no repo needed)
 
@@ -189,10 +196,12 @@ docker run -d \
   ollama/ollama
 ```
 
-Then pull a model:
+Then pull the models:
 
 ```bash
-docker exec ollama ollama pull llama3.2:3b
+docker exec ollama ollama pull llama3.1:8b
+docker exec ollama ollama pull qwen2.5-coder:1.5b-base
+docker exec ollama ollama pull nomic-embed-text:latest
 ```
 
 ### Verify Ollama is running
@@ -201,19 +210,7 @@ docker exec ollama ollama pull llama3.2:3b
 curl http://localhost:11434/api/tags
 ```
 
-Returns a JSON list of downloaded models. You should see `llama3.2:3b`.
-
-### (Optional) Pull a fast autocomplete model
-
-For snappy tab completion, a small code-specific model works better than the 3B chat model:
-
-```bash
-# Option A (with repo)
-docker compose exec ollama ollama pull qwen2.5-coder:1.5b
-
-# Option B (standalone)
-docker exec ollama ollama pull qwen2.5-coder:1.5b
-```
+Returns a JSON list of downloaded models. You should see all three models listed.
 
 ---
 
@@ -227,31 +224,43 @@ Publisher: `Continue` (the icon is a purple arrow).
 
 ### 5.2 Configure Continue
 
-Press `Ctrl+Shift+P` → type **"Continue: Open config.json"** → Enter.
+Press `Ctrl+Shift+P` → type **"Continue: Open config.yaml"** → Enter.
 
 Replace the file contents with:
 
-```json
-{
-  "models": [
-    {
-      "title": "Llama 3.2 3B (local)",
-      "provider": "ollama",
-      "model": "llama3.2:3b",
-      "apiBase": "http://localhost:11434"
-    }
-  ],
-  "tabAutocompleteModel": {
-    "title": "Qwen 2.5 Coder 1.5B (local)",
-    "provider": "ollama",
-    "model": "qwen2.5-coder:1.5b",
-    "apiBase": "http://localhost:11434"
-  },
-  "allowAnonymousTelemetry": false
-}
+```yaml
+name: Main Config
+version: 1.0.0
+schema: v1
+models:
+  - name: Llama 3.1 8B
+    provider: ollama
+    model: llama3.1:8b
+    roles:
+      - chat
+      - edit
+      - apply
+  - name: Qwen2.5-Coder 1.5B
+    provider: ollama
+    model: qwen2.5-coder:1.5b-base
+    roles:
+      - autocomplete
+  - name: Nomic Embed
+    provider: ollama
+    model: nomic-embed-text:latest
+    roles:
+      - embed
 ```
 
-> If you skipped the autocomplete model, remove the `tabAutocompleteModel` block.
+Each model is assigned a **role**:
+
+| Role | What it does |
+|------|-------------|
+| `chat` / `edit` / `apply` | Powers the chat panel and inline edits |
+| `autocomplete` | Tab completion suggestions |
+| `embed` | Local codebase indexing for context-aware chat |
+
+> If you skipped pulling the autocomplete or embed model, remove those entries from the config.
 
 Save the file.
 
