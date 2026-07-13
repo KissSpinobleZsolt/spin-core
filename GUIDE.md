@@ -9,7 +9,7 @@ A step-by-step guide to running a local LLM (no API keys, no cloud costs) and us
 | Piece | What it does |
 |-------|-------------|
 | **WSL2** | Linux environment inside Windows |
-| **Docker Desktop** | Runs containers on WSL2 |
+| **Docker Engine** | Runs containers inside WSL2 |
 | **NVIDIA Container Toolkit** | Passes your GPU into Docker containers |
 | **Ollama** | Runs LLMs locally (no internet after first download) |
 | **Continue (VS Code extension)** | Free Copilot — chat + tab autocomplete powered by your local model |
@@ -46,23 +46,55 @@ wsl --list --verbose   # should show VERSION 2
 
 ---
 
-## Part 2 — Docker Desktop
+## Part 2 — Docker Engine
 
-### 2.1 Install Docker Desktop
+Install Docker Engine directly inside WSL2 (no Docker Desktop needed).
 
-Download from [docker.com/products/docker-desktop](https://www.docker.com/products/docker-desktop) and install.
-
-During setup, enable **"Use the WSL 2 based engine"** (it is the default on Windows 11).
-
-### 2.2 Enable WSL integration
-
-Open Docker Desktop → **Settings → Resources → WSL Integration** → turn on integration for your Ubuntu distro → **Apply & Restart**.
-
-### 2.3 Verify
-
-In your Ubuntu (WSL2) terminal:
+### 2.1 Install dependencies
 
 ```bash
+sudo apt update
+sudo apt-get install -y ca-certificates curl gnupg lsb-release
+```
+
+### 2.2 Add Docker's GPG key and repository
+
+```bash
+sudo mkdir -p /etc/apt/keyrings
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+
+echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu \
+$(lsb_release -cs) stable" | sudo tee /etc/apt/sources.list.d/docker.list > /dev/null
+```
+
+### 2.3 Install Docker Engine
+
+```bash
+sudo apt-get update
+sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+### 2.4 Allow your user to run Docker without sudo
+
+```bash
+sudo usermod -aG docker $USER
+newgrp docker
+```
+
+Then **restart WSL** from PowerShell so the group change takes effect:
+
+```powershell
+wsl --shutdown
+```
+
+Reopen your Ubuntu terminal.
+
+### 2.5 Verify
+
+```bash
+source ~/.bashrc
+docker --version   # e.g. Docker version 26.x.x
+docker version     # shows client + server details
 docker run --rm hello-world
 ```
 
@@ -104,15 +136,35 @@ sudo apt-get install -y nvidia-container-toolkit
 sudo nvidia-ctk runtime configure --runtime=docker
 ```
 
-Then restart Docker Desktop from the system tray icon (right-click → **Restart Docker Desktop**).
+Then restart the Docker daemon:
+
+```bash
+sudo systemctl restart docker
+```
 
 ### 3.4 Verify GPU is available in Docker
 
+First confirm Docker has the NVIDIA runtime registered (no image needed):
+
 ```bash
+docker info | grep -i runtime
+```
+
+The output should include `nvidia` in the list of runtimes.
+
+Then confirm the GPU is visible inside a container. Use `nvidia-smi` directly in WSL2 to find your driver version, then pick a matching CUDA image from [hub.docker.com/r/nvidia/cuda/tags](https://hub.docker.com/r/nvidia/cuda/tags):
+
+```bash
+# Check your driver version in WSL2
+nvidia-smi
+
+# Run the GPU check inside Docker — replace the tag to match your setup
+# Format: nvidia/cuda:<cuda-version>-base-<ubuntu-version>
+# Example for CUDA 12 on Ubuntu 22.04:
 docker run --rm --gpus all nvidia/cuda:12.0-base-ubuntu22.04 nvidia-smi
 ```
 
-You should see your GPU listed inside the container output.
+You should see your GPU listed inside the container output. If you get a version mismatch error, adjust the image tag to a CUDA version supported by your driver (shown in the `nvidia-smi` table under "CUDA Version").
 
 ---
 
@@ -263,4 +315,4 @@ docker exec ollama ollama pull mistral:7b
 
 ---
 
-*Guide tested on Windows 11 + WSL2 Ubuntu 22.04 + RTX GPU + Docker Desktop 4.x.*
+*Guide tested on Windows 11 + WSL2 Ubuntu 22.04 + RTX GPU + Docker Engine (CE).*
