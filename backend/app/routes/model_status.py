@@ -6,6 +6,8 @@ import httpx
 from fastapi import APIRouter
 from fastapi.responses import StreamingResponse
 
+from app.model_tracker import get_model_progress
+
 router = APIRouter(prefix="/api/model-status", tags=["model-status"])
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
@@ -67,11 +69,41 @@ async def model_status():
 @router.get("/stream")
 async def model_status_stream():
     async def generate():
-        # max 30 minutes; client closes EventSource when all_ready
-        for _ in range(600):
-            payload = await _check_status()
-            yield f"data: {json.dumps(payload)}\n\n"
-            await asyncio.sleep(3)
+        last_payload_str: str | None = None
+        tags_cache: dict | None = None
+
+        for iteration in range(1800):  # 30 min at 1 s interval
+            if iteration % 3 == 0:
+                tags_cache = await _check_status()
+
+            base = tags_cache or await _check_status()
+            progress_map = get_model_progress()
+
+            enriched_models = []
+            for m in base["models"]:
+                entry = dict(m)
+                mp = progress_map.get(m["model"])
+
+                if m["status"] == "ready" or mp is None:
+                    entry["progress"] = None
+                else:
+                    entry["progress"] = mp.as_progress_dict()
+                    if mp.phase in ("pulling", "verifying", "writing", "error"):
+                        entry["status"] = mp.phase
+
+                enriched_models.append(entry)
+
+            payload = {**base, "models": enriched_models}
+            payload_str = json.dumps(payload)
+
+            if payload_str != last_payload_str:
+                last_payload_str = payload_str
+                yield f"data: {payload_str}\n\n"
+
+            if base["all_ready"]:
+                return
+
+            await asyncio.sleep(1)
 
     return StreamingResponse(
         generate(),

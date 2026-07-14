@@ -1,3 +1,4 @@
+import asyncio
 import os
 import sys
 import time
@@ -7,10 +8,12 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, get_pg, get_ch, get_mongo
+from app.model_tracker import run_sequential_trackers
 from app.settings import read_settings
 from app.state import set_settings
 
 from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router, health, chat, model_status
+from app.routes.model_status import _required_models
 from app.settings import ModuleConfig, new_module_id, write_settings
 from app.state import get_settings
 
@@ -67,7 +70,15 @@ async def lifespan(app: FastAPI):
         write_settings(s)
         print("[spin-core] Chatbot module seeded", file=sys.stderr)
 
+    tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
+
     yield
+
+    tracker_task.cancel()
+    try:
+        await tracker_task
+    except asyncio.CancelledError:
+        pass
 
 
 app = FastAPI(title="spin-core API", lifespan=lifespan)
