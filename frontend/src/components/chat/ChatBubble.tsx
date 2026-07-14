@@ -34,8 +34,6 @@ export function ChatBubble() {
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
 
-  if (!status?.all_ready) return null
-
   useEffect(() => {
     saveHistory(messages)
   }, [messages])
@@ -43,6 +41,8 @@ export function ChatBubble() {
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
+
+  if (!status?.all_ready) return null
 
   function clearHistory() {
     const fresh = [GREETING]
