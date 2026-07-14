@@ -42,6 +42,34 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 - **Header**: shows a red "API offline" or "DB degraded" pill when any service is down; invisible when everything is healthy.
 - **Settings → Databases**: each row shows a live badge — grey pulsing "checking…" before the first result, green "online", or red pulsing "unreachable" — plus a "Last checked" timestamp.
 
+## Ollama model status banner
+
+`src/components/layout/ModelStatusBanner.tsx` is a persistent banner rendered in `Layout` between the header and the page content. It connects to `GET /api/model-status/stream` via the browser-native `EventSource` API and shows live download progress for required Ollama models.
+
+### Behaviour
+
+| State | Banner |
+|-------|--------|
+| All models already ready on page load | Never appears |
+| Models still downloading | Amber banner with per-model status |
+| All models finish downloading | Green "All models ready" — auto-dismisses after 4 s |
+| Ollama container unreachable | Grey "Waiting for Ollama…" until it responds |
+
+The banner is always dismissible via the `✕` button. No polling — the backend pushes a Server-Sent Event every 3 seconds.
+
+### Hook
+
+`src/hooks/useModelStatus.ts` wraps the `EventSource` lifecycle:
+
+```ts
+const { status, dismissed, dismiss } = useModelStatus()
+// status: ModelStatusPayload | null
+// dismissed: boolean — true once all ready (or manually closed)
+// dismiss(): () => void — manual close
+```
+
+`EventSource` auto-reconnects on network drops without any manual retry logic.
+
 ## Module federation loader
 
 `src/utils/federationLoader.ts` implements the webpack container protocol for a **Vite host**.
