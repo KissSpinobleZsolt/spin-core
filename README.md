@@ -33,12 +33,12 @@ All three databases start unconditionally. Each has a fixed, non-configurable ro
 | `postgres` | 5432 | PostgreSQL |
 | `mongo` | 27017 | MongoDB |
 | `clickhouse` | 8123 / 9000 | ClickHouse HTTP + native |
-| `ollama` | 11434 | Self-hosted LLM server (pulls `$OLLAMA_MODEL` on first start) |
-| `model-downloader` | — | One-shot container that pre-pulls extra Ollama models into the shared volume |
+| `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated, healthchecked |
+| `model-downloader` | — | One-shot HTTP client: instructs the `ollama` server to pull all required models, then exits |
 | `hello-world` | 3001 | Reference MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
 | `chatbot` | 3002 | AI chatbot MF remote (nginx, serves `remoteEntry.js` + `manifest.json`) |
 
-All services expose Docker healthchecks. Dependent services wait for `service_healthy` (or `service_completed_successfully` for `model-downloader`) before starting, so startup order is fully enforced.
+All services expose Docker healthchecks. Dependent services wait for `service_healthy` before starting, so startup order is fully enforced. `model-downloader` waits for `ollama` to be healthy, then uses `OLLAMA_HOST` to instruct the server to pull models via the REST API — no shared volume access, no second server process.
 
 ## Quick start
 
@@ -58,7 +58,7 @@ Frontend source is volume-mounted; edits reflect instantly via Vite HMR. A singl
 docker compose up --build frontend-dev
 ```
 
-This starts: `model-downloader` → `ollama` → `chatbot` + `hello-world` + (`postgres` + `mongo` + `clickhouse` → `backend`) → `frontend-dev`.
+This starts: `ollama` → `model-downloader` (pulls models via Ollama API) + `chatbot` + `hello-world` + (`postgres` + `mongo` + `clickhouse` → `backend`) → `frontend-dev`.
 
 ### Kubernetes (minikube)
 
@@ -205,17 +205,17 @@ If no GPU is available Docker falls back to CPU automatically (the `deploy` bloc
 
 ### Changing the model
 
-The model is controlled by a single env var — no code change needed:
+The chatbot model is controlled by a single env var — no code change needed:
 
 ```bash
 # Use a smaller/faster model
-OLLAMA_MODEL=llama3.2:1b docker compose up ollama backend
+OLLAMA_MODEL=llama3.2:1b docker compose up ollama model-downloader backend
 
 # Use a larger model (needs more VRAM / RAM)
-OLLAMA_MODEL=llama3.1:8b docker compose up ollama backend
+OLLAMA_MODEL=llama3.1:8b docker compose up ollama model-downloader backend
 ```
 
-Default: `llama3.2:3b`. The model name is stored in `settings.json` when the chatbot module is seeded, so changing it after first run requires updating the module entry in **Settings → Modules** or deleting `settings.json` and restarting.
+Default: `llama3.2:3b`. `model-downloader` reads `OLLAMA_MODEL` and pulls that model first, then pulls the fixed VS Code Continue models (`llama3.1:8b`, `qwen2.5-coder:1.5b-base`, `nomic-embed-text:latest`). The chatbot model name is stored in `settings.json` when seeded; changing it after first run requires updating **Settings → Modules** or deleting `settings.json` and restarting.
 
 ### Docker Compose (multi-terminal dev workflow)
 
@@ -228,8 +228,8 @@ docker compose up --build frontend-dev
 If you prefer to watch each tier's logs separately, split across terminals:
 
 ```bash
-# Terminal 1 — model pre-pull + Ollama server
-docker compose up --build model-downloader ollama
+# Terminal 1 — Ollama server + model downloads (model-downloader pulls via Ollama API)
+docker compose up --build ollama model-downloader
 
 # Terminal 2 — MF remotes (waits for ollama to be healthy)
 docker compose up --build chatbot hello-world
@@ -253,7 +253,7 @@ kubectl logs -n spin-core -l app=ollama -f
 
 ### What to do after the services start
 
-1. **Wait for Ollama** — terminal 1 shows `pulling dde5aa3f…`. Wait until it prints `success` (≈ 10–15 min on first run; instant on subsequent starts because models are cached in the `ollama_data` volume).
+1. **Wait for Ollama** — terminal 1 shows download progress in the `ollama` container logs. `model-downloader` exits once all models are ready (≈ 15–60 min on first run depending on connection; instant on subsequent starts because models are cached in the `ollama_data` volume). Watch progress with `docker logs spin-core-ollama-1 --follow`.
 2. **Open the app** — [http://localhost:3000](http://localhost:3000), log in with `ADMIN_EMAIL` / `ADMIN_PASSWORD`.
 3. **Chatbot in sidebar** — a "💬 Chatbot" link appears automatically under **Modules**. Click it to open the full-page chat. The floating bubble is also visible on every page.
 4. **If the sidebar link is missing** — the chatbot module was already seeded with a different scope. Go to **Settings → Modules**, delete any stale Chatbot entry, then restart the backend (`docker compose restart backend`). The correct entry is re-seeded automatically.
