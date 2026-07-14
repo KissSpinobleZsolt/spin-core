@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useModelStatusContext } from '../../context/ModelStatusContext'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -26,11 +27,14 @@ function saveHistory(messages: Message[]) {
 }
 
 export function ChatBubble() {
+  const { status } = useModelStatusContext()
   const [open, setOpen] = useState(false)
   const [messages, setMessages] = useState<Message[]>(loadHistory)
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  if (!status?.all_ready) return null
 
   useEffect(() => {
     saveHistory(messages)
