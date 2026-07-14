@@ -1,9 +1,15 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+secretGenerator:
+  - name: spin-core-secrets
+    envs:
+      - .env
+    options:
+      disableNameSuffixHash: true
+
 resources:
   - namespace.yaml
-  - secret.yaml
   - configmap.yaml
   - app-data-pvc.yaml
   - postgres/pvc.yaml
@@ -18,6 +24,7 @@ resources:
   - ollama/pvc.yaml
   - ollama/service.yaml
   - ollama/deployment.yaml
+  - ollama/model-downloader-job.yaml
   - backend/service.yaml
   - backend/deployment.yaml
   - chatbot/service.yaml

@@ -246,18 +246,14 @@ name: Main Config
 version: 1.0.0
 schema: v1
 models:
-  - name: Llama 3.1 8B
+  - name: Qwen 2.5 7B
     provider: ollama
-    model: llama3.1:8b
+    model: qwen2.5:7b
     roles:
       - chat
       - edit
       - apply
-  - name: Qwen2.5-Coder 1.5B
-    provider: ollama
-    model: qwen2.5-coder:1.5b-base
-    roles:
-      - autocomplete
+      - agent
   - name: Nomic Embed
     provider: ollama
     model: nomic-embed-text:latest
@@ -270,10 +266,10 @@ Each model is assigned a **role**:
 | Role | What it does |
 |------|-------------|
 | `chat` / `edit` / `apply` | Powers the chat panel and inline edits |
-| `autocomplete` | Tab completion suggestions |
-| `embed` | Local codebase indexing for context-aware chat |
+| `agent` | Multi-step agentic edits (file creation, refactors) |
+| `embed` | Local codebase indexing for context-aware chat (`@codebase`) |
 
-> If you skipped pulling the autocomplete or embed model, remove those entries from the config.
+Both models are pulled automatically by `model-downloader` on first start — no manual download needed.
 
 Save the file.
 
@@ -312,7 +308,7 @@ Save the file.
 | `nvidia-smi` not found in WSL2 | Update NVIDIA Windows driver to ≥ 525 and restart |
 | `could not select device driver "nvidia"` | Redo Part 3 — Container Toolkit not configured |
 | Continue shows "connection refused" | Make sure Ollama is running: `docker compose up ollama model-downloader` |
-| Autocomplete never appears | Check models are downloaded: `docker exec spin-core-ollama-1 ollama list` |
+| Models not found in Continue | Check models are downloaded: `docker exec spin-core-ollama-1 ollama list` — wait for `model-downloader` to finish |
 | Downloads keep failing / resetting | Apply the WSL2 TCP keepalive fix in the Option A section above |
 | First reply is slow (~10 s) | Normal — Ollama loads the model on first request; subsequent replies are fast |
 | Out of VRAM error | Use a smaller model: change `llama3.2:3b` → `llama3.2:1b` in config.json |
