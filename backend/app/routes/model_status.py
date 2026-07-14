@@ -1,6 +1,7 @@
 import asyncio
 import json
 import os
+from datetime import datetime, timezone
 
 import httpx
 from fastapi import APIRouter
@@ -93,7 +94,11 @@ async def model_status_stream():
 
                 enriched_models.append(entry)
 
-            payload = {**base, "models": enriched_models}
+            payload = {
+                **base,
+                "models": enriched_models,
+                "server_time": datetime.now(timezone.utc).strftime("%H:%M:%S.%f")[:-3] + "Z",
+            }
             payload_str = json.dumps(payload)
 
             if payload_str != last_payload_str:
