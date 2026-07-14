@@ -172,18 +172,31 @@ You should see your GPU listed inside the container output. If you get a version
 
 ### Option A — Docker Compose (recommended if you cloned this repo)
 
-```bash
-docker compose up ollama
-```
-
-Ollama starts on **http://localhost:11434**. Pull the models required by the Continue config:
+Start the Ollama server and let `model-downloader` pull all required models automatically:
 
 ```bash
-# Option A (with repo)
-docker compose exec ollama ollama pull llama3.1:8b
-docker compose exec ollama ollama pull qwen2.5-coder:1.5b-base
-docker compose exec ollama ollama pull nomic-embed-text:latest
+docker compose up ollama model-downloader
 ```
+
+`ollama` starts on **http://localhost:11434** and becomes healthy within ~15 seconds. `model-downloader` then connects to it via the Ollama REST API and pulls all three Continue models (`llama3.1:8b`, `qwen2.5-coder:1.5b-base`, `nomic-embed-text:latest`) with automatic retry on network failure.
+
+Watch download progress in the ollama container:
+
+```bash
+docker logs spin-core-ollama-1 --follow
+```
+
+On first run this takes 15–60 minutes depending on your connection (~6 GB total). Subsequent starts are instant — models are cached in the `ollama_data` Docker volume.
+
+> **WSL2 tip — fix connection resets during download:** WSL2's internal NAT can drop long-lived TCP connections during large downloads. Run this once in your WSL2 terminal to enable TCP keepalives:
+>
+> ```bash
+> sudo sysctl -w net.ipv4.tcp_keepalive_time=30
+> sudo sysctl -w net.ipv4.tcp_keepalive_intvl=10
+> sudo sysctl -w net.ipv4.tcp_keepalive_probes=5
+> ```
+>
+> To persist across WSL2 restarts, add those three lines to `/etc/sysctl.conf`.
 
 ### Option B — Standalone Docker (no repo needed)
 
@@ -196,7 +209,7 @@ docker run -d \
   ollama/ollama
 ```
 
-Then pull the models:
+Wait for the server to start (a few seconds), then pull the models:
 
 ```bash
 docker exec ollama ollama pull llama3.1:8b
@@ -298,8 +311,9 @@ Save the file.
 |---------|-----|
 | `nvidia-smi` not found in WSL2 | Update NVIDIA Windows driver to ≥ 525 and restart |
 | `could not select device driver "nvidia"` | Redo Part 3 — Container Toolkit not configured |
-| Continue shows "connection refused" | Make sure Ollama is running (`docker compose up ollama`) |
-| Autocomplete never appears | Check model was pulled: `curl localhost:11434/api/tags` |
+| Continue shows "connection refused" | Make sure Ollama is running: `docker compose up ollama model-downloader` |
+| Autocomplete never appears | Check models are downloaded: `docker exec spin-core-ollama-1 ollama list` |
+| Downloads keep failing / resetting | Apply the WSL2 TCP keepalive fix in the Option A section above |
 | First reply is slow (~10 s) | Normal — Ollama loads the model on first request; subsequent replies are fast |
 | Out of VRAM error | Use a smaller model: change `llama3.2:3b` → `llama3.2:1b` in config.json |
 
@@ -325,30 +339,3 @@ docker exec ollama ollama pull mistral:7b
 ---
 
 *Guide tested on Windows 11 + WSL2 Ubuntu 22.04 + RTX GPU + Docker Engine (CE).*
-
-ollama what runs separatly, need to be installed models later in vs code
-``` yaml
- ollama:
-    image: ollama/ollama
-    # Start the server, wait until it accepts requests, pull the model, then keep serving.
-    entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "ollama serve &
-      until ollama list > /dev/null 2>&1; do sleep 2; done &&
-      ollama pull ${OLLAMA_MODEL:-llama3.2:3b} &&
-      wait"
-    environment:
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
-    ports:
-      - "11434:11434"
-    volumes:
-      - ollama_data:/root/.ollama
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: 1
-              capabilities: [gpu]
-    restart: unless-stopped
-```

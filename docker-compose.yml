@@ -52,39 +52,21 @@ services:
         soft: 262144
         hard: 262144
 
-  model-downloader:
-    image: ollama/ollama
-    entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "ollama serve &
-      until ollama list > /dev/null 2>&1; do sleep 2; done &&
-      ollama pull llama3.1:8b &&
-      ollama pull qwen2.5-coder:1.5b-base &&
-      ollama pull nomic-embed-text:latest"
-    volumes:
-      - ollama_data:/root/.ollama
-    
   ollama:
     image: ollama/ollama
-    # Start the server, wait until it accepts requests, pull the model, then keep serving.
-    entrypoint: ["/bin/bash", "-c"]
-    command: >
-      "ollama serve &
-      until ollama list > /dev/null 2>&1; do sleep 2; done &&
-      ollama pull ${OLLAMA_MODEL:-llama3.2:3b} &&
-      wait"
-    environment:
-      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+    command: ["serve"]
     ports:
       - "11434:11434"
     volumes:
       - ollama_data:/root/.ollama
+    environment:
+      OLLAMA_KEEP_ALIVE: "24h"
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:11434/"]
-      interval: 10s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+      start_period: 15s
     deploy:
       resources:
         reservations:
@@ -92,10 +74,32 @@ services:
             - driver: nvidia
               count: 1
               capabilities: [gpu]
-    depends_on:
-      model-downloader:
-        condition: service_completed_successfully
     restart: unless-stopped
+
+  model-downloader:
+    image: ollama/ollama
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "MODEL=$${OLLAMA_MODEL:-llama3.2:3b} &&
+       until ollama pull \"$$MODEL\"; do
+         echo \"[model-downloader] retrying $$MODEL...\"; sleep 5;
+       done &&
+       until ollama pull llama3.1:8b; do
+         echo '[model-downloader] retrying llama3.1:8b...'; sleep 5;
+       done &&
+       until ollama pull qwen2.5-coder:1.5b-base; do
+         echo '[model-downloader] retrying qwen2.5-coder:1.5b-base...'; sleep 5;
+       done &&
+       until ollama pull nomic-embed-text:latest; do
+         echo '[model-downloader] retrying nomic-embed-text...'; sleep 5;
+       done &&
+       echo '[model-downloader] all models ready.'"
+    environment:
+      OLLAMA_HOST: "http://ollama:11434"
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: on-failure
 
   hello-world:
     build: ./modules/hello-world
