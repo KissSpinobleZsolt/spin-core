@@ -7,6 +7,7 @@ import httpx
 from fastapi import APIRouter, Header, HTTPException, Response
 from pydantic import BaseModel
 
+from app.database import get_ch
 from app.deps import require_admin
 from app.settings import ModuleConfig, new_module_id, write_settings
 from app.state import get_settings
@@ -71,6 +72,9 @@ async def create_module(payload: ModuleInput, authorization: str = Header(defaul
     module = ModuleConfig(id=new_module_id(), **payload.model_dump())
     s.modules.append(module)
     write_settings(s)
+    ch = get_ch()
+    ch.ensure_module_table(module.scope)
+    ch.ensure_module_mv(module.scope)
     return asdict(module)
 
 

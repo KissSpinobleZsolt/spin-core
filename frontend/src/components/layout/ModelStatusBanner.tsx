@@ -1,4 +1,5 @@
-import { useModelStatus, type ModelInfo } from '../../hooks/useModelStatus'
+import { type ModelInfo } from '../../hooks/useModelStatus'
+import { useModelStatusContext } from '../../context/ModelStatusContext'
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`
@@ -73,7 +74,7 @@ function ModelRow({ model }: { model: ModelInfo }) {
 }
 
 export function ModelStatusBanner() {
-  const { status, dismissed, dismiss } = useModelStatus()
+  const { status, dismissed, dismiss } = useModelStatusContext()
 
   if (dismissed || status === null) return null
 

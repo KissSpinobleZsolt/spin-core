@@ -6,7 +6,7 @@ FastAPI backend for the spin-core platform.
 
 - **Framework**: FastAPI, Python 3.12, uvicorn
 - **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages)
-- **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log)
+- **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log + per-module log tables + refreshable materialized views)
 - **Module DB**: MongoDB 7 via pymongo (generic document store for installed modules)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
 - **AI proxy**: httpx — async streaming proxy to Ollama for the `/api/chat` endpoint
@@ -18,11 +18,24 @@ All three databases are always initialised at startup via `init_db()`. Each has 
 
 ```
 get_pg()    → PostgresAdapter      — users, pages, admin ops
-get_ch()    → ClickHouseLogAdapter — write_log() / query_logs()
+get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_logs_mv()
+                                     ensure_module_table() / write_module_log()
+                                     query_module_logs() / query_module_logs_mv()
 get_mongo() → MongoDataAdapter     — get/insert/update/delete documents per module
 ```
 
-Every HTTP request is automatically appended to ClickHouse by the middleware in `main.py`.
+Every HTTP request is automatically appended to `app_logs` by the middleware in `main.py`.
+
+**ClickHouse tables created at startup:**
+
+| Table | Description |
+|-------|-------------|
+| `app_logs` | Every HTTP request — method, path, status, duration, user |
+| `app_logs_mv` | Refreshable MV — hourly aggregates of `app_logs` (request count, avg/max duration, error count). Rebuilt every 10 minutes. |
+| `module_{scope}_logs` | Per-module event log — created automatically when a module is registered |
+| `module_{scope}_logs_mv` | Refreshable MV — hourly aggregates per module (event count, unique users). Rebuilt every 10 minutes. |
+
+All raw tables have a 30-day TTL. All `from`/`to` query params default to the start of the current month → now.
 
 ## Running locally
 
@@ -117,9 +130,24 @@ Each field is `true` if the connection check passed, `false` otherwise. `api` is
 
 ### Logs (admin)
 
+All log endpoints support `from` and `to` query params (ISO datetime, e.g. `2026-07-01T00:00:00`). Default range: start of current month → now.
+
+**App logs:**
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/logs` | Query ClickHouse event log. Query params: `limit`, `offset`, `event_type`, `user_email` |
+| `GET` | `/api/logs` | Raw `app_logs` rows. Params: `limit`, `offset`, `event_type`, `user_email`, `from`, `to`. Returns `{items, total}`. |
+| `GET` | `/api/logs/summary` | Hourly aggregates from `app_logs_mv`. Params: `from`, `to`, `event_type`, `path`, `limit`, `offset`. Returns `{items, total}`. |
+
+**Module logs:**
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `POST` | `/api/module-logs/{moduleId}` | Bearer | Write a log entry to `module_{scope}_logs`. Body: `{event_type, details}`. |
+| `GET` | `/api/module-logs/{moduleId}` | Admin | Raw module log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
+| `GET` | `/api/module-logs/{moduleId}/summary` | Admin | Hourly aggregates from `module_{scope}_logs_mv`. Params: `from`, `to`, `event_type`. Returns `{items, total}`. |
+
+Module log tables and their MVs are created automatically when a module is registered via `POST /api/settings/modules`.
 
 ### Translations (i18n)
 
@@ -145,13 +173,15 @@ Namespaced MongoDB collections for installed modules. Collections are stored as 
 
 ### Chat (AI assistant)
 
-Streams responses from a local Ollama instance. Requires `OLLAMA_URL` to point at a running Ollama server.
+Streams responses from a local Ollama instance. Requires `OLLAMA_URL` to point at a running Ollama server. Every completed conversation is persisted to `module_chatbot_logs` in ClickHouse.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/chat` | Bearer | Send a message list, receive a streaming NDJSON response from Ollama |
+| `GET` | `/api/chat/logs` | Admin | Paginated chat completion history. Params: `from`, `to`, `user_email`, `limit`, `offset`. Returns `{items, total}`. |
+| `GET` | `/api/chat/logs/summary` | Admin | Hourly aggregates from `module_chatbot_logs_mv`. Params: `from`, `to`. Returns `{items, total}`. |
 
-Request body:
+Request body for `POST /api/chat`:
 ```json
 {
   "messages": [{ "role": "user", "content": "Hello" }],
@@ -159,9 +189,21 @@ Request body:
 }
 ```
 
-`model` defaults to the value of `OLLAMA_MODEL` (env var). Callers can override it per-request by passing a different model name in the body.
+`model` defaults to the value of `OLLAMA_MODEL` (env var). Callers can override it per-request.
 
-Each streamed line is a raw Ollama NDJSON chunk — the frontend reads `chunk.message.content` and appends it to the current reply. If Ollama is unreachable the stream yields `{"error": "..."}` and closes.
+Each streamed line is a raw Ollama NDJSON chunk. If Ollama is unreachable the stream yields `{"error": "..."}` and closes. After streaming finishes, the full conversation (messages, response, token counts, duration) is written to ClickHouse — this never blocks or breaks the stream.
+
+The chat log `details` field is JSON with the shape:
+```json
+{
+  "model": "qwen2.5:7b",
+  "messages": [{ "role": "user", "content": "…" }],
+  "response": "…",
+  "prompt_tokens": 42,
+  "eval_tokens": 123,
+  "duration_ms": 1842.5
+}
+```
 
 ### Data ingestion (WebSocket)
 
@@ -186,18 +228,19 @@ backend/
 │   ├── db/
 │   │   ├── interface.py  # AppAdapter protocol + UserRecord dataclass
 │   │   ├── postgres.py   # PostgresAdapter — users + pages via SQLAlchemy
-│   │   ├── clickhouse.py # ClickHouseLogAdapter — MergeTree log table
+│   │   ├── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
 │   │   └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
 │   └── routes/
 │       ├── auth.py           # /api/auth/login
 │       ├── dashboard.py      # /api/dashboard, /api/user/theme
-│       ├── settings.py       # /api/settings/* (modules CRUD + concurrent manifest discovery)
-│       ├── logs.py           # /api/logs
+│       ├── settings.py       # /api/settings/* (modules CRUD + manifest discovery)
+│       ├── logs.py           # /api/logs, /api/logs/summary
+│       ├── module_logs.py    # /api/module-logs/{id} (write/read/summary)
 │       ├── module_data.py    # /api/module-data/*
 │       ├── i18n.py           # /api/i18n/{lang}
 │       ├── health.py         # /api/health — DB liveness checks
 │       ├── ingestion.py      # /api/data-ingestion + WebSocket
-│       └── chat.py           # /api/chat — JWT-protected streaming proxy to Ollama
+│       └── chat.py           # /api/chat — streaming Ollama proxy, logs to module_chatbot_logs
 ├── requirements.txt
 └── Dockerfile
 ```

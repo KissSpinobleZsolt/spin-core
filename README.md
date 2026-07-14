@@ -27,7 +27,7 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
 | `hello-world` | 3001 | Reference MF remote |
-| `chatbot` | 3002 | AI chatbot MF remote |
+| `chatbot` | 3002 | Legacy MF remote — no longer loaded by the core app; chatbot is now a native widget |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -100,14 +100,20 @@ To start fresh: `docker compose down -v`
 ```
 Browser
   └─ Frontend (React 19 + Vite)
+       ├─ ChatBubble — native floating widget, history persisted in localStorage
        ├─ /api/*  ──►  Backend (FastAPI)
        │                  ├─ PostgreSQL  — users, pages, settings
-       │                  ├─ ClickHouse  — every HTTP request logged here
+       │                  ├─ ClickHouse  — HTTP request log (app_logs)
+       │                  │               per-module log tables (module_{scope}_logs)
+       │                  │               chat completion log (module_chatbot_logs)
+       │                  │               refreshable MVs rebuilt every 10 min:
+       │                  │                 app_logs_mv           — hourly HTTP stats
+       │                  │                 module_{scope}_logs_mv — hourly module stats
        │                  ├─ MongoDB     — module data + i18n translations
        │                  └─ Ollama      — streaming LLM proxy (/api/chat)
-       └─ Module Federation
-            ├─ hello-world remote (port 3001)
-            └─ chatbot remote   (port 3002)
+       │                                  each completion persisted to module_chatbot_logs
+       └─ Module Federation (optional third-party remotes)
+            └─ hello-world remote (port 3001)  — reference implementation
 
 Ollama stack:
   ollama (pure server)  ◄──  model-downloader (HTTP client via OLLAMA_HOST)
@@ -116,6 +122,17 @@ Ollama stack:
 ## Useful commands
 
 ```bash
+# Restart all core services (no rebuild — picks up config/env changes)
+bash scripts/restart.sh
+
+# Restart a specific service
+bash scripts/restart.sh backend
+bash scripts/restart.sh backend clickhouse
+
+# Rebuild an image then restart (after code changes)
+bash scripts/restart.sh --rebuild backend
+bash scripts/restart.sh --rebuild frontend chatbot
+
 # Wipe all data and restart fresh
 docker compose down -v
 
@@ -133,6 +150,10 @@ docker exec spin-core-ollama-1 ollama list
 
 # Watch model download progress (in-app banner appears automatically on the frontend)
 curl -N http://localhost:8000/api/model-status/stream
+
+# Query the ClickHouse logs summary for the current month (admin token required)
+curl -s "http://localhost:8000/api/logs/summary?from=$(date -u +%Y-%m-01T00:00:00)" \
+  -H "Authorization: Bearer <token>" | python3 -m json.tool
 ```
 
 ## Project structure
