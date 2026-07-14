@@ -3,6 +3,7 @@ import Header from './Header';
 import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { ChatBubble } from '../chat/ChatBubble';
+import { ModelStatusBanner } from './ModelStatusBanner';
 
 export default function Layout() {
   return (
@@ -10,6 +11,7 @@ export default function Layout() {
       <Sidebar />
       <div className="flex flex-col flex-1 min-w-0">
         <Header />
+        <ModelStatusBanner />
         <main className="flex-1 overflow-y-auto p-6">
           <Outlet />
         </main>
