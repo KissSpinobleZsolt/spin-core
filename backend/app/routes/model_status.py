@@ -67,6 +67,32 @@ async def model_status():
     return await _check_status()
 
 
+@router.get("/installed")
+async def installed_models():
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(f"{OLLAMA_URL}/api/tags")
+            resp.raise_for_status()
+            data = resp.json()
+    except Exception:
+        return {"ollama": "unreachable", "models": []}
+
+    models = []
+    for m in data.get("models", []):
+        details = m.get("details", {})
+        models.append({
+            "name": m.get("name"),
+            "size_bytes": m.get("size"),
+            "modified_at": m.get("modified_at"),
+            "family": details.get("family"),
+            "parameter_size": details.get("parameter_size"),
+            "quantization": details.get("quantization_level"),
+            "format": details.get("format"),
+        })
+
+    return {"ollama": "ok", "models": models}
+
+
 @router.get("/stream")
 async def model_status_stream():
     async def generate():

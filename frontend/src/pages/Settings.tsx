@@ -3,6 +3,8 @@ import { settingsService, type ModuleConfig, type DiscoveredModule } from '../se
 import { useSettings } from '../context/SettingsContext'
 import { useTheme } from '../context/ThemeContext'
 import { useHealth } from '../context/HealthContext'
+import { useGet } from '../hooks/useApi'
+import { apiService } from '../services/apiService'
 
 // ---------------------------------------------------------------------------
 // Shared UI
@@ -419,6 +421,90 @@ function DatabaseSection() {
 }
 
 // ---------------------------------------------------------------------------
+// Ollama models section
+// ---------------------------------------------------------------------------
+
+type InstalledModel = {
+  name: string
+  size_bytes: number | null
+  modified_at: string | null
+  family: string | null
+  parameter_size: string | null
+  quantization: string | null
+}
+
+type InstalledModelsData = {
+  ollama: 'ok' | 'unreachable'
+  models: InstalledModel[]
+}
+
+function fmtBytes(bytes: number): string {
+  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`
+  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`
+  return `${bytes} B`
+}
+
+function OllamaModelsSection() {
+  const { data, isLoading, isError, refetch } = useGet<InstalledModelsData>(
+    ['ollama-installed-models'],
+    () => apiService.get<InstalledModelsData>('/model-status/installed'),
+  )
+
+  return (
+    <Section title="Ollama models">
+      {isLoading && (
+        <p className="text-sm text-slate-500">Loading…</p>
+      )}
+      {isError && (
+        <p className="text-sm text-red-500">Failed to reach backend.</p>
+      )}
+      {data?.ollama === 'unreachable' && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-700 dark:text-amber-400 text-sm">
+          <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse inline-block shrink-0" />
+          Ollama unreachable — no model information available
+        </div>
+      )}
+      {data?.ollama === 'ok' && data.models.length === 0 && (
+        <p className="text-sm text-slate-500">No models installed yet.</p>
+      )}
+      {data?.ollama === 'ok' && data.models.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                <th className="pb-2 pr-4">Model</th>
+                <th className="pb-2 pr-4">Family</th>
+                <th className="pb-2 pr-4">Params</th>
+                <th className="pb-2 pr-4">Quantization</th>
+                <th className="pb-2 text-right">Size</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
+              {data.models.map(m => (
+                <tr key={m.name}>
+                  <td className="py-2 pr-4 font-mono font-medium text-slate-800 dark:text-white">{m.name}</td>
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.family ?? '—'}</td>
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.parameter_size ?? '—'}</td>
+                  <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.quantization ?? '—'}</td>
+                  <td className="py-2 text-right text-slate-500 dark:text-slate-400">
+                    {m.size_bytes != null ? fmtBytes(m.size_bytes) : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {!isLoading && (
+        <div className="flex justify-end">
+          <Btn variant="secondary" onClick={() => refetch()}>↻ Refresh</Btn>
+        </div>
+      )}
+    </Section>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
@@ -429,6 +515,7 @@ export default function Settings() {
       <ModulesSection />
       <AppearanceSection />
       <DatabaseSection />
+      <OllamaModelsSection />
     </div>
   )
 }
