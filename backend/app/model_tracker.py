@@ -28,13 +28,16 @@ class ModelProgress:
 
     def as_progress_dict(self) -> dict:
         pct = (self.completed_bytes / self.total_bytes * 100.0) if self.total_bytes else 0.0
+        # Round speed to nearest KB/s — sub-kilobyte noise causes constant SSE frames
+        # even when nothing meaningful has changed, defeating the dedup check.
+        speed = round(self.speed_bps, -3)
         return {
             "phase": self.phase,
             "total_bytes": self.total_bytes,
             "completed_bytes": self.completed_bytes,
             "percent": round(pct, 1),
-            "speed_bps": round(self.speed_bps),
-            "speed_str": _fmt_speed(self.speed_bps),
+            "speed_bps": speed,
+            "speed_str": _fmt_speed(speed),
             "eta_str": self.eta_str,
         }
 
@@ -64,12 +67,18 @@ def _fmt_eta(seconds: float) -> str:
     return f"{h}h {m}m"
 
 
-_SPEED_WINDOW = 10.0  # seconds
+_SPEED_WINDOW = 30.0  # seconds — wider window gives smoother ETA
 
 
 def _update_speed_and_eta(mp: ModelProgress) -> None:
     now = time.monotonic()
-    mp.speed_samples.append((now, mp.completed_bytes))
+
+    # Only add a sample when bytes actually advanced.
+    # Duplicate-bytes samples (stall) would corrupt the rolling average as
+    # old high-byte samples age out, making speed appear to crash.
+    last_bytes = mp.speed_samples[-1][1] if mp.speed_samples else -1
+    if mp.completed_bytes > last_bytes:
+        mp.speed_samples.append((now, mp.completed_bytes))
 
     cutoff = now - _SPEED_WINDOW
     while mp.speed_samples and mp.speed_samples[0][0] < cutoff:
@@ -88,7 +97,8 @@ def _update_speed_and_eta(mp: ModelProgress) -> None:
         mp.eta_str = None
         return
 
-    mp.speed_bps = (b1 - b0) / dt
+    # Clamp to zero — negative values signal a reconnect artifact, not real data.
+    mp.speed_bps = max(0.0, (b1 - b0) / dt)
     remaining = mp.total_bytes - mp.completed_bytes
     mp.eta_str = _fmt_eta(remaining / mp.speed_bps) if mp.speed_bps > 0 and remaining > 0 else None
 
@@ -117,9 +127,15 @@ def _process_pull_line(mp: ModelProgress, line: dict) -> None:
     if digest and total is not None and completed is not None:
         mp.phase = "pulling"
         mp.layers[digest] = {"total": total, "completed": completed}
-        mp.total_bytes = sum(v["total"] for v in mp.layers.values())
-        mp.completed_bytes = sum(v["completed"] for v in mp.layers.values())
-        _update_speed_and_eta(mp)
+        new_total = sum(v["total"] for v in mp.layers.values())
+        new_completed = sum(v["completed"] for v in mp.layers.values())
+        # total_bytes only grows (new layers discovered during pull)
+        mp.total_bytes = max(mp.total_bytes, new_total)
+        # completed_bytes is monotonic — reconnect can cause Ollama to report
+        # a lower value for a layer it already reported; ignore those.
+        if new_completed >= mp.completed_bytes:
+            mp.completed_bytes = new_completed
+            _update_speed_and_eta(mp)
 
 
 async def _track_model(model: str) -> None:
