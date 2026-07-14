@@ -325,3 +325,30 @@ docker exec ollama ollama pull mistral:7b
 ---
 
 *Guide tested on Windows 11 + WSL2 Ubuntu 22.04 + RTX GPU + Docker Engine (CE).*
+
+ollama what runs separatly, need to be installed models later in vs code
+``` yaml
+ ollama:
+    image: ollama/ollama
+    # Start the server, wait until it accepts requests, pull the model, then keep serving.
+    entrypoint: ["/bin/bash", "-c"]
+    command: >
+      "ollama serve &
+      until ollama list > /dev/null 2>&1; do sleep 2; done &&
+      ollama pull ${OLLAMA_MODEL:-llama3.2:3b} &&
+      wait"
+    environment:
+      - OLLAMA_MODEL=${OLLAMA_MODEL:-llama3.2:3b}
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    restart: unless-stopped
+```
