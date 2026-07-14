@@ -131,8 +131,8 @@ docker compose ps
 # Check downloaded AI models
 docker exec spin-core-ollama-1 ollama list
 
-# Watch model download progress
-docker logs spin-core-model-downloader-1 --follow
+# Watch model download progress (in-app banner appears automatically on the frontend)
+curl -N http://localhost:8000/api/model-status/stream
 ```
 
 ## Project structure

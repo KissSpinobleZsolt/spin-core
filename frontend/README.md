@@ -51,11 +51,14 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 | State | Banner |
 |-------|--------|
 | All models already ready on page load | Never appears |
-| Models still downloading | Amber banner with per-model status |
+| Models still downloading | Amber banner with per-model progress bar, speed, and ETA |
 | All models finish downloading | Green "All models ready" — auto-dismisses after 4 s |
 | Ollama container unreachable | Grey "Waiting for Ollama…" until it responds |
 
-The banner is always dismissible via the `✕` button. No polling — the backend pushes a Server-Sent Event every 3 seconds.
+The banner is always dismissible via the `✕` button. The backend pushes a Server-Sent Event every ~1 second during download (deduped — identical frames are skipped). Per-model progress shows:
+- Animated progress bar (`completed / total` bytes)
+- Download speed (rolling 10-second window average, e.g. `5.0 MB/s`)
+- ETA (e.g. `10m 7s`), hidden until enough speed samples are collected
 
 ### Hook
 
@@ -67,6 +70,8 @@ const { status, dismissed, dismiss } = useModelStatus()
 // dismissed: boolean — true once all ready (or manually closed)
 // dismiss(): () => void — manual close
 ```
+
+`ModelInfo.progress` is `null` when a model is ready or the tracker hasn't started yet; otherwise it carries `{ percent, speed_str, eta_str, total_bytes, completed_bytes }`.
 
 `EventSource` auto-reconnects on network drops without any manual retry logic.
 
