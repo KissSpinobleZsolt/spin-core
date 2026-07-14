@@ -1,9 +1,22 @@
 import { useEffect, useRef, useState } from 'react'
 
+export type ModelPhase = 'pending' | 'pulling' | 'verifying' | 'writing' | 'done' | 'error'
+
+export type ProgressInfo = {
+  phase: ModelPhase
+  total_bytes: number
+  completed_bytes: number
+  percent: number
+  speed_bps: number
+  speed_str: string
+  eta_str: string | null
+}
+
 export type ModelInfo = {
   model: string
-  status: 'ready' | 'pending' | 'unknown'
+  status: 'ready' | 'pending' | 'unknown' | 'pulling' | 'verifying' | 'writing' | 'error'
   size_bytes: number | null
+  progress: ProgressInfo | null
 }
 
 export type ModelStatusPayload = {
@@ -32,10 +45,8 @@ export function useModelStatus() {
       if (data.all_ready) {
         es.close()
         if (everNotReady.current) {
-          // was downloading — show success briefly then dismiss
           setTimeout(() => setDismissed(true), 4000)
         } else {
-          // already ready on first event — never show the banner
           setDismissed(true)
         }
       }
