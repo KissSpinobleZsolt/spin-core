@@ -1,17 +1,22 @@
+import json
 import os
-from typing import List
+import time
+from datetime import datetime
+from typing import List, Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Header, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.deps import require_token
+from app.database import get_ch
+from app.deps import require_admin, require_token
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+_CHATBOT_SCOPE = "chatbot"
 
 
 class Message(BaseModel):
@@ -26,9 +31,14 @@ class ChatRequest(BaseModel):
 
 @router.post("")
 async def chat(payload: ChatRequest, authorization: str = Header(default="")):
-    require_token(authorization)
+    user_email = require_token(authorization)
 
     async def stream():
+        start = time.time()
+        response_parts: list[str] = []
+        prompt_tokens = 0
+        eval_tokens = 0
+
         try:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 async with client.stream(
@@ -45,9 +55,78 @@ async def chat(payload: ChatRequest, authorization: str = Header(default="")):
                         return
                     async for chunk in resp.aiter_text():
                         yield chunk
+                        try:
+                            data = json.loads(chunk.strip())
+                            content = data.get("message", {}).get("content", "")
+                            if content:
+                                response_parts.append(content)
+                            if data.get("done"):
+                                prompt_tokens = data.get("prompt_eval_count", 0)
+                                eval_tokens = data.get("eval_count", 0)
+                        except Exception:
+                            pass
         except httpx.ConnectError:
             yield '{"error": "Ollama service unreachable"}\n'
+            return
         except Exception as e:
             yield f'{{"error": "{str(e)}"}}\n'
+            return
+
+        try:
+            get_ch().write_module_log(
+                scope=_CHATBOT_SCOPE,
+                user_email=user_email,
+                event_type="chat.completion",
+                details={
+                    "model": payload.model,
+                    "messages": [m.model_dump() for m in payload.messages],
+                    "response": "".join(response_parts),
+                    "prompt_tokens": prompt_tokens,
+                    "eval_tokens": eval_tokens,
+                    "duration_ms": round((time.time() - start) * 1000, 2),
+                },
+            )
+        except Exception:
+            pass
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+@router.get("/logs")
+async def get_chat_logs(
+    authorization: str = Header(default=""),
+    from_dt: Optional[datetime] = Query(default=None, alias="from"),
+    to_dt: Optional[datetime] = Query(default=None, alias="to"),
+    user_email: Optional[str] = Query(default=None),
+    limit: int = Query(default=50, le=200),
+    offset: int = Query(default=0, ge=0),
+):
+    require_admin(authorization)
+    result = get_ch().query_module_logs(
+        _CHATBOT_SCOPE,
+        limit=limit,
+        offset=offset,
+        from_dt=from_dt,
+        to_dt=to_dt,
+    )
+    if user_email:
+        result["items"] = [r for r in result["items"] if r["user_email"] == user_email]
+    return result
+
+
+@router.get("/logs/summary")
+async def get_chat_logs_summary(
+    authorization: str = Header(default=""),
+    from_dt: Optional[datetime] = Query(default=None, alias="from"),
+    to_dt: Optional[datetime] = Query(default=None, alias="to"),
+    limit: int = Query(default=500, le=2000),
+    offset: int = Query(default=0, ge=0),
+):
+    require_admin(authorization)
+    return get_ch().query_module_logs_mv(
+        _CHATBOT_SCOPE,
+        from_dt=from_dt,
+        to_dt=to_dt,
+        limit=limit,
+        offset=offset,
+    )

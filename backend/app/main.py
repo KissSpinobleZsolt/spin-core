@@ -12,9 +12,9 @@ from app.model_tracker import run_sequential_trackers
 from app.settings import read_settings
 from app.state import set_settings
 
-from app.routes import auth, dashboard, ingestion, settings, logs, module_data, i18n as i18n_router, health, chat, model_status
+from app.routes import auth, dashboard, ingestion, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status
 from app.routes.model_status import _required_models
-from app.settings import ModuleConfig, new_module_id, write_settings
+from app.settings import write_settings
 from app.state import get_settings
 
 
@@ -52,23 +52,22 @@ async def lifespan(app: FastAPI):
         if mongo.get_i18n_data(lang) is None:
             mongo.set_i18n_data(lang, data)
 
-    # Seed built-in chatbot module on first run
+    # Remove legacy chatbot module entry — chatbot is now a core widget, not a registered module
     s = get_settings()
-    if not any(m.scope == "chatbot" for m in s.modules):
-        chatbot_url = os.getenv("CHATBOT_REMOTE_URL", "http://localhost:3002/remoteEntry.js")
-        s.modules.append(ModuleConfig(
-            id=new_module_id(),
-            name="Chatbot",
-            remote_url=chatbot_url,
-            scope="chatbot",
-            component="./ChatPage",
-            route="chatbot",
-            icon="💬",
-            enabled=True,
-            roles=["user", "admin"],
-        ))
+    before = len(s.modules)
+    s.modules = [m for m in s.modules if m.scope != "chatbot"]
+    if len(s.modules) < before:
         write_settings(s)
-        print("[spin-core] Chatbot module seeded", file=sys.stderr)
+        print("[spin-core] Removed legacy chatbot module from settings", file=sys.stderr)
+
+    # Ensure ClickHouse tables + materialized views for app_logs, chatbot, and all registered modules
+    ch = get_ch()
+    ch.ensure_app_logs_mv()
+    ch.ensure_module_table("chatbot")
+    ch.ensure_module_mv("chatbot")
+    for m in get_settings().modules:
+        ch.ensure_module_table(m.scope)
+        ch.ensure_module_mv(m.scope)
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
 
@@ -127,6 +126,7 @@ app.include_router(settings.router)
 app.include_router(ingestion.router)
 app.include_router(logs.router)
 app.include_router(module_data.router)
+app.include_router(module_logs.router)
 app.include_router(i18n_router.router)
 app.include_router(health.router)
 app.include_router(chat.router)
