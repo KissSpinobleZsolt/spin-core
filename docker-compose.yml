@@ -80,15 +80,8 @@ services:
     image: ollama/ollama
     entrypoint: ["/bin/bash", "-c"]
     command: >
-      "MODEL=$${OLLAMA_MODEL:-llama3.2:3b} &&
-       until ollama pull \"$$MODEL\"; do
-         echo \"[model-downloader] retrying $$MODEL...\"; sleep 5;
-       done &&
-       until ollama pull llama3.1:8b; do
-         echo '[model-downloader] retrying llama3.1:8b...'; sleep 5;
-       done &&
-       until ollama pull qwen2.5-coder:1.5b-base; do
-         echo '[model-downloader] retrying qwen2.5-coder:1.5b-base...'; sleep 5;
+      "until ollama pull qwen2.5:7b; do
+         echo '[model-downloader] retrying qwen2.5:7b...'; sleep 5;
        done &&
        until ollama pull nomic-embed-text:latest; do
          echo '[model-downloader] retrying nomic-embed-text...'; sleep 5;
@@ -106,7 +99,7 @@ services:
     ports:
       - "3001:80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -117,7 +110,7 @@ services:
     ports:
       - "3002:80"
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost/"]
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
       interval: 5s
       timeout: 5s
       retries: 10
@@ -142,7 +135,7 @@ services:
     volumes:
       - app_data:/app/data
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8000/api/health"]
+      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
       timeout: 5s
       retries: 10

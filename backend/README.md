@@ -41,7 +41,7 @@ uvicorn app.main:app --reload --port 8000
 Or via Docker Compose from the project root:
 
 ```bash
-docker compose up backend db mongo clickhouse
+docker compose up backend postgres mongo clickhouse
 ```
 
 ## Environment variables
@@ -57,7 +57,7 @@ docker compose up backend db mongo clickhouse
 | `MONGO_URL` | `mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin` | Module data store |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
-| `OLLAMA_MODEL` | `llama3.2:3b` | Model used as the default for `POST /api/chat`. Override to switch models without a code change. |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Model used as the default for `POST /api/chat`. Override to switch models without a code change. |
 | `CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Browser-accessible URL of the chatbot MF remote, stored in settings on first run |
 | `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` by `GET /api/settings/modules/discover` |
 
@@ -155,7 +155,7 @@ Request body:
 ```json
 {
   "messages": [{ "role": "user", "content": "Hello" }],
-  "model": "llama3.2:3b"
+  "model": "qwen2.5:7b"
 }
 ```
 

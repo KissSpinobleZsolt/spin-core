@@ -107,10 +107,10 @@ Runs on [http://localhost:3000](http://localhost:3000). Requires the backend on 
 
 ## Development with Docker (hot reload)
 
-From the project root:
+From the project root — health checks enforce the correct startup order automatically:
 
 ```bash
-docker compose --profile dev up frontend-dev backend db mongo clickhouse
+docker compose up --build frontend-dev
 ```
 
 Source files are mounted into the container — edits are reflected immediately via Vite HMR.
