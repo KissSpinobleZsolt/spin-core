@@ -80,7 +80,7 @@ docker compose up backend postgres clickhouse
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
-| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` on startup (auto-discovery) and by `GET /api/settings/modules/discover` |
+| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` on startup (auto-discovery) and by `GET /api/settings/modules/discover`. Docker Compose default: `http://data-ingestion:80,http://hello-world:80,http://vision-watch:80` |
 
 ## Admin bootstrap
 

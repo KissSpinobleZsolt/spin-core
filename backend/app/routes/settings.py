@@ -88,6 +88,7 @@ async def delete_module(module_id: str, _: str = Depends(admin_dep)):
     return Response(status_code=204)
 
 
+
 @router.get("/modules/discover")
 async def discover_modules(_: str = Depends(admin_dep)):
     raw = os.getenv("MODULE_REGISTRY_URLS", "").strip()

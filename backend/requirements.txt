@@ -7,3 +7,7 @@ python-jose[cryptography]
 bcrypt
 python-dotenv
 httpx
+ultralytics
+pillow
+numpy
+opencv-python-headless

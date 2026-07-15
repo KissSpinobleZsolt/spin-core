@@ -22,7 +22,7 @@ React 19 SPA for the spin-core platform.
 | `/bots/:botId` | Bot chat | Yes | Full-page streaming chat with a specific bot |
 | `/admin/llms` | LLMs | Admin | Ollama model management — pull, list, delete |
 | `/admin/users` | Users | Admin | User listing (stub) |
-| `/admin/modules` | Modules | Admin | Module CRUD — register (with description + JSON presets), edit, delete, toggle, scan for new modules, view per-module log drawer |
+| `/admin/modules` | Modules | Admin | Module CRUD — register (with i18n translations + manifest auto-fill), edit, delete, toggle, scan for new modules, view per-module log drawer |
 | `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
 | `/logs` | Logs | Admin | ClickHouse event log viewer |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
@@ -136,7 +136,19 @@ Each registered module stores a `presets` JSON blob (`{ i18n, layout, settings }
 <RemoteComponent presets={mod.presets} />
 ```
 
-Remote components can read `props.presets` to receive platform configuration without any additional API calls. Admins set preset values in the **Admin → Modules** form via three collapsible JSON editors (one per preset type).
+Remote components can read `props.presets` to receive platform configuration without any additional API calls.
+
+### Add / Edit module form
+
+The **Admin → Modules** add/edit modal exposes two additional actions beyond the basic fields:
+
+**Load manifest** — button next to the Remote entry URL field. The browser fetches `manifest.json` from the module's base URL directly (no backend proxy — nginx serves it with `Access-Control-Allow-Origin: *`). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots will be provisioned on save.
+
+**i18n translations** — a JSON textarea that accepts a multi-language object:
+```json
+{ "en": { "key": "value" }, "ro": { "cheie": "valoare" } }
+```
+When the form is saved, each language key is posted to `PUT /api/i18n/{lang}` before the module record is persisted, merging the translations into the database.
 
 ### Module discovery
 

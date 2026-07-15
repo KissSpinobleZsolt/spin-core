@@ -89,6 +89,24 @@ services:
       retries: 10
     restart: unless-stopped
 
+  vision-watch:
+    build: ./modules/vision-watch
+    ports:
+      - "3003:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  yolo-downloader:
+    build: ./backend
+    command: python -c "from ultralytics import YOLO; YOLO('yolov8n.pt'); print('[yolo-downloader] weights ready')"
+    volumes:
+      - yolo_models:/root/.config/Ultralytics
+    restart: "no"
+
   hello-world:
     build: ./modules/hello-world
     ports:
@@ -112,10 +130,13 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80
+      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80,http://vision-watch:80,http://vision-watch:80
+      YOLO_MODELS_DIR: /app/vision-models
     volumes:
       - app_data:/app/data
       - ./data:/app/seed-data:ro
+      - yolo_models:/root/.config/Ultralytics
+      - vision_model_weights:/app/vision-models
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
@@ -159,3 +180,5 @@ volumes:
   clickhouse_data:
   app_data:
   ollama_data:
+  yolo_models:
+  vision_model_weights:

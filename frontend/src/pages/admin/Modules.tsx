@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { settingsService, type ModuleConfig, type DiscoveredModule } from '../../services/settingsService'
+import { i18nService } from '../../services/i18nService'
 import {
   logsService,
   type ModuleLogEntry,
@@ -66,13 +67,10 @@ function ModuleModal({
 }) {
   const base = initial ? { ...BLANK, ...initial } : { ...BLANK }
   const [form, setForm] = useState<Omit<ModuleConfig, 'id'>>(base)
-  const [presetStrs, setPresetStrs] = useState({
-    i18n: JSON.stringify(base.presets?.i18n ?? {}, null, 2),
-    layout: JSON.stringify(base.presets?.layout ?? {}, null, 2),
-    settings: JSON.stringify(base.presets?.settings ?? {}, null, 2),
-  })
-  const [presetError, setPresetError] = useState<string | null>(null)
-  const [presetsOpen, setPresetsOpen] = useState(false)
+  const [i18nStr, setI18nStr] = useState('{}')
+  const [i18nError, setI18nError] = useState<string | null>(null)
+  const [manifestLoading, setManifestLoading] = useState(false)
+  const [manifestStatus, setManifestStatus] = useState<{ ok: boolean; message: string } | null>(null)
 
   const valid =
     form.name.trim().length > 0 &&
@@ -80,20 +78,61 @@ function ModuleModal({
     form.scope.trim().length > 0 &&
     form.route.trim().length > 0
 
-  function submit() {
-    let presets: ModuleConfig['presets']
+  async function loadManifest() {
+    setManifestLoading(true)
+    setManifestStatus(null)
     try {
-      presets = {
-        i18n: JSON.parse(presetStrs.i18n || '{}'),
-        layout: JSON.parse(presetStrs.layout || '{}'),
-        settings: JSON.parse(presetStrs.settings || '{}'),
-      }
-      setPresetError(null)
+      const base = form.remote_url.replace(/\/remoteEntry\.js$/, '').replace(/\/$/, '')
+      const resp = await fetch(`${base}/manifest.json`)
+      if (!resp.ok) throw new Error(`${resp.status}`)
+      const manifest = await resp.json() as Record<string, unknown>
+      setForm(f => ({
+        ...f,
+        name: (manifest.name as string) || f.name,
+        description: (manifest.description as string) || f.description,
+        scope: (manifest.scope as string) || f.scope,
+        component: (manifest.component as string) || f.component,
+        route: (manifest.route as string) || f.route,
+        icon: (manifest.icon as string) || f.icon,
+        roles: (manifest.roles as string[]) || f.roles,
+      }))
+      const remoteEntry = (manifest.remote_entry as string) || (manifest.remote_url as string)
+      if (remoteEntry) setForm(f => ({ ...f, remote_url: remoteEntry }))
+      const bots = (manifest.bots as unknown[]) ?? []
+      setManifestStatus({ ok: true, message: `Loaded — ${bots.length} bot${bots.length !== 1 ? 's' : ''} will be provisioned on save` })
     } catch {
-      setPresetError('Invalid JSON in one of the preset fields.')
-      return
+      setManifestStatus({ ok: false, message: 'Could not fetch manifest.json from the given URL' })
+    } finally {
+      setManifestLoading(false)
     }
-    onSave({ ...form, presets })
+  }
+
+  async function submit() {
+    let i18nData: Record<string, Record<string, unknown>> = {}
+    if (i18nStr.trim() && i18nStr.trim() !== '{}') {
+      try {
+        i18nData = JSON.parse(i18nStr)
+        setI18nError(null)
+      } catch {
+        setI18nError('Invalid JSON.')
+        return
+      }
+    }
+
+    if (Object.keys(i18nData).length > 0) {
+      try {
+        await Promise.all(
+          Object.entries(i18nData).map(([lang, translations]) =>
+            i18nService.saveTranslations(lang, translations as Record<string, unknown>)
+          )
+        )
+      } catch {
+        setI18nError('Failed to save translations to the database.')
+        return
+      }
+    }
+
+    onSave({ ...form })
   }
 
   return (
@@ -121,7 +160,21 @@ function ModuleModal({
 
       <div>
         <Label>Remote entry URL</Label>
-        <Input value={form.remote_url} onChange={e => setForm(f => ({ ...f, remote_url: e.target.value }))} placeholder="http://host/remoteEntry.js" />
+        <div className="flex gap-2">
+          <Input value={form.remote_url} onChange={e => setForm(f => ({ ...f, remote_url: e.target.value }))} placeholder="http://host/remoteEntry.js" />
+          <Btn
+            variant="secondary"
+            disabled={!form.remote_url.startsWith('http') || manifestLoading}
+            onClick={loadManifest}
+          >
+            {manifestLoading ? '…' : 'Load manifest'}
+          </Btn>
+        </div>
+        {manifestStatus && (
+          <p className={`text-xs mt-1 ${manifestStatus.ok ? 'text-green-600 dark:text-green-400' : 'text-red-500'}`}>
+            {manifestStatus.message}
+          </p>
+        )}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -151,50 +204,18 @@ function ModuleModal({
         <label htmlFor="enabled" className="text-sm text-slate-600 dark:text-slate-300">Enabled</label>
       </div>
 
-      <div className="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
-        <button
-          type="button"
-          className="w-full flex items-center justify-between px-4 py-2.5 text-sm font-medium text-slate-700 dark:text-slate-200 bg-slate-50 dark:bg-slate-700/50 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-          onClick={() => setPresetsOpen(o => !o)}
-        >
-          <span>Presets</span>
-          <span className="text-slate-400">{presetsOpen ? '▲' : '▼'}</span>
-        </button>
-        {presetsOpen && (
-          <div className="p-4 space-y-3">
-            <p className="text-xs text-slate-500 dark:text-slate-400">JSON config blobs injected into the remote component as props.</p>
-            {presetError && (
-              <p className="text-xs text-red-500">{presetError}</p>
-            )}
-            <div>
-              <Label>i18n preset (JSON)</Label>
-              <Textarea
-                value={presetStrs.i18n}
-                onChange={v => setPresetStrs(s => ({ ...s, i18n: v }))}
-                placeholder="{}"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Layout preset (JSON)</Label>
-              <Textarea
-                value={presetStrs.layout}
-                onChange={v => setPresetStrs(s => ({ ...s, layout: v }))}
-                placeholder="{}"
-                rows={3}
-              />
-            </div>
-            <div>
-              <Label>Settings preset (JSON)</Label>
-              <Textarea
-                value={presetStrs.settings}
-                onChange={v => setPresetStrs(s => ({ ...s, settings: v }))}
-                placeholder="{}"
-                rows={3}
-              />
-            </div>
-          </div>
-        )}
+      <div>
+        <Label>i18n translations (JSON)</Label>
+        <Textarea
+          value={i18nStr}
+          onChange={v => { setI18nStr(v); setI18nError(null) }}
+          placeholder={'{\n  "en": { "key": "value" },\n  "ro": { "cheie": "valoare" }\n}'}
+          rows={5}
+        />
+        {i18nError && <p className="text-xs text-red-500 mt-1">{i18nError}</p>}
+        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
+          Merged into the database translations on save. Keys are language codes (en, ro, …).
+        </p>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -439,7 +460,7 @@ export default function Modules() {
         )}
 
         <div className="flex gap-2 flex-wrap">
-          <Btn onClick={() => setModal('add')}>+ Add module</Btn>
+          <Btn disabled onClick={() => setModal('add')}>+ Add module</Btn>
           <Btn variant="secondary" disabled={scanning} onClick={scanModules}>
             {scanning ? 'Scanning…' : '🔍 Scan for modules'}
           </Btn>
