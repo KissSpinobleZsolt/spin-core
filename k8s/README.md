@@ -32,7 +32,6 @@ Available keys:
 | `ADMIN_PASSWORD` | Admin password seeded on first run |
 | `ADMIN_NAME` | Admin display name |
 | `POSTGRES_USER` / `POSTGRES_PASSWORD` | PostgreSQL credentials |
-| `MONGO_USER` / `MONGO_PASSWORD` | MongoDB credentials |
 | `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` | ClickHouse credentials |
 
 ## Deploy
@@ -99,7 +98,6 @@ k8s/
 ├── .env                      # Your credentials (gitignored)
 ├── app-data-pvc.yaml         # Backend settings.json volume
 ├── postgres/                 # StatefulSet + Service + PVC
-├── mongo/                    # StatefulSet + Service + PVC
 ├── clickhouse/               # StatefulSet + Service + PVC
 ├── ollama/
 │   ├── deployment.yaml       # Pure ollama serve — GPU-accelerated, no model pulling

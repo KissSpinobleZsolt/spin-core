@@ -1,13 +1,13 @@
 const INTERVAL_MS = 30_000
 const TIMEOUT_MS = 5_000
 
-const OFFLINE: HealthPayload = { api: false, postgres: false, clickhouse: false, mongo: false }
+const OFFLINE: HealthPayload = { api: false, postgres: false, clickhouse: false }
 
 export type HealthPayload = {
   api: boolean
   postgres: boolean
   clickhouse: boolean
-  mongo: boolean
+  translations?: Record<string, string>
 }
 
 async function ping() {

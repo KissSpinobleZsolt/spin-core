@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Index, Integer, JSON, String, Text, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.sql import func
@@ -40,6 +40,35 @@ class BotRow(Base):
     roles = Column(ARRAY(String), nullable=False, default=list)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class TranslationRow(Base):
+    __tablename__ = "translations"
+    lang = Column(String, primary_key=True)
+    data = Column(JSON, nullable=False)
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=True)
+
+
+class ModuleDocumentRow(Base):
+    __tablename__ = "module_documents"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    module_id = Column(String, nullable=False)
+    collection = Column(String, nullable=False)
+    data = Column(JSON, nullable=False, default=dict)
+
+    __table_args__ = (
+        Index("ix_module_documents_module_collection", "module_id", "collection"),
+    )
+
+
+def _deep_merge(base: dict, override: dict) -> dict:
+    result = dict(base)
+    for key, value in override.items():
+        if key in result and isinstance(result[key], dict) and isinstance(value, dict):
+            result[key] = _deep_merge(result[key], value)
+        else:
+            result[key] = value
+    return result
 
 
 class PostgresAdapter:
@@ -230,6 +259,129 @@ class PostgresAdapter:
         db = self._session()
         try:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            if not row:
+                return False
+            db.delete(row)
+            db.commit()
+            return True
+        finally:
+            db.close()
+
+    # ------------------------------------------------------------------
+    # i18n
+    # ------------------------------------------------------------------
+
+    def get_i18n_data(self, lang: str) -> dict | None:
+        db = self._session()
+        try:
+            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
+            return dict(row.data) if row else None
+        finally:
+            db.close()
+
+    def set_i18n_data(self, lang: str, data: dict) -> None:
+        from datetime import datetime
+        db = self._session()
+        try:
+            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
+            if row:
+                row.data = data
+                row.updated_at = datetime.utcnow()
+            else:
+                db.add(TranslationRow(lang=lang, data=data, updated_at=datetime.utcnow()))
+            db.commit()
+        finally:
+            db.close()
+
+    def merge_i18n_data(self, lang: str, defaults: dict) -> None:
+        existing = self.get_i18n_data(lang) or {}
+        self.set_i18n_data(lang, _deep_merge(defaults, existing))
+
+    def get_i18n_versions(self) -> dict[str, str]:
+        db = self._session()
+        try:
+            rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()
+            return {
+                r.lang: r.updated_at.isoformat() if r.updated_at else ""
+                for r in rows
+            }
+        finally:
+            db.close()
+
+    # ------------------------------------------------------------------
+    # Module documents
+    # ------------------------------------------------------------------
+
+    def get_documents(
+        self,
+        module_id: str,
+        collection: str,
+        filter_dict: dict,
+        limit: int = 50,
+        skip: int = 0,
+    ) -> list[dict]:
+        db = self._session()
+        try:
+            q = (
+                db.query(ModuleDocumentRow)
+                .filter(
+                    ModuleDocumentRow.module_id == module_id,
+                    ModuleDocumentRow.collection == collection,
+                )
+                .offset(skip)
+                .limit(limit)
+            )
+            return [{"id": row.id, **(row.data or {})} for row in q.all()]
+        finally:
+            db.close()
+
+    def insert_document(self, module_id: str, collection: str, data: dict) -> str:
+        db = self._session()
+        try:
+            row = ModuleDocumentRow(
+                id=str(uuid.uuid4()),
+                module_id=module_id,
+                collection=collection,
+                data=data,
+            )
+            db.add(row)
+            db.commit()
+            return row.id
+        finally:
+            db.close()
+
+    def update_document(self, module_id: str, collection: str, doc_id: str, update: dict) -> bool:
+        db = self._session()
+        try:
+            row = (
+                db.query(ModuleDocumentRow)
+                .filter(
+                    ModuleDocumentRow.id == doc_id,
+                    ModuleDocumentRow.module_id == module_id,
+                    ModuleDocumentRow.collection == collection,
+                )
+                .first()
+            )
+            if not row:
+                return False
+            row.data = update
+            db.commit()
+            return True
+        finally:
+            db.close()
+
+    def delete_document(self, module_id: str, collection: str, doc_id: str) -> bool:
+        db = self._session()
+        try:
+            row = (
+                db.query(ModuleDocumentRow)
+                .filter(
+                    ModuleDocumentRow.id == doc_id,
+                    ModuleDocumentRow.module_id == module_id,
+                    ModuleDocumentRow.collection == collection,
+                )
+                .first()
+            )
             if not row:
                 return False
             db.delete(row)

@@ -8,7 +8,6 @@ from typing import Literal
 SETTINGS_PATH = Path(os.getenv("SETTINGS_PATH", "/app/data/settings.json"))
 
 DEFAULT_POSTGRES_URL = "postgresql://core-postgres:core-postgres@postgres:5432/core-postgres"
-DEFAULT_MONGO_URL = "mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin"
 DEFAULT_CLICKHOUSE_URL = "clickhouse://core-ch:core-ch@clickhouse:9000/core"
 
 

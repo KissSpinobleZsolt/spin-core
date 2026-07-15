@@ -15,22 +15,6 @@ services:
       timeout: 5s
       retries: 10
 
-  mongo:
-    image: mongo:7
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: core-mongo
-      MONGO_INITDB_ROOT_PASSWORD: core-mongo
-      MONGO_INITDB_DATABASE: core-mongo
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongo_data:/data/db
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
   clickhouse:
     image: clickhouse/clickhouse-server:24
     environment:
@@ -112,6 +96,7 @@ services:
     environment:
       JWT_SECRET_KEY: change-me-in-production
       SETTINGS_PATH: /app/data/settings.json
+      SEED_PATH: /app/seed-data/seed.json
       ADMIN_EMAIL: admin@spin.local
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
@@ -119,6 +104,7 @@ services:
       MODULE_REGISTRY_URLS: http://hello-world
     volumes:
       - app_data:/app/data
+      - ./data:/app/seed-data:ro
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
@@ -126,8 +112,6 @@ services:
       retries: 10
     depends_on:
       postgres:
-        condition: service_healthy
-      mongo:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
@@ -168,7 +152,6 @@ services:
 
 volumes:
   postgres_data:
-  mongo_data:
   clickhouse_data:
   app_data:
   ollama_data:

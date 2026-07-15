@@ -90,12 +90,11 @@ function AppearanceSection() {
 // Database info section
 // ---------------------------------------------------------------------------
 
-type DbKey = 'postgres' | 'clickhouse' | 'mongo'
+type DbKey = 'postgres' | 'clickhouse'
 
 const DB_ROWS: { key: DbKey; icon: string; name: string; role: string }[] = [
   { key: 'postgres',   icon: '🐘', name: 'PostgreSQL', role: 'Users & application data' },
   { key: 'clickhouse', icon: '🏠', name: 'ClickHouse',  role: 'Event logs & audit trail' },
-  { key: 'mongo',      icon: '🍃', name: 'MongoDB',     role: 'Module data store' },
 ]
 
 function StatusBadge({ up, checkedAt }: { up: boolean; checkedAt: Date | null }) {

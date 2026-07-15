@@ -1,9 +1,16 @@
 EN: dict = {
     "nav": {
         "dashboard": "Dashboard",
-        "upload": "Upload",
-        "chat": "AI Chat",
-        "reports": "Reports",
+        "bots": "Bots",
+        "chat": "Chat",
+        "settings": "Settings",
+        "logs": "Logs",
+        "translations": "Translations",
+        "botsAdmin": "Bots — Admin",
+        "llms": "LLMs",
+        "users": "Users",
+        "modules": "Modules",
+        "status": "Status",
     },
     "sidebar": {
         "brand": "Core",
@@ -96,9 +103,16 @@ EN: dict = {
 RO: dict = {
     "nav": {
         "dashboard": "Panou de control",
-        "upload": "Încărcare",
-        "chat": "Chat AI",
-        "reports": "Rapoarte",
+        "bots": "Boți",
+        "chat": "Chat",
+        "settings": "Setări",
+        "logs": "Jurnale",
+        "translations": "Traduceri",
+        "botsAdmin": "Boți — Admin",
+        "llms": "LLM-uri",
+        "users": "Utilizatori",
+        "modules": "Module",
+        "status": "Status",
     },
     "sidebar": {
         "brand": "Core",

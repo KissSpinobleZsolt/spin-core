@@ -1,0 +1,23 @@
+{
+  "dashboard": {
+    "content": "Hello welcome"
+  },
+  "bots": [
+    {
+      "name": "AI Assistant",
+      "description": "General-purpose AI assistant powered by Ollama.",
+      "type": "chatbot",
+      "model": "qwen2.5:7b",
+      "system_prompt": "You are a helpful AI assistant.",
+      "icon": "💬",
+      "enabled": true,
+      "roles": ["user", "admin"]
+    }
+  ],
+  "settings": {
+    "theme": {
+      "default_theme": "dark"
+    },
+    "modules": []
+  }
+}
