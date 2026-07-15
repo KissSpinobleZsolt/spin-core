@@ -37,3 +37,27 @@ The script:
 3. Applies all manifests from `k8s/` in dependency order.
 4. Waits for core pods to become ready.
 5. Prints the NodePort URLs for frontend and backend.
+
+## `generate-docs.sh`
+
+Generates API reference documentation for both the frontend and backend.
+
+```bash
+bash scripts/generate-docs.sh
+```
+
+Output:
+- `docs/frontend/` — TypeDoc HTML site (services, contexts, hooks)
+- `docs/backend/` — pdoc HTML site (all Python modules)
+
+The script auto-installs **TypeDoc** (`npm`) and **pdoc** (`pip`) if they are not already present. To use a specific Python interpreter set the `PYTHON` env var:
+
+```bash
+PYTHON=python3.12 bash scripts/generate-docs.sh
+```
+
+You can also generate frontend docs alone via:
+
+```bash
+cd frontend && npm run docs
+```

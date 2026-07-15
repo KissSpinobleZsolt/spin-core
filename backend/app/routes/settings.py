@@ -16,10 +16,14 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 
 class ThemePayload(BaseModel):
+    """Request body schema for updating the platform default theme."""
+
     theme: Literal["dark", "light"]
 
 
 class DiscoveredModule(BaseModel):
+    """Metadata returned when probing a remote module registry URL."""
+
     source_url: str
     name: Optional[str] = None
     scope: Optional[str] = None
@@ -35,12 +39,14 @@ class DiscoveredModule(BaseModel):
 
 @router.get("")
 async def get_settings_route(_: str = Depends(admin_dep)):
+    """Return the current platform-level settings (theme only)."""
     s = get_settings()
     return {"theme": {"default_theme": s.theme.default_theme}}
 
 
 @router.patch("/theme", status_code=204)
 async def update_theme(payload: ThemePayload, _: str = Depends(admin_dep)):
+    """Update the platform default theme and persist it to settings.json (admin only)."""
     s = get_settings()
     s.theme.default_theme = payload.theme
     write_settings(s)
@@ -49,11 +55,13 @@ async def update_theme(payload: ThemePayload, _: str = Depends(admin_dep)):
 
 @router.get("/modules")
 async def list_modules(_: str = Depends(admin_dep)):
+    """Return all registered micro-frontend modules (admin only)."""
     return get_pg().get_modules()
 
 
 @router.post("/modules", status_code=201)
 async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
+    """Register a new module, provision its ClickHouse tables, and seed bots declared in its manifest (admin only)."""
     pg = get_pg()
     module = pg.create_module(payload.model_dump())
     ch = get_ch()
@@ -68,6 +76,8 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
         bots_data = manifest.get("bots") or []
         if bots_data:
             pg.seed_bots_for_module(module["id"], bots_data, created_by=email)
+        if not payload.backend_url and manifest.get("backend_url"):
+            module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module
     except Exception:
         pass
     return module
@@ -75,6 +85,7 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
 
 @router.put("/modules/{module_id}")
 async def update_module(module_id: str, payload: ModuleInput, _: str = Depends(admin_dep)):
+    """Update the configuration of an existing module by ID (admin only)."""
     module = get_pg().update_module(module_id, payload.model_dump())
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -83,6 +94,7 @@ async def update_module(module_id: str, payload: ModuleInput, _: str = Depends(a
 
 @router.delete("/modules/{module_id}", status_code=204)
 async def delete_module(module_id: str, _: str = Depends(admin_dep)):
+    """Permanently remove a registered module by ID (admin only)."""
     if not get_pg().delete_module(module_id):
         raise HTTPException(status_code=404, detail="Module not found")
     return Response(status_code=204)
@@ -91,6 +103,7 @@ async def delete_module(module_id: str, _: str = Depends(admin_dep)):
 
 @router.get("/modules/discover")
 async def discover_modules(_: str = Depends(admin_dep)):
+    """Probe MODULE_REGISTRY_URLS for available modules and report which are already registered."""
     raw = os.getenv("MODULE_REGISTRY_URLS", "").strip()
     if not raw:
         return []

@@ -7,6 +7,7 @@ router = APIRouter(prefix="/api/health", tags=["health"])
 
 @router.get("")
 async def health():
+    """Check connectivity to PostgreSQL and ClickHouse and return a per-service status map."""
     result: dict = {"api": True, "postgres": False, "clickhouse": False, "translations": {}}
 
     try:

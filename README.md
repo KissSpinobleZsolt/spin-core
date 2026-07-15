@@ -19,13 +19,16 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 |---------|------|-------------|
 | `frontend` | 3000 | React SPA (nginx, proxies `/api/*` to backend) |
 | `frontend-dev` | 3000 | Vite dev server with HMR |
-| `backend` | 8000 | FastAPI REST + WebSocket API |
+| `backend` | 8000 | FastAPI REST API — core platform only (no module-specific logic) |
 | `postgres` | 5432 | PostgreSQL |
 | `clickhouse` | 8123/9000 | ClickHouse HTTP + native |
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
-| `hello-world` | 3001 | Reference MF remote |
-| `data-ingestion` | 3002 | Data ingestion MF remote |
+| `hello-world` | 3001 | Reference MF remote (frontend only) |
+| `data-ingestion` | 3002 | Data ingestion MF remote (frontend only) |
+| `data-ingestion-backend` | 8002 | Plugin backend for the data-ingestion module |
+| `vision-watch` | 3003 | Vision-watch MF remote (frontend only) |
+| `vision-watch-backend` | 8003 | Plugin backend for the vision-watch module (YOLO, PyTorch) |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -120,8 +123,16 @@ Browser
        │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs
        └─ Module Federation (optional third-party remotes)
-            ├─ hello-world remote (port 3001)     — reference implementation
-            └─ data-ingestion remote (port 3002)  — data source upload and management
+            ├─ hello-world (port 3001)              — reference implementation (frontend only)
+            ├─ data-ingestion (port 3002)           — data source upload and management
+            │    └─ data-ingestion-backend (8002)   — plugin backend (REST + WebSocket)
+            └─ vision-watch (port 3003)             — YOLO object detection
+                 └─ vision-watch-backend (8003)     — plugin backend (PyTorch, ultralytics)
+
+Plugin backend pattern:
+  core backend (/api/plugin/{scope}/…) ──► module backend (backend_url from modules table)
+  Each module that needs server-side logic runs its own FastAPI service and declares
+  "backend_url" in its manifest.json — no module-specific code lives in the core backend.
 
 Ollama stack:
   ollama (pure server)  ◄──  model-downloader (HTTP client via OLLAMA_HOST)
@@ -175,8 +186,11 @@ spin-core/
 ├── frontend/         # React SPA — see frontend/README.md
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
-│   ├── hello-world/      # Reference MF remote — see modules/hello-world/README.md
-│   └── data-ingestion/   # Data ingestion MF remote — see modules/data-ingestion/README.md
+│   ├── hello-world/          # Reference MF remote — see modules/hello-world/README.md
+│   ├── data-ingestion/       # Data ingestion MF remote
+│   │   └── backend/          # Plugin backend (FastAPI) — optional, per-module
+│   └── vision-watch/         # Vision-watch MF remote (YOLO)
+│       └── backend/          # Plugin backend with PyTorch + ultralytics
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml

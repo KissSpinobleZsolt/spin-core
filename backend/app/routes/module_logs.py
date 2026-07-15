@@ -11,6 +11,7 @@ router = APIRouter(prefix="/api/module-logs", tags=["module-logs"])
 
 
 def _get_scope(module_id: str) -> str:
+    """Resolve the ClickHouse scope name for a module, raising 404 if the module does not exist."""
     mod = get_pg().get_module(module_id)
     if not mod:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -18,6 +19,8 @@ def _get_scope(module_id: str) -> str:
 
 
 class LogPayload(BaseModel):
+    """Request body schema for writing a structured event entry to a module log."""
+
     event_type: str
     details: dict = {}
 
@@ -28,6 +31,7 @@ async def write_module_log(
     payload: LogPayload,
     user_email: str = Depends(token_dep),
 ):
+    """Write a structured event log entry for a module to ClickHouse."""
     scope = _get_scope(module_id)
     get_ch().write_module_log(scope, user_email, payload.event_type, payload.details)
     return {"ok": True}
@@ -43,6 +47,7 @@ async def get_module_logs_summary(
     limit: int = Query(default=500, le=2000),
     offset: int = Query(default=0, ge=0),
 ):
+    """Return hourly aggregated event summaries for a module log, filtered by time range and event type."""
     scope = _get_scope(module_id)
     return get_ch().query_module_logs_mv(
         scope,
@@ -64,6 +69,7 @@ async def read_module_logs(
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
 ):
+    """Return paginated raw event log entries for a module, filtered by time range and event type."""
     scope = _get_scope(module_id)
     return get_ch().query_module_logs(
         scope,

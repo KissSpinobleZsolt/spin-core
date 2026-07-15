@@ -1,7 +1,9 @@
 import { useState } from 'react'
 
+/** A single chat message with a role and text content. */
 export type Message = { role: 'user' | 'assistant'; content: string }
 
+/** Manages chat history, input state, and streaming responses from the /api/chat endpoint. */
 export function useChatStream(botId: string | undefined, selectedModel: string, moduleId?: string) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')

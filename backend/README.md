@@ -80,6 +80,9 @@ docker compose up backend postgres clickhouse
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
+| `ANTHROPIC_API_KEY` | _(empty)_ | Anthropic Claude API key — required for bots with `provider = "anthropic"`. Obtain at console.anthropic.com |
+| `OPENAI_API_KEY` | _(empty)_ | OpenAI API key — also used for Groq, Mistral, Azure OpenAI, and any other OpenAI-compatible endpoint |
+| `OPENAI_BASE_URL` | _(empty)_ | Override the OpenAI-compatible base URL (e.g. `https://api.groq.com/openai/v1`). Leave blank for `api.openai.com` |
 | `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` on startup (auto-discovery) and by `GET /api/settings/modules/discover`. Docker Compose default: `http://data-ingestion:80,http://hello-world:80,http://vision-watch:80` |
 
 ## Admin bootstrap
@@ -99,8 +102,9 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning; best-effort (failure does not fail the create response) |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
+| Daily log purge (background task) | always started; first run after 24 h | `[spin-core] Daily log purge: N table(s) optimized` |
 
-**Startup order:** migration → seed → discovery → i18n merge → ClickHouse table provisioning (one table + MV per registered module).
+**Startup order:** migration → seed → discovery → i18n merge → ClickHouse table provisioning (one table + MV per registered module) → background tasks (model tracker + daily log purge).
 
 Default values for dashboard content, bots, theme, and modules come from **`./data/seed.json`** (mounted read-only at `SEED_PATH`). Edit that file before first run to customise defaults. If the file is absent or malformed, the backend falls back to built-in defaults and logs a warning.
 
@@ -163,7 +167,7 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
 | `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |
 
-**Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`).
+**Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`), `backend_url` (nullable — URL of the module's own backend service; enables the plugin proxy).
 
 ### Logs (admin)
 
@@ -175,6 +179,7 @@ All log endpoints support `from` and `to` query params (ISO datetime, e.g. `2026
 |--------|------|-------------|
 | `GET` | `/api/logs` | Raw `app_logs` rows. Params: `limit`, `offset`, `event_type`, `user_email`, `from`, `to`. Returns `{items, total}`. |
 | `GET` | `/api/logs/summary` | Hourly aggregates from `app_logs_mv`. Params: `from`, `to`, `event_type`, `path`, `limit`, `offset`. Returns `{items, total}`. |
+| `POST` | `/api/logs/purge` | Admin | Force-optimize all ClickHouse log tables (`OPTIMIZE TABLE … FINAL`) to enforce TTL expiry immediately. Returns `{purged: string[], errors: string[]}`. |
 
 **Module logs:**
 
@@ -212,7 +217,7 @@ Namespaced document store in PostgreSQL (`module_documents` table). Documents ar
 
 CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
 
-**Bot fields:** `id`, `name`, `description`, `type` (references `bot_types.name`), `model`, `system_prompt`, `icon`, `active` (bool — requires at least one module), `restricted`, `roles`, `modules` (string array of module IDs; `"core"` = visible in ChatBubble only, other IDs = visible on `/bots` page), `created_by`.
+**Bot fields:** `id`, `name`, `description`, `type` (references `bot_types.name`), `provider` (`"ollama"` | `"anthropic"` | `"openai"` — determines the LLM backend), `model` (provider-specific model identifier; empty = provider default), `system_prompt`, `icon`, `active` (bool — requires at least one module), `restricted`, `modules` (string array of module IDs; `"core"` = visible in ChatBubble only, other IDs = visible on `/bots` page), `created_by`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -227,11 +232,19 @@ CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
 
 ### Chat (AI assistant)
 
-Streams responses from a local Ollama instance. Requires `OLLAMA_URL` to point at a running Ollama server. Every completed conversation is persisted to `module_chatbot_logs` in ClickHouse.
+Streams responses from the bot's configured LLM provider. Every completed conversation is persisted to `module_chatbot_logs` in ClickHouse.
+
+**Supported providers** (set per-bot in the `provider` field):
+
+| Provider | Key required | Notes |
+|----------|-------------|-------|
+| `ollama` | — | Default; self-hosted. Requires `OLLAMA_URL` |
+| `anthropic` | `ANTHROPIC_API_KEY` | Claude models (`claude-sonnet-5`, `claude-opus-4-8`, …) |
+| `openai` | `OPENAI_API_KEY` | OpenAI + any compatible endpoint (Groq, Mistral, Azure, local vLLM). Set `OPENAI_BASE_URL` to override the endpoint. |
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `POST` | `/api/chat` | Bearer | Send a message list, receive a streaming NDJSON response from Ollama |
+| `POST` | `/api/chat` | Bearer | Send a message list, receive a streaming NDJSON response |
 | `GET` | `/api/chat/logs` | Admin | Paginated chat completion history. Params: `from`, `to`, `user_email`, `limit`, `offset`. Returns `{items, total}`. |
 | `GET` | `/api/chat/logs/summary` | Admin | Hourly aggregates from `module_chatbot_logs_mv`. Params: `from`, `to`. Returns `{items, total}`. |
 
@@ -245,16 +258,15 @@ Request body for `POST /api/chat`:
 }
 ```
 
-When both `bot_id` and `module_id` are provided, the module's name and description are injected into the bot's system prompt as a "Current Module" context section. `module_id` is also recorded in the ClickHouse chat log.
+When `bot_id` is provided the backend loads the bot's `provider`, `model`, and system prompt from Postgres. The bot's provider and model override the request's `model` field. The system prompt (including platform context) is prepended as a `system` role message before calling the provider. `model` defaults to `OLLAMA_MODEL` when no bot is selected.
 
-When `bot_id` is provided the backend looks up the bot's configured model and system prompt. The model overrides the `model` field; the system prompt is prepended as a `system` role message before calling Ollama. `model` defaults to `OLLAMA_MODEL` when no bot is selected or the bot has no model set.
-
-Each streamed line is a raw Ollama NDJSON chunk. If Ollama is unreachable the stream yields `{"error": "..."}` and closes. After streaming finishes, the full conversation is written to ClickHouse — this never blocks or breaks the stream.
+Each streamed line is NDJSON in the shape `{"message": {"role": "assistant", "content": "…"}, "done": false}`. On stream completion a `{"done": true}` chunk is emitted. If the provider is unreachable or the API key is missing, the stream yields `{"error": "…"}` and closes. After streaming finishes the full exchange is written to ClickHouse — this never blocks or breaks the stream.
 
 The chat log `details` field is JSON with the shape:
 ```json
 {
-  "model": "qwen2.5:7b",
+  "provider": "anthropic",
+  "model": "claude-sonnet-5",
   "messages": [{ "role": "user", "content": "…" }],
   "response": "…",
   "prompt_tokens": 42,
@@ -267,13 +279,15 @@ The chat log `details` field is JSON with the shape:
 
 `bot_id` and `bot_name` are only present when the request included a `bot_id`.
 
-### Data ingestion (WebSocket)
+### Plugin proxy
 
-| Method | Path | Description |
-|--------|------|-------------|
-| `POST` | `/api/data-ingestion` | Submit payload for async processing |
-| `WS` | `/api/data-ingestion-listener/{client_id}` | Receive processing status updates |
-| `GET` | `/api/data-ingestion-response/{client_id}` | Poll for final result |
+Forwards REST requests to a module's own backend service. The module must have `backend_url` set in the `modules` table (populated from its `manifest.json` or via the admin API).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `*` | `/api/plugin/{scope}/{path}` | Bearer | Proxy any HTTP method to `{backend_url}/{path}`. Returns 404 if the module has no `backend_url`. |
+
+The `Authorization` header is forwarded verbatim — module backends validate the same `JWT_SECRET_KEY`. WebSocket connections (e.g. for progress notifications) connect directly from the module frontend to the module backend URL passed via `presets.settings.backend_url`.
 
 ## Project structure
 
@@ -299,15 +313,17 @@ backend/
 │       ├── auth.py           # /api/auth/login
 │       ├── dashboard.py      # /api/dashboard, /api/user/theme
 │       ├── settings.py       # /api/settings/* (modules CRUD + manifest discovery)
-│       ├── logs.py           # /api/logs, /api/logs/summary
+│       ├── logs.py           # /api/logs, /api/logs/summary, /api/logs/purge
 │       ├── module_logs.py    # /api/module-logs/{id} (write/read/summary)
 │       ├── module_data.py    # /api/module-data/*
 │       ├── i18n.py           # /api/i18n/{lang}
 │       ├── health.py         # /api/health — DB liveness checks
-│       ├── ingestion.py      # /api/data-ingestion + WebSocket
+│       ├── plugin_proxy.py   # /api/plugin/{scope}/{path} — forwards to module backend_url
 │       ├── bots.py           # /api/bots — bot CRUD (stored in PostgreSQL)
 │       ├── model_status.py   # /api/model-status — Ollama readiness, installed models, pull/delete, SSE stream
-│       └── chat.py           # /api/chat — streaming Ollama proxy, bot system prompt injection
+│       └── chat.py           # /api/chat — streaming LLM proxy, bot system prompt injection
 ├── requirements.txt
-└── Dockerfile
+└── Dockerfile         # single pip install layer — core deps only (no ML libraries)
 ```
+
+> **Module plugin pattern** — ML-heavy dependencies (PyTorch, ultralytics, OpenCV) live in the module's own `backend/Dockerfile`, not in the core image. The core backend stays lightweight. Each module that needs server-side logic declares `"backend_url"` in its `manifest.json`; the core backend proxy at `/api/plugin/{scope}/…` routes requests there at runtime.

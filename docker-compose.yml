@@ -78,6 +78,19 @@ services:
         condition: service_healthy
     restart: on-failure
 
+  # ── Module frontend services (serve remoteEntry.js + manifest.json) ──────────
+
+  hello-world:
+    build: ./modules/hello-world
+    ports:
+      - "3001:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
   data-ingestion:
     build: ./modules/data-ingestion
     ports:
@@ -100,23 +113,51 @@ services:
       retries: 10
     restart: unless-stopped
 
-  yolo-downloader:
-    build: ./backend
-    command: python -c "from ultralytics import YOLO; YOLO('yolov8n.pt'); print('[yolo-downloader] weights ready')"
-    volumes:
-      - yolo_models:/root/.config/Ultralytics
-    restart: "no"
+  # ── Module backend services (plugin backends — each module owns its deps) ────
+  # Each module that declares `backend_url` in its manifest runs its own
+  # FastAPI service here.  The core backend proxies /api/plugin/{scope}/...
+  # to the module's backend_url using the registered DB record.
 
-  hello-world:
-    build: ./modules/hello-world
+  data-ingestion-backend:
+    build: ./modules/data-ingestion/backend
     ports:
-      - "3001:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
+      - "8002:8000"
+    environment:
+      JWT_SECRET_KEY: change-me-in-production
+      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_USER: core-ch
+      CLICKHOUSE_PASSWORD: core-ch
+      CLICKHOUSE_DB: core
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
     restart: unless-stopped
+
+  vision-watch-backend:
+    build: ./modules/vision-watch/backend
+    ports:
+      - "8003:8000"
+    environment:
+      JWT_SECRET_KEY: change-me-in-production
+      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_USER: core-ch
+      CLICKHOUSE_PASSWORD: core-ch
+      CLICKHOUSE_DB: core
+      YOLO_MODELS_DIR: /app/vision-models
+    volumes:
+      - vision_model_weights:/app/vision-models
+    depends_on:
+      postgres:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ── Core platform ─────────────────────────────────────────────────────────────
 
   backend:
     build: ./backend
@@ -130,13 +171,18 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80,http://vision-watch:80,http://vision-watch:80
-      YOLO_MODELS_DIR: /app/vision-models
+      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80,http://vision-watch:80
+      # Cloud LLM providers — leave blank to disable; bots using that provider will
+      # return an error chunk instead of streaming tokens.
+      # Anthropic Claude: get your key at https://console.anthropic.com/settings/keys
+      ANTHROPIC_API_KEY: ""
+      # OpenAI or any compatible endpoint (Groq, Mistral, Azure OpenAI, …)
+      OPENAI_API_KEY: ""
+      # Override the OpenAI base URL for compatible endpoints; leave blank for api.openai.com
+      OPENAI_BASE_URL: ""
     volumes:
       - app_data:/app/data
       - ./data:/app/seed-data:ro
-      - yolo_models:/root/.config/Ultralytics
-      - vision_model_weights:/app/vision-models
     healthcheck:
       test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/api/health')"]
       interval: 5s
@@ -180,5 +226,4 @@ volumes:
   clickhouse_data:
   app_data:
   ollama_data:
-  yolo_models:
   vision_model_weights:

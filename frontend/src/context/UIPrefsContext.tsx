@@ -23,6 +23,7 @@ function save(prefs: UIPrefs) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(prefs))
 }
 
+/** Persists UI preferences in localStorage and syncs changes across tabs. */
 export function UIPrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<UIPrefs>(load)
 
@@ -51,6 +52,7 @@ export function UIPrefsProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Returns UI preference values and mutators; must be inside UIPrefsProvider. */
 export function useUIPrefs(): UIPrefsContextValue {
   const ctx = useContext(UIPrefsContext)
   if (!ctx) throw new Error('useUIPrefs must be used inside UIPrefsProvider')

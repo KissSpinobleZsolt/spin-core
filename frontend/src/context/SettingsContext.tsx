@@ -9,6 +9,7 @@ interface SettingsContextValue {
 
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
+/** Fetches and caches the registered module list, re-fetching when the current user changes. */
 export function SettingsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth()
   const [modules, setModules] = useState<ModuleConfig[]>([])
@@ -35,6 +36,7 @@ export function SettingsProvider({ children }: { children: React.ReactNode }) {
   )
 }
 
+/** Returns the registered modules list and a refresh callback; must be inside SettingsProvider. */
 export function useSettings(): SettingsContextValue {
   const ctx = useContext(SettingsContext)
   if (!ctx) throw new Error('useSettings must be used inside SettingsProvider')

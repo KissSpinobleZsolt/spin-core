@@ -24,7 +24,7 @@ React 19 SPA for the spin-core platform.
 | `/admin/users` | Users | Admin | User listing (stub) |
 | `/admin/modules` | Modules | Admin | Module CRUD — register (with i18n translations + manifest auto-fill), edit, delete, toggle, scan for new modules, view per-module log drawer |
 | `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
-| `/logs` | Logs | Admin | ClickHouse event log viewer |
+| `/logs` | Logs | Admin | ClickHouse event log viewer + "Purge expired logs" admin button |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
 | `/modules/:id` | Federated module | Yes | Webpack container protocol |

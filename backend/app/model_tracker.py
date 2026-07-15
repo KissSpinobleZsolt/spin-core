@@ -16,6 +16,7 @@ _model_progress: dict[str, "ModelProgress"] = {}
 
 @dataclass
 class ModelProgress:
+    """Tracks the live download state of a single Ollama model pull."""
     model: str
     phase: ModelPhase = "pending"
     layers: dict[str, dict] = field(default_factory=dict)
@@ -27,6 +28,7 @@ class ModelProgress:
     error: str | None = None
 
     def as_progress_dict(self) -> dict:
+        """Return a serialisable snapshot of the current download progress."""
         pct = (self.completed_bytes / self.total_bytes * 100.0) if self.total_bytes else 0.0
         # Round speed to nearest KB/s — sub-kilobyte noise causes constant SSE frames
         # even when nothing meaningful has changed, defeating the dedup check.
@@ -47,6 +49,7 @@ def get_model_progress() -> dict[str, ModelProgress]:
 
 
 def _fmt_speed(bps: float) -> str:
+    """Format a bytes-per-second value as a human-readable speed string."""
     if bps >= 1e9:
         return f"{bps / 1e9:.1f} GB/s"
     if bps >= 1e6:
@@ -57,6 +60,7 @@ def _fmt_speed(bps: float) -> str:
 
 
 def _fmt_eta(seconds: float) -> str:
+    """Format a remaining-time duration in seconds as a human-readable ETA string."""
     s = int(seconds)
     if s < 60:
         return f"{s}s"
@@ -71,6 +75,7 @@ _SPEED_WINDOW = 30.0  # seconds — wider window gives smoother ETA
 
 
 def _update_speed_and_eta(mp: ModelProgress) -> None:
+    """Recalculate the rolling download speed and ETA for a ModelProgress object."""
     now = time.monotonic()
 
     # Only add a sample when bytes actually advanced.
@@ -104,6 +109,7 @@ def _update_speed_and_eta(mp: ModelProgress) -> None:
 
 
 def _process_pull_line(mp: ModelProgress, line: dict) -> None:
+    """Process one JSON line from Ollama's streaming pull response and update ModelProgress."""
     status = line.get("status", "")
 
     if status == "success":
@@ -139,6 +145,7 @@ def _process_pull_line(mp: ModelProgress, line: dict) -> None:
 
 
 async def _track_model(model: str) -> None:
+    """Stream an Ollama model pull and update the shared ModelProgress entry until done."""
     mp = ModelProgress(model=model)
     _model_progress[model] = mp
 
@@ -174,6 +181,7 @@ async def _track_model(model: str) -> None:
 
 
 async def run_sequential_trackers(models: list[str]) -> None:
+    """Pull a list of Ollama models one after another, waiting for each to complete."""
     for model in models:
         await _track_model(model)
 

@@ -8,12 +8,15 @@ router = APIRouter(prefix="/api/auth", tags=["auth"])
 
 
 class LoginCredentials(BaseModel):
+    """Request body schema for email and password login."""
+
     email: str
     password: str
 
 
 @router.post("/login")
 async def login(credentials: LoginCredentials):
+    """Authenticate a user with email and password and return a signed JWT with user profile."""
     user = get_pg().get_user_by_email(credentials.email)
     if not user or not verify_password(credentials.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")

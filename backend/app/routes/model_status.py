@@ -16,6 +16,7 @@ router = APIRouter(prefix="/api/model-status", tags=["model-status"])
 
 
 def _required_models() -> list[str]:
+    """Return the list of Ollama model names the platform requires, read from environment variables."""
     return [
         m for m in [
             os.getenv("OLLAMA_MODEL", "qwen2.5:7b"),
@@ -26,6 +27,7 @@ def _required_models() -> list[str]:
 
 
 async def _check_status() -> dict:
+    """Query Ollama for installed models and return ready or pending status for each required model."""
     required = _required_models()
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -65,11 +67,13 @@ async def _check_status() -> dict:
 
 @router.get("")
 async def model_status():
+    """Return the current ready or pending status for all required Ollama models."""
     return await _check_status()
 
 
 @router.get("/installed")
 async def installed_models():
+    """Return the full list of Ollama models currently installed, with size, family, and quantization metadata."""
     try:
         async with httpx.AsyncClient(timeout=5.0) as client:
             resp = await client.get(f"{OLLAMA_URL}/api/tags")
@@ -95,11 +99,14 @@ async def installed_models():
 
 
 class PullPayload(BaseModel):
+    """Request body schema for initiating an Ollama model pull."""
+
     name: str
 
 
 @router.post("/pull")
 async def pull_model(payload: PullPayload, _: str = Depends(admin_dep)):
+    """Start a background pull of the named Ollama model (admin only)."""
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="model name is required")
@@ -109,6 +116,7 @@ async def pull_model(payload: PullPayload, _: str = Depends(admin_dep)):
 
 @router.delete("/{model_name:path}")
 async def delete_model(model_name: str, _: str = Depends(admin_dep)):
+    """Delete a named model from the local Ollama instance (admin only)."""
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.request(
@@ -128,7 +136,9 @@ async def delete_model(model_name: str, _: str = Depends(admin_dep)):
 
 @router.get("/stream")
 async def model_status_stream():
+    """Stream real-time model status as Server-Sent Events until all required models are ready."""
     async def generate():
+        """Yield SSE payloads with model status and pull progress at one-second intervals."""
         last_payload_str: str | None = None
         tags_cache: dict | None = None
 

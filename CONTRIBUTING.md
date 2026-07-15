@@ -70,6 +70,18 @@ Leave the `externals` block **untouched**. React must remain external so the mod
 }
 ```
 
+If your module needs a backend service, add `backend_url` pointing to it (see step 3b below). Omit the field for frontend-only modules.
+
+### 3b. (Optional) Add a plugin backend
+
+If your module needs server-side logic (file uploads, ML inference, async jobs), create a `backend/` directory inside your module with its own FastAPI app and `Dockerfile`. The core backend will proxy `POST /api/plugin/{scope}/…` requests to your backend automatically once you declare:
+
+```json
+"backend_url": "http://your-module-backend:8000"
+```
+
+in `manifest.json`. Add the corresponding service to `docker-compose.yml` with `JWT_SECRET_KEY`, `POSTGRES_URL`, and `CLICKHOUSE_*` env vars so it can validate tokens and access the shared databases.
+
 ### 4. Run it standalone
 
 ```bash

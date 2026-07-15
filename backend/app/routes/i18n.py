@@ -8,6 +8,7 @@ router = APIRouter(prefix="/api/i18n", tags=["i18n"])
 
 @router.get("/{lang}")
 async def get_translations(lang: str):
+    """Return all translation strings for the requested language."""
     data = get_pg().get_i18n_data(lang)
     if data is None:
         raise HTTPException(status_code=404, detail=f"Language '{lang}' not found")
@@ -20,5 +21,6 @@ async def update_translations(
     data: dict,
     _: str = Depends(admin_dep),
 ):
+    """Replace the full translation dataset for a given language (admin only)."""
     get_pg().set_i18n_data(lang, data)
     return {"ok": True}

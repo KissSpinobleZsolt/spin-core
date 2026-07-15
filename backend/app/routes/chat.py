@@ -34,6 +34,7 @@ _NAV_ADMIN = [
 
 
 def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = None) -> str:
+    """Compose the full system prompt for a bot by prepending bot-type context, platform navigation, and optional module info."""
     is_admin = "admin" in user_roles
 
     preprompt = ""
@@ -83,11 +84,15 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
 
 
 class Message(BaseModel):
+    """A single chat message with a role (user, assistant, or system) and text content."""
+
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
+    """Request body schema for a streaming chat completion."""
+
     messages: List[Message]
     model: str = OLLAMA_MODEL
     bot_id: Optional[str] = None
@@ -96,7 +101,7 @@ class ChatRequest(BaseModel):
 
 @router.post("")
 async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
-
+    """Stream a chat completion from Ollama, applying bot configuration and logging the exchange to ClickHouse."""
     # Resolve bot config if bot_id provided
     bot_name: Optional[str] = None
     effective_model = payload.model
@@ -122,6 +127,7 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
         messages_to_send = [Message(role="system", content=system_content)] + messages_to_send
 
     async def stream():
+        """Yield NDJSON chunks from Ollama and write a completion log entry when the stream finishes."""
         start = time.time()
         response_parts: list[str] = []
         prompt_tokens = 0
@@ -195,6 +201,7 @@ async def get_chat_logs(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
 ):
+    """Return paginated chatbot completion logs from ClickHouse, optionally filtered by time range and user email."""
     result = get_ch().query_module_logs(
         _CHATBOT_SCOPE,
         limit=limit,
@@ -215,6 +222,7 @@ async def get_chat_logs_summary(
     limit: int = Query(default=500, le=2000),
     offset: int = Query(default=0, ge=0),
 ):
+    """Return hourly aggregated chatbot log summaries from the materialized view for the given time window."""
     return get_ch().query_module_logs_mv(
         _CHATBOT_SCOPE,
         from_dt=from_dt,

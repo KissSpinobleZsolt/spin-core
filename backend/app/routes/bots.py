@@ -11,6 +11,8 @@ router = APIRouter(prefix="/api/bots", tags=["bots"])
 
 
 class BotPayload(BaseModel):
+    """Request body schema for creating or updating a bot."""
+
     name: str
     description: str = ""
     type: str = "communicator"
@@ -23,6 +25,8 @@ class BotPayload(BaseModel):
 
 
 class BotOut(BaseModel):
+    """Response schema representing a single bot with its full configuration and metadata."""
+
     id: str
     name: str
     description: str
@@ -39,11 +43,13 @@ class BotOut(BaseModel):
 
 @router.get("/types")
 def list_bot_types(_: str = Depends(token_dep)):
+    """Return all registered bot type definitions."""
     return get_pg().get_bot_types()
 
 
 @router.get("", response_model=List[BotOut])
 def list_bots(email: str = Depends(token_dep), module_id: Optional[str] = Query(default=None)):
+    """Return bots visible to the authenticated user, optionally scoped to a specific module."""
     pg = get_pg()
     user = pg.get_user_by_email(email)
     user_roles = user.roles if user else []
@@ -57,6 +63,7 @@ def list_bots(email: str = Depends(token_dep), module_id: Optional[str] = Query(
 
 @router.post("", response_model=BotOut, status_code=201)
 def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
+    """Create a new bot with the provided configuration (admin only)."""
     bot = get_pg().create_bot(
         name=payload.name,
         description=payload.description,
@@ -74,6 +81,7 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
 
 @router.get("/{bot_id}", response_model=BotOut)
 def get_bot(bot_id: str, email: str = Depends(token_dep)):
+    """Return a single bot by ID, enforcing active status and role restrictions for non-admins."""
     pg = get_pg()
     bot = pg.get_bot_by_id(bot_id)
     if not bot:
@@ -94,6 +102,7 @@ def get_bot(bot_id: str, email: str = Depends(token_dep)):
 
 @router.put("/{bot_id}", response_model=BotOut)
 def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
+    """Replace a bot's full configuration by ID (admin only)."""
     bot = get_pg().update_bot(
         bot_id=bot_id,
         name=payload.name,
@@ -113,5 +122,6 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
 
 @router.delete("/{bot_id}", status_code=204)
 def delete_bot(bot_id: str, _: str = Depends(admin_dep)):
+    """Permanently delete a bot by ID (admin only)."""
     if not get_pg().delete_bot(bot_id):
         raise HTTPException(status_code=404, detail="Bot not found")

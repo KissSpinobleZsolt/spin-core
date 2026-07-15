@@ -12,3 +12,4 @@ class ModuleInput(BaseModel):
     enabled: bool = True
     roles: list[str] = ["user", "admin"]
     presets: dict = {"i18n": {}, "layout": {}, "settings": {}}
+    backend_url: str | None = None

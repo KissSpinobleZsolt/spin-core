@@ -1,0 +1,430 @@
+<!DOCTYPE html><html class="default" lang="en" data-base="./"><head><meta charset="utf-8"/><meta http-equiv="x-ua-compatible" content="IE=edge"/><title>spin-core frontend</title><meta name="description" content="Documentation for spin-core frontend"/><meta name="viewport" content="width=device-width, initial-scale=1"/><link rel="stylesheet" href="assets/style.css"/><link rel="stylesheet" href="assets/highlight.css"/><script defer src="assets/main.js"></script><script async src="assets/icons.js" id="tsd-icons-script"></script><script async src="assets/search.js" id="tsd-search-script"></script><script async src="assets/navigation.js" id="tsd-nav-script"></script></head><body><script>document.documentElement.dataset.theme = localStorage.getItem("tsd-theme") || "os";document.body.style.display="none";setTimeout(() => window.app?app.showPage():document.body.style.removeProperty("display"),500)</script><header class="tsd-page-toolbar">
+<div class="tsd-toolbar-contents container"><a href="index.html" class="title">spin-core frontend</a>
+<div id="tsd-toolbar-links"><a href="https://github.com/KissSpinobleZsolt/spin-core">GitHub</a></div><button id="tsd-search-trigger" class="tsd-widget" aria-label="Search"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-search"></use></svg></button><dialog id="tsd-search" aria-label="Search"><input role="combobox" id="tsd-search-input" aria-controls="tsd-search-results" aria-autocomplete="list" aria-expanded="true" autocapitalize="off" autocomplete="off" placeholder="Search the docs" maxLength="100"/>
+<ul role="listbox" id="tsd-search-results"></ul>
+<div id="tsd-search-status" aria-live="polite" aria-atomic="true">
+<div>Preparing search index...</div></div></dialog><a href="#" class="tsd-widget menu" id="tsd-toolbar-menu-trigger" data-toggle="menu" aria-label="Menu"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-menu"></use></svg></a></div></header>
+<div class="container container-main">
+<div class="col-content">
+<div class="tsd-page-title">
+<h1>spin-core frontend</h1></div>
+<div class="tsd-panel tsd-typography"><h1 id="spin-core-frontend" class="tsd-anchor-link">spin-core / frontend<a href="#spin-core-frontend" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h1>
+<p>React 19 SPA for the spin-core platform.</p>
+<h2 id="tech" class="tsd-anchor-link">Tech<a href="#tech" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<ul>
+<li><strong>Framework</strong>: React 19 + TypeScript</li>
+<li><strong>Build tool</strong>: Vite 8 with React Compiler enabled</li>
+<li><strong>Styling</strong>: Tailwind CSS v4</li>
+<li><strong>Routing</strong>: React Router v7</li>
+<li><strong>Data fetching</strong>: TanStack React Query v5</li>
+<li><strong>i18n</strong>: i18next + react-i18next — translations fetched from <code>GET /api/i18n/{lang}</code> (PostgreSQL-backed), live-editable by admins</li>
+<li><strong>Package manager</strong>: pnpm 9</li>
+</ul>
+<h2 id="pages-routes" class="tsd-anchor-link">Pages &amp; routes<a href="#pages-routes" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>Route</th>
+<th>Page</th>
+<th>Auth</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/login</code></td>
+<td>Login</td>
+<td>No</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/</code></td>
+<td>Dashboard</td>
+<td>Yes</td>
+<td></td>
+</tr>
+<tr>
+<td><code>/bots</code></td>
+<td>Bots</td>
+<td>Yes</td>
+<td>Card grid of enabled bots the user can launch</td>
+</tr>
+<tr>
+<td><code>/bots/:botId</code></td>
+<td>Bot chat</td>
+<td>Yes</td>
+<td>Full-page streaming chat with a specific bot</td>
+</tr>
+<tr>
+<td><code>/admin/llms</code></td>
+<td>LLMs</td>
+<td>Admin</td>
+<td>Ollama model management — pull, list, delete</td>
+</tr>
+<tr>
+<td><code>/admin/users</code></td>
+<td>Users</td>
+<td>Admin</td>
+<td>User listing (stub)</td>
+</tr>
+<tr>
+<td><code>/admin/modules</code></td>
+<td>Modules</td>
+<td>Admin</td>
+<td>Module CRUD — register (with i18n translations + manifest auto-fill), edit, delete, toggle, scan for new modules, view per-module log drawer</td>
+</tr>
+<tr>
+<td><code>/admin/status</code></td>
+<td>Status</td>
+<td>Admin</td>
+<td>Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation</td>
+</tr>
+<tr>
+<td><code>/logs</code></td>
+<td>Logs</td>
+<td>Admin</td>
+<td>ClickHouse event log viewer + &quot;Purge expired logs&quot; admin button</td>
+</tr>
+<tr>
+<td><code>/translations</code></td>
+<td>Translations</td>
+<td>Admin</td>
+<td>Live i18n editor (EN + RO side-by-side)</td>
+</tr>
+<tr>
+<td><code>/bots-admin</code></td>
+<td>Bots (admin)</td>
+<td>Admin</td>
+<td>Bot CRUD — create, edit, delete, enable/disable</td>
+</tr>
+<tr>
+<td><code>/modules/:id</code></td>
+<td>Federated module</td>
+<td>Yes</td>
+<td>Webpack container protocol</td>
+</tr>
+</tbody>
+</table>
+<p>All authenticated routes redirect to <code>/login</code> if no token is present. The admin user is seeded by the backend from <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> env vars — there is no setup wizard.</p>
+<h2 id="context-providers" class="tsd-anchor-link">Context providers<a href="#context-providers" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>Provider</th>
+<th>Key stored</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>AuthContext</code></td>
+<td><code>token</code> (localStorage)</td>
+<td>JWT + user object</td>
+</tr>
+<tr>
+<td><code>ThemeContext</code></td>
+<td><code>theme</code> (localStorage)</td>
+<td>Dark / light, cross-tab sync</td>
+</tr>
+<tr>
+<td><code>SettingsContext</code></td>
+<td>—</td>
+<td>Polls <code>GET /api/settings</code></td>
+</tr>
+<tr>
+<td><code>UIPrefsContext</code></td>
+<td><code>ui_prefs</code> (localStorage)</td>
+<td>Sidebar collapsed state, cross-tab sync</td>
+</tr>
+<tr>
+<td><code>HealthContext</code></td>
+<td>—</td>
+<td>Receives DB liveness updates from the health Web Worker</td>
+</tr>
+</tbody>
+</table>
+<h2 id="health-monitoring" class="tsd-anchor-link">Health monitoring<a href="#health-monitoring" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>src/workers/healthWorker.ts</code> is a <strong>Web Worker</strong> that runs off the main thread. It pings <code>GET /api/health</code> immediately on startup, then every 30 s (5 s timeout). Results are sent back via <code>postMessage</code> and consumed by <code>HealthContext</code>.</p>
+<p>The health payload includes a <code>translations</code> map (<code>lang → ISO timestamp</code>) alongside the DB liveness flags. <code>useI18nSync</code> watches this map and reloads the active language's bundle only when its timestamp changes — no polling, no unnecessary fetches.</p>
+<ul>
+<li><strong>Header</strong>: shows a red &quot;API offline&quot; or &quot;DB degraded&quot; pill when any service is down; invisible when everything is healthy.</li>
+<li><strong>Admin → Status</strong>: live system overview with per-service health badges and a &quot;Last checked&quot; timestamp.</li>
+</ul>
+<h2 id="i18n" class="tsd-anchor-link">i18n<a href="#i18n" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Translations are fetched from <code>GET /api/i18n/{lang}</code> (PostgreSQL-backed) — there are no bundled locale files. On first render <code>App</code> shows a full-screen spinner while the initial fetch completes, then unmounts it. Subsequent reloads happen automatically when the health worker detects a <code>translations</code> timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.</p>
+<h2 id="ollama-model-status-banner" class="tsd-anchor-link">Ollama model status banner<a href="#ollama-model-status-banner" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>src/components/layout/ModelStatusBanner.tsx</code> is a persistent banner rendered in <code>Layout</code> between the header and the page content. It connects to <code>GET /api/model-status/stream</code> via the browser-native <code>EventSource</code> API and shows live download progress for required Ollama models.</p>
+<h3 id="behaviour" class="tsd-anchor-link">Behaviour<a href="#behaviour" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<table>
+<thead>
+<tr>
+<th>State</th>
+<th>Banner</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All models already ready on page load</td>
+<td>Never appears</td>
+</tr>
+<tr>
+<td>Models still downloading</td>
+<td>Amber banner with per-model progress bar, speed, and ETA</td>
+</tr>
+<tr>
+<td>All models finish downloading</td>
+<td>Green &quot;All models ready&quot; — auto-dismisses after 4 s</td>
+</tr>
+<tr>
+<td>Ollama container unreachable</td>
+<td>Grey &quot;Waiting for Ollama…&quot; until it responds</td>
+</tr>
+</tbody>
+</table>
+<p>The banner is always dismissible via the <code>✕</code> button. The backend pushes a Server-Sent Event every ~1 second during download (deduped — identical frames are skipped). Per-model progress shows:</p>
+<ul>
+<li>Animated progress bar (<code>completed / total</code> bytes)</li>
+<li>Download speed (rolling 10-second window average, e.g. <code>5.0 MB/s</code>)</li>
+<li>ETA (e.g. <code>10m 7s</code>), hidden until enough speed samples are collected</li>
+</ul>
+<h3 id="hook" class="tsd-anchor-link">Hook<a href="#hook" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>src/hooks/useModelStatus.ts</code> wraps the <code>EventSource</code> lifecycle:</p>
+<pre><code class="ts"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">status</span><span class="hl-1">, </span><span class="hl-2">dismissed</span><span class="hl-1">, </span><span class="hl-2">dismiss</span><span class="hl-1"> } = </span><span class="hl-3">useModelStatus</span><span class="hl-1">()</span><br/><span class="hl-4">// status: ModelStatusPayload | null</span><br/><span class="hl-4">// dismissed: boolean — true once all ready (or manually closed)</span><br/><span class="hl-4">// dismiss(): () =&gt; void — manual close</span>
+</code><button type="button">Copy</button></pre>
+
+<p><code>ModelInfo.progress</code> is <code>null</code> when a model is ready or the tracker hasn't started yet; otherwise it carries <code>{ percent, speed_str, eta_str, total_bytes, completed_bytes }</code>.</p>
+<p><code>EventSource</code> auto-reconnects on network drops without any manual retry logic.</p>
+<h2 id="module-federation-loader" class="tsd-anchor-link">Module federation loader<a href="#module-federation-loader" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p><code>src/utils/federationLoader.ts</code> implements the webpack container protocol for a <strong>Vite host</strong>.</p>
+<h3 id="how-it-works" class="tsd-anchor-link">How it works<a href="#how-it-works" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<ol>
+<li>Sets <code>window.React</code> and <code>window.ReactDOM</code> to the host's running instances.</li>
+<li>Injects a <code>&lt;script&gt;</code> tag for the remote's <code>remoteEntry.js</code> (deduplicated by scope name).</li>
+<li>Calls <code>container.init({})</code> then <code>container.get(component)</code> to obtain the component factory.</li>
+</ol>
+<h3 id="react-singleton-contract" class="tsd-anchor-link">React singleton contract<a href="#react-singleton-contract" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Every remote <strong>must</strong> declare react as a webpack external so it reads from the host's globals rather than bundling its own copy:</p>
+<pre><code class="js"><span class="hl-4">// remote webpack.config.js</span><br/><span class="hl-5">externals</span><span class="hl-1">: {</span><br/><span class="hl-1">  </span><span class="hl-5">react</span><span class="hl-1">: </span><span class="hl-6">&#39;React&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&#39;react-dom&#39;</span><span class="hl-1">: </span><span class="hl-6">&#39;ReactDOM&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">  </span><span class="hl-6">&#39;react-dom/client&#39;</span><span class="hl-1">: </span><span class="hl-6">&#39;ReactDOM&#39;</span><span class="hl-1">,</span><br/><span class="hl-1">}</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Bundling a second React alongside the host's renderer causes the <code>Invalid hook call</code> / <code>Cannot read properties of null (reading 'useState')</code> error.</p>
+<p>For standalone testing of a remote at its own port, add the React 18 UMD scripts to the remote's <code>public/index.html</code> — they set <code>window.React</code> and <code>window.ReactDOM</code> automatically. See <code>modules/hello-world/</code> for a working example.</p>
+<h3 id="native-bot-system" class="tsd-anchor-link">Native bot system<a href="#native-bot-system" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The platform ships with a built-in bot system — no Module Federation required.</p>
+<p><strong><code>ChatBubble</code></strong> (<code>src/components/chat/ChatBubble.tsx</code>) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to <code>localStorage</code>; the selected bot/model are also persisted.</p>
+<p><strong><code>/bots</code></strong> (<code>src/pages/Bots.tsx</code>) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking <strong>Launch</strong> opens a full-page chat at <code>/bots/:botId</code>.</p>
+<p><strong><code>/bots/:botId</code></strong> (<code>src/pages/Chat.tsx</code>) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends <code>bot_id</code> with every request to <code>POST /api/chat</code>. The backend injects the bot's system prompt and model. Non-communicator bots render a <code>BotConfigSkeleton</code> placeholder instead of the chat UI.</p>
+<p><strong><code>ModuleBotPanel</code></strong> (<code>src/components/modules/ModuleBotPanel.tsx</code>) — a floating violet panel (<code>fixed bottom-6 left-6</code>) rendered inside every <code>FederatedPage</code>. On mount it fetches <code>GET /api/bots?module_id=&lt;id&gt;</code> and renders a bot selector + streaming chat scoped to that module. Passes <code>module_id</code> to <code>POST /api/chat</code> so the backend injects the module's name and description into the bot's system prompt. Returns <code>null</code> and is invisible when no active bots are assigned to the module.</p>
+<p><strong><code>/bots-admin</code></strong> (<code>src/pages/BotsAdmin.tsx</code>) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default &quot;AI Assistant&quot; bot is seeded on first backend startup.</p>
+<h3 id="module-presets" class="tsd-anchor-link">Module presets<a href="#module-presets" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>Each registered module stores a <code>presets</code> JSON blob (<code>{ i18n, layout, settings }</code>) in PostgreSQL. When a federated module is loaded, <code>FederatedPage</code> passes the presets as a prop:</p>
+<pre><code class="tsx"><span class="hl-7">&lt;</span><span class="hl-8">RemoteComponent</span><span class="hl-1"> </span><span class="hl-9">presets</span><span class="hl-1">=</span><span class="hl-0">{</span><span class="hl-10">mod</span><span class="hl-11">.</span><span class="hl-10">presets</span><span class="hl-0">}</span><span class="hl-1"> </span><span class="hl-7">/&gt;</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Remote components can read <code>props.presets</code> to receive platform configuration without any additional API calls.</p>
+<h3 id="add-edit-module-form" class="tsd-anchor-link">Add / Edit module form<a href="#add-edit-module-form" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p>The <strong>Admin → Modules</strong> add/edit modal exposes two additional actions beyond the basic fields:</p>
+<p><strong>Load manifest</strong> — button next to the Remote entry URL field. The browser fetches <code>manifest.json</code> from the module's base URL directly (no backend proxy — nginx serves it with <code>Access-Control-Allow-Origin: *</code>). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots will be provisioned on save.</p>
+<p><strong>i18n translations</strong> — a JSON textarea that accepts a multi-language object:</p>
+<pre><code class="json"><span class="hl-1">{ </span><span class="hl-12">&quot;en&quot;</span><span class="hl-1">: { </span><span class="hl-12">&quot;key&quot;</span><span class="hl-1">: </span><span class="hl-6">&quot;value&quot;</span><span class="hl-1"> }, </span><span class="hl-12">&quot;ro&quot;</span><span class="hl-1">: { </span><span class="hl-12">&quot;cheie&quot;</span><span class="hl-1">: </span><span class="hl-6">&quot;valoare&quot;</span><span class="hl-1"> } }</span>
+</code><button type="button">Copy</button></pre>
+
+<p>When the form is saved, each language key is posted to <code>PUT /api/i18n/{lang}</code> before the module record is persisted, merging the translations into the database.</p>
+<h3 id="module-discovery" class="tsd-anchor-link">Module discovery<a href="#module-discovery" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
+<p><code>src/services/settingsService.ts</code> exposes <code>discoverModules()</code> which calls <code>GET /api/settings/modules/discover</code>. The backend concurrently fetches <code>manifest.json</code> from every URL in <code>MODULE_REGISTRY_URLS</code> and returns a <code>DiscoveredModule[]</code> with an <code>already_registered</code> flag per entry.</p>
+<p><strong>Admin → Modules</strong> (<code>/admin/modules</code>) surfaces this via a <strong>🔍 Scan for modules</strong> button. After a scan:</p>
+<ul>
+<li>Modules whose <code>scope</code> is already registered show a green <strong>Registered</strong> badge.</li>
+<li>New modules show an <strong>Add</strong> button that opens the module form pre-filled from the manifest — the admin adjusts the <code>remote_url</code> if needed (e.g. NodePort URL in K8s) and clicks Save.</li>
+</ul>
+<p>The scan is on-demand (no background polling) and requires admin auth.</p>
+<h2 id="shared-ui-components" class="tsd-anchor-link">Shared UI components<a href="#shared-ui-components" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>All reusable primitives live in <code>src/components/ui/</code>. Always import from there — do not re-declare these inline.</p>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>File</th>
+<th>Props</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Btn</code></td>
+<td><code>Button.tsx</code></td>
+<td><code>variant?: 'primary' | 'secondary' | 'danger'</code>, all <code>&lt;button&gt;</code> attrs</td>
+</tr>
+<tr>
+<td><code>Input</code></td>
+<td><code>Input.tsx</code></td>
+<td><code>label?: string</code>, all <code>&lt;input&gt;</code> attrs</td>
+</tr>
+<tr>
+<td><code>Label</code></td>
+<td><code>Label.tsx</code></td>
+<td>all <code>&lt;label&gt;</code> attrs</td>
+</tr>
+<tr>
+<td><code>Modal</code></td>
+<td><code>Modal.tsx</code></td>
+<td><code>title</code>, <code>onClose?</code>, <code>maxWidth?</code>, <code>children</code></td>
+</tr>
+<tr>
+<td><code>Card</code></td>
+<td><code>Card.tsx</code></td>
+<td><code>className?</code>, <code>children</code></td>
+</tr>
+<tr>
+<td><code>Spinner</code></td>
+<td><code>Spinner.tsx</code></td>
+<td><code>size?: 'sm' | 'md' | 'lg'</code></td>
+</tr>
+<tr>
+<td><code>Toggle</code></td>
+<td><code>Toggle.tsx</code></td>
+<td><code>checked</code>, <code>onChange</code>, <code>disabled?</code></td>
+</tr>
+<tr>
+<td><code>ErrorBanner</code></td>
+<td><code>ErrorBanner.tsx</code></td>
+<td><code>message: string</code></td>
+</tr>
+<tr>
+<td><code>PageTitle</code></td>
+<td><code>PageTitle.tsx</code></td>
+<td><code>children</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="utilities-hooks-and-constants" class="tsd-anchor-link">Utilities, hooks, and constants<a href="#utilities-hooks-and-constants" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Exports</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>src/utils/formatters.ts</code></td>
+<td><code>fmtBytes(n)</code>, <code>formatEventTime(ts)</code></td>
+</tr>
+<tr>
+<td><code>src/utils/safeJsonParse.ts</code></td>
+<td><code>safeJsonParse&lt;T&gt;(raw, fallback)</code></td>
+</tr>
+<tr>
+<td><code>src/constants/botConstants.ts</code></td>
+<td><code>BOT_TYPES</code>, <code>TYPE_BADGE</code></td>
+</tr>
+<tr>
+<td><code>src/services/modelStatusService.ts</code></td>
+<td><code>InstalledModel</code>, <code>InstalledModelsData</code> types</td>
+</tr>
+<tr>
+<td><code>src/hooks/useChatStream.ts</code></td>
+<td><code>useChatStream(botId, model, moduleId?)</code> → <code>{ messages, setMessages, input, setInput, loading, sendMessage }</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/useModelStatus.ts</code></td>
+<td><code>useModelStatus()</code> → <code>{ status, dismissed, dismiss }</code></td>
+</tr>
+</tbody>
+</table>
+<h2 id="first-visit-modals" class="tsd-anchor-link">First-visit modals<a href="#first-visit-modals" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Two modals fire automatically — no configuration needed.</p>
+<p><strong><code>CookieConsentModal</code></strong> (<code>src/components/CookieConsentModal.tsx</code>) — fixed bottom banner shown to every visitor before login. Offers &quot;Essential only&quot; and &quot;Accept all&quot;. Choice stored in <code>localStorage</code> under <code>spin_cookie_consent</code>. Disappears permanently once accepted.</p>
+<p><strong><code>WorkspaceTermsModal</code></strong> (<code>src/components/WorkspaceTermsModal.tsx</code>) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click &quot;Continue to spin-core&quot;. Acceptance stored in <code>localStorage</code> under <code>spin_workspace_accepted_v1</code> keyed by username. Cannot be dismissed without accepting.</p>
+<h2 id="local-development-without-docker" class="tsd-anchor-link">Local development (without Docker)<a href="#local-development-without-docker" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">install</span><br/><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">dev</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Runs on <a href="http://localhost:3000">http://localhost:3000</a>. Requires the backend on port 8000 (or set <code>API_PROXY_TARGET</code>).</p>
+<h2 id="development-with-docker-hot-reload" class="tsd-anchor-link">Development with Docker (hot reload)<a href="#development-with-docker-hot-reload" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>From the project root — health checks enforce the correct startup order automatically:</p>
+<pre><code class="bash"><span class="hl-3">docker</span><span class="hl-1"> </span><span class="hl-6">compose</span><span class="hl-1"> </span><span class="hl-6">up</span><span class="hl-1"> </span><span class="hl-0">--build</span><span class="hl-1"> </span><span class="hl-6">frontend-dev</span>
+</code><button type="button">Copy</button></pre>
+
+<p>Source files are mounted into the container — edits are reflected immediately via Vite HMR.</p>
+<h2 id="environment-variables" class="tsd-anchor-link">Environment variables<a href="#environment-variables" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<table>
+<thead>
+<tr>
+<th>Variable</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>API_PROXY_TARGET</code></td>
+<td><code>http://localhost:8000</code></td>
+<td>Backend URL for Vite dev proxy</td>
+</tr>
+<tr>
+<td><code>VITE_API_BASE_URL</code></td>
+<td><code>/api</code></td>
+<td>API base URL (build-time)</td>
+</tr>
+</tbody>
+</table>
+<p><code>API_PROXY_TARGET</code> is set to <code>http://backend:8000</code> automatically when running via Docker Compose.</p>
+<h2 id="production-build" class="tsd-anchor-link">Production build<a href="#production-build" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">build</span><span class="hl-1">       </span><span class="hl-4"># outputs to dist/</span><br/><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">preview</span><span class="hl-1">     </span><span class="hl-4"># preview the production build locally</span>
+</code><button type="button">Copy</button></pre>
+
+<p>The Docker production image (<code>Dockerfile</code>) builds the SPA and serves it via nginx. nginx proxies <code>/api/*</code> to the backend container. The same <code>nginx.conf</code> works in Kubernetes because the backend Service DNS resolves as <code>backend</code> within the <code>spin-core</code> namespace.</p>
+<h2 id="linting" class="tsd-anchor-link">Linting<a href="#linting" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<pre><code class="bash"><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">lint</span>
+</code><button type="button">Copy</button></pre>
+
+</div></div>
+<div class="col-sidebar">
+<div class="page-menu">
+<div class="tsd-navigation settings">
+<details class="tsd-accordion"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>Settings</h3></summary>
+<div class="tsd-accordion-details">
+<div class="tsd-filter-visibility"><span class="settings-label">Member Visibility</span>
+<ul id="tsd-filter-options">
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-protected" name="protected"/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Protected</span></label></li>
+<li class="tsd-filter-item"><label class="tsd-filter-input"><input type="checkbox" id="tsd-filter-inherited" name="inherited" checked/><svg width="32" height="32" viewBox="0 0 32 32" aria-hidden="true"><rect class="tsd-checkbox-background" width="30" height="30" x="1" y="1" rx="6" fill="none"></rect><path class="tsd-checkbox-checkmark" d="M8.35422 16.8214L13.2143 21.75L24.6458 10.25" stroke="none" stroke-width="3.5" stroke-linejoin="round" fill="none"></path></svg><span>Inherited</span></label></li></ul></div>
+<div class="tsd-theme-toggle"><label class="settings-label" for="tsd-theme">Theme</label><select id="tsd-theme"><option value="os">OS</option><option value="light">Light</option><option value="dark">Dark</option></select></div></div></details></div>
+<details open class="tsd-accordion tsd-page-navigation"><summary class="tsd-accordion-summary"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden="true"><use href="assets/icons.svg#icon-chevronDown"></use></svg>
+<h3>On This Page</h3></summary>
+<div class="tsd-accordion-details"><a href="#spin-core-frontend"><span>spin-<wbr/>core / frontend</span></a>
+<ul>
+<li><a href="#tech"><span>Tech</span></a></li>
+<li><a href="#pages-routes"><span>Pages &amp; routes</span></a></li>
+<li><a href="#context-providers"><span>Context providers</span></a></li>
+<li><a href="#health-monitoring"><span>Health monitoring</span></a></li>
+<li><a href="#i18n"><span>i18n</span></a></li>
+<li><a href="#ollama-model-status-banner"><span>Ollama model status banner</span></a></li>
+<li>
+<ul>
+<li><a href="#behaviour"><span>Behaviour</span></a></li>
+<li><a href="#hook"><span>Hook</span></a></li></ul></li>
+<li><a href="#module-federation-loader"><span>Module federation loader</span></a></li>
+<li>
+<ul>
+<li><a href="#how-it-works"><span>How it works</span></a></li>
+<li><a href="#react-singleton-contract"><span>React singleton contract</span></a></li>
+<li><a href="#native-bot-system"><span>Native bot system</span></a></li>
+<li><a href="#module-presets"><span>Module presets</span></a></li>
+<li><a href="#add-edit-module-form"><span>Add / <wbr/>Edit module form</span></a></li>
+<li><a href="#module-discovery"><span>Module discovery</span></a></li></ul></li>
+<li><a href="#shared-ui-components"><span>Shared <wbr/>UI components</span></a></li>
+<li><a href="#utilities-hooks-and-constants"><span>Utilities, hooks, and constants</span></a></li>
+<li><a href="#first-visit-modals"><span>First-<wbr/>visit modals</span></a></li>
+<li><a href="#local-development-without-docker"><span>Local development (without <wbr/>Docker)</span></a></li>
+<li><a href="#development-with-docker-hot-reload"><span>Development with <wbr/>Docker (hot reload)</span></a></li>
+<li><a href="#environment-variables"><span>Environment variables</span></a></li>
+<li><a href="#production-build"><span>Production build</span></a></li>
+<li><a href="#linting"><span>Linting</span></a></li></ul></div></details></div>
+<div class="site-menu">
+<nav id="tsd-sidebar-links" class="tsd-navigation"><a href="https://github.com/KissSpinobleZsolt/spin-core" class="tsd-nav-link">GitHub</a></nav>
+<nav class="tsd-navigation"><a href="modules.html">spin-core frontend</a>
+<ul class="tsd-small-nested-navigation" id="tsd-nav-container">
+<li>Loading...</li></ul></nav></div></div></div><footer>
+<p class="tsd-generator">Generated using <a href="https://typedoc.org/" target="_blank">TypeDoc</a></p></footer>
+<div class="overlay"></div></body></html>

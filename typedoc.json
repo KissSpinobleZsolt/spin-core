@@ -1,0 +1,22 @@
+{
+  "tsconfig": "frontend/tsconfig.app.json",
+  "entryPoints": [
+    "frontend/src/services",
+    "frontend/src/context",
+    "frontend/src/hooks"
+  ],
+  "entryPointStrategy": "expand",
+  "out": "docs/frontend",
+  "exclude": [
+    "**/*.test.ts",
+    "**/node_modules/**",
+    "**/dist/**"
+  ],
+  "excludePrivate": true,
+  "excludeExternals": true,
+  "readme": "frontend/README.md",
+  "name": "spin-core frontend",
+  "navigationLinks": {
+    "GitHub": "https://github.com/KissSpinobleZsolt/spin-core"
+  }
+}

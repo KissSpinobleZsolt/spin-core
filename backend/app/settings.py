@@ -12,15 +12,18 @@ DEFAULT_CLICKHOUSE_URL = "clickhouse://core-ch:core-ch@clickhouse:9000/core"
 
 @dataclass
 class ThemeConfig:
+    """Holds the default theme preference for the application UI."""
     default_theme: Literal["dark", "light"] = "dark"
 
 
 @dataclass
 class AppSettings:
+    """Top-level application settings container persisted to settings.json."""
     theme: ThemeConfig = field(default_factory=ThemeConfig)
 
 
 def read_settings() -> AppSettings:
+    """Read AppSettings from settings.json, returning defaults on any error or absence."""
     if not SETTINGS_PATH.exists():
         return AppSettings()
     try:
@@ -44,6 +47,7 @@ def read_legacy_modules() -> list[dict]:
 
 
 def write_settings(s: AppSettings) -> None:
+    """Atomically write AppSettings to settings.json via a temporary file."""
     SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = SETTINGS_PATH.with_suffix(".tmp")
     data = asdict(s)

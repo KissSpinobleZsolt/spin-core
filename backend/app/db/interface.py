@@ -4,6 +4,7 @@ from datetime import datetime
 
 @dataclass
 class BotRecord:
+    """Database-agnostic representation of a bot row returned to callers."""
     id: str
     name: str
     description: str
@@ -20,6 +21,7 @@ class BotRecord:
 
 @dataclass
 class UserRecord:
+    """Database-agnostic representation of a user row returned to callers."""
     email: str
     name: str
     hashed_password: str
