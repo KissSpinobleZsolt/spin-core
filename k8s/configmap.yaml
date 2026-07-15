@@ -9,5 +9,4 @@ data:
   MONGO_URL: "mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin"
   CLICKHOUSE_URL: "clickhouse://core-ch:core-ch@clickhouse:9000/core"
   OLLAMA_URL: "http://ollama.spin-core.svc.cluster.local:11434"
-  CHATBOT_REMOTE_URL: "http://localhost:3002/remoteEntry.js"
-  MODULE_REGISTRY_URLS: "http://hello-world.spin-core.svc.cluster.local,http://chatbot.spin-core.svc.cluster.local"
+  MODULE_REGISTRY_URLS: "http://hello-world.spin-core.svc.cluster.local"

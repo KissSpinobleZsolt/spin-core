@@ -1,8 +1,11 @@
-from sqlalchemy import create_engine, Column, Integer, String, Text
+import uuid
+
+from sqlalchemy import create_engine, Column, Integer, String, Text, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import sessionmaker, declarative_base
+from sqlalchemy.sql import func
 
-from app.db.interface import UserRecord
+from app.db.interface import UserRecord, BotRecord
 
 Base = declarative_base()
 
@@ -22,6 +25,21 @@ class PageRow(Base):
     id = Column(Integer, primary_key=True, index=True)
     page_key = Column(String, unique=True, nullable=False, index=True)
     content = Column(Text, nullable=False)
+
+
+class BotRow(Base):
+    __tablename__ = "bots"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(Text, nullable=False, default="")
+    type = Column(String, nullable=False, default="chatbot")
+    model = Column(String, nullable=False, default="")
+    system_prompt = Column(Text, nullable=False, default="")
+    icon = Column(String, nullable=False, default="🤖")
+    enabled = Column(Boolean, nullable=False, default=True)
+    roles = Column(ARRAY(String), nullable=False, default=list)
+    created_at = Column(DateTime, server_default=func.now())
+    updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
 
 class PostgresAdapter:
@@ -103,5 +121,119 @@ class PostgresAdapter:
             else:
                 db.add(PageRow(page_key=key, content=content))
             db.commit()
+        finally:
+            db.close()
+
+    def _bot_row_to_record(self, row: BotRow) -> BotRecord:
+        return BotRecord(
+            id=row.id,
+            name=row.name,
+            description=row.description,
+            type=row.type,
+            model=row.model,
+            system_prompt=row.system_prompt,
+            icon=row.icon,
+            enabled=row.enabled,
+            roles=list(row.roles or []),
+        )
+
+    def get_bots(self, admin: bool = False, user_roles: list[str] | None = None) -> list[BotRecord]:
+        db = self._session()
+        try:
+            q = db.query(BotRow)
+            if not admin:
+                q = q.filter(BotRow.enabled == True)
+            rows = q.order_by(BotRow.created_at).all()
+            if admin:
+                return [self._bot_row_to_record(r) for r in rows]
+            # Filter by role overlap for non-admins
+            result = []
+            for r in rows:
+                bot_roles = list(r.roles or [])
+                if not bot_roles or any(role in bot_roles for role in (user_roles or [])):
+                    result.append(self._bot_row_to_record(r))
+            return result
+        finally:
+            db.close()
+
+    def get_bot_by_id(self, bot_id: str) -> BotRecord | None:
+        db = self._session()
+        try:
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            return self._bot_row_to_record(row) if row else None
+        finally:
+            db.close()
+
+    def create_bot(
+        self,
+        name: str,
+        description: str,
+        type: str,
+        model: str,
+        system_prompt: str,
+        icon: str,
+        enabled: bool,
+        roles: list[str],
+    ) -> BotRecord:
+        db = self._session()
+        try:
+            row = BotRow(
+                id=str(uuid.uuid4()),
+                name=name,
+                description=description,
+                type=type,
+                model=model,
+                system_prompt=system_prompt,
+                icon=icon,
+                enabled=enabled,
+                roles=roles,
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return self._bot_row_to_record(row)
+        finally:
+            db.close()
+
+    def update_bot(
+        self,
+        bot_id: str,
+        name: str,
+        description: str,
+        type: str,
+        model: str,
+        system_prompt: str,
+        icon: str,
+        enabled: bool,
+        roles: list[str],
+    ) -> BotRecord | None:
+        db = self._session()
+        try:
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            if not row:
+                return None
+            row.name = name
+            row.description = description
+            row.type = type
+            row.model = model
+            row.system_prompt = system_prompt
+            row.icon = icon
+            row.enabled = enabled
+            row.roles = roles
+            db.commit()
+            db.refresh(row)
+            return self._bot_row_to_record(row)
+        finally:
+            db.close()
+
+    def delete_bot(self, bot_id: str) -> bool:
+        db = self._session()
+        try:
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            if not row:
+                return False
+            db.delete(row)
+            db.commit()
+            return True
         finally:
             db.close()
