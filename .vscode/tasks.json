@@ -27,26 +27,21 @@
     }
   ],
   "tasks": [
+
+    // ── Core platform ────────────────────────────────────────────────────────────
+
     {
       "label": "Down",
       "type": "shell",
       "command": "docker compose down ${input:downFlags}",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "close": false },
       "problemMatcher": []
     },
     {
       "label": "Restart",
       "type": "shell",
       "command": "bash scripts/restart.sh ${input:restartMode}",
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "close": false },
       "problemMatcher": []
     },
     {
@@ -54,24 +49,14 @@
       "type": "shell",
       "command": "docker compose up --build backend",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "dev",
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "group": "dev", "close": false },
       "problemMatcher": []
     },
     {
       "label": "Wait-BE",
       "type": "shell",
       "command": "until curl -sf http://localhost:8000/api/health > /dev/null; do sleep 1; done",
-      "presentation": {
-        "reveal": "silent",
-        "panel": "shared",
-        "group": "dev",
-        "close": true
-      },
+      "presentation": { "reveal": "silent", "panel": "shared", "group": "dev", "close": true },
       "problemMatcher": []
     },
     {
@@ -79,12 +64,7 @@
       "type": "shell",
       "command": "docker compose up --build frontend-dev",
       "isBackground": true,
-      "presentation": {
-        "reveal": "always",
-        "panel": "shared",
-        "group": "dev",
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "shared", "group": "dev", "close": false },
       "dependsOn": ["Wait-BE"],
       "problemMatcher": []
     },
@@ -98,12 +78,144 @@
       "label": "deploy to kubectl",
       "type": "shell",
       "command": "kubectl apply -k k8s/",
-      "presentation": {
-        "reveal": "always",
-        "panel": "new",
-        "close": false
-      },
+      "presentation": { "reveal": "always", "panel": "new", "close": false },
+      "problemMatcher": []
+    },
+
+    // ── Module: Hello World ──────────────────────────────────────────────────────
+
+    {
+      "label": "Hello World — dev",
+      "detail": "webpack serve (hot reload) from local folder — port 3001",
+      "type": "shell",
+      "command": "npm install --prefer-offline && npm start",
+      "options": { "cwd": "${workspaceFolder}/modules/hello-world" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "Hello World — prod (local)",
+      "detail": "Build Docker image from local folder and run on port 3001",
+      "type": "shell",
+      "command": "docker compose up --build hello-world",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "Hello World — prod (GitHub)",
+      "detail": "Pull latest from GitHub, build Docker image, run on port 3001",
+      "type": "shell",
+      "command": "git -C modules/hello-world pull origin main && docker compose up --build hello-world",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "problemMatcher": []
+    },
+
+    // ── Module: CloudInsight AI ──────────────────────────────────────────────────
+
+    {
+      "label": "CloudInsight AI — dev",
+      "detail": "webpack serve (hot reload) from local folder — port 3002",
+      "type": "shell",
+      "command": "npm install --prefer-offline && npm start",
+      "options": { "cwd": "${workspaceFolder}/modules/data-ingestion" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "CloudInsight AI — backend dev",
+      "detail": "Plugin backend via docker compose — port 8002",
+      "type": "shell",
+      "command": "docker compose up --build cloud-insight-ai-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "CloudInsight AI — prod (local)",
+      "detail": "Build Docker image from local folder and run on port 3002",
+      "type": "shell",
+      "command": "docker compose up --build cloud-insight-ai cloud-insight-ai-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "CloudInsight AI — prod (GitHub)",
+      "detail": "Pull latest from GitHub, build Docker images, run frontend + backend",
+      "type": "shell",
+      "command": "git -C modules/data-ingestion pull origin main && docker compose up --build cloud-insight-ai cloud-insight-ai-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "problemMatcher": []
+    },
+
+    // ── Module: AnomaScan ────────────────────────────────────────────────────────
+
+    {
+      "label": "AnomaScan — dev",
+      "detail": "webpack serve (hot reload) from local folder — port 3003",
+      "type": "shell",
+      "command": "npm install --prefer-offline && npm start",
+      "options": { "cwd": "${workspaceFolder}/modules/vision-watch" },
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "AnomaScan — backend dev",
+      "detail": "Plugin backend via docker compose — port 8003",
+      "type": "shell",
+      "command": "docker compose up --build anomascan-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "AnomaScan — prod (local)",
+      "detail": "Build Docker images from local folder and run on ports 3003 + 8003",
+      "type": "shell",
+      "command": "docker compose up --build anomascan anomascan-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "problemMatcher": []
+    },
+    {
+      "label": "AnomaScan — prod (GitHub)",
+      "detail": "Pull latest from GitHub, build Docker images, run frontend + backend",
+      "type": "shell",
+      "command": "git -C modules/vision-watch pull origin main && docker compose up --build anomascan anomascan-backend",
+      "isBackground": true,
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "problemMatcher": []
+    },
+
+    // ── Compound: all modules ────────────────────────────────────────────────────
+
+    {
+      "label": "Modules: all — dev",
+      "detail": "Start all three modules in dev (hot reload) mode simultaneously",
+      "dependsOn": ["Hello World — dev", "CloudInsight AI — dev", "AnomaScan — dev"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modules: all — prod (local)",
+      "detail": "Build and run all module containers from local source",
+      "dependsOn": ["Hello World — prod (local)", "CloudInsight AI — prod (local)", "AnomaScan — prod (local)"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "Modules: all — prod (GitHub)",
+      "detail": "Pull latest from each GitHub repo, build, and run all module containers",
+      "dependsOn": ["Hello World — prod (GitHub)", "CloudInsight AI — prod (GitHub)", "AnomaScan — prod (GitHub)"],
+      "dependsOrder": "parallel",
       "problemMatcher": []
     }
+
   ]
 }
