@@ -10,8 +10,11 @@ class BotRecord:
     model: str
     system_prompt: str
     icon: str
-    enabled: bool
+    active: bool
+    restricted: str
     roles: list[str]
+    modules: list[str]
+    created_by: str
 
 
 @dataclass

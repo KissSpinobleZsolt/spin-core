@@ -168,7 +168,7 @@ function ActiveBotsSection() {
     () => botsService.getBots(),
   )
 
-  const activeBots = data?.filter(b => b.enabled) ?? []
+  const activeBots = data?.filter(b => b.active) ?? []
 
   return (
     <SectionCard title="Active Bots" navigateTo="/bots-admin">

@@ -28,10 +28,11 @@ function BotCard({ bot }: { bot: Bot }) {
 }
 
 export default function Bots() {
-  const { data: bots = [], isLoading, isError } = useGet<Bot[]>(
+  const { data: allBots = [], isLoading, isError } = useGet<Bot[]>(
     ['bots'],
     () => botsService.getBots(),
   )
+  const bots = allBots.filter(b => !b.modules.includes('core'))
 
   return (
     <div className="max-w-5xl space-y-6">

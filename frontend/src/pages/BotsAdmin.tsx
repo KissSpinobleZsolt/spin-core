@@ -1,5 +1,6 @@
-import { type ReactNode, useState } from 'react'
-import { botsService, type Bot, type BotPayload } from '../services/botsService'
+import { type ReactNode, useState, useEffect } from 'react'
+import { botsService, type Bot, type BotPayload, type BotType } from '../services/botsService'
+import { settingsService, type ModuleConfig } from '../services/settingsService'
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
 import { Btn } from '../components/ui/Button'
@@ -33,20 +34,35 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
 // ---------------------------------------------------------------------------
 
 const BLANK: BotPayload = {
-  name: '', description: '', type: 'chatbot', model: '', system_prompt: '',
-  icon: '🤖', enabled: true, roles: ['user', 'admin'],
+  name: '', description: '', type: 'communicator', model: '',
+  system_prompt: '', icon: '💬', active: false, restricted: 'user', modules: [],
 }
 
 function BotModal({
   initial,
+  botTypes,
+  installedModules,
   onSave,
   onClose,
 }: {
   initial?: Bot
+  botTypes: BotType[]
+  installedModules: ModuleConfig[]
   onSave: (payload: BotPayload) => Promise<void>
   onClose: () => void
 }) {
-  const [form, setForm] = useState<BotPayload>(initial ? { ...initial } : { ...BLANK })
+  const isNew = initial === undefined
+  const [form, setForm] = useState<BotPayload>(initial ? {
+    name: initial.name,
+    description: initial.description,
+    type: initial.type,
+    model: initial.model,
+    system_prompt: initial.system_prompt,
+    icon: initial.icon,
+    active: initial.active,
+    restricted: initial.restricted,
+    modules: initial.modules,
+  } : { ...BLANK })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -56,10 +72,38 @@ function BotModal({
   )
   const models = modelsData?.ollama === 'ok' ? modelsData.models.map(m => m.name) : []
 
-  function toggleRole(role: string) {
+  function handleTypeChange(newType: string) {
+    const bt = botTypes.find(t => t.name === newType)
+    if (!bt) {
+      setForm(f => ({ ...f, type: newType }))
+      return
+    }
     setForm(f => ({
       ...f,
-      roles: f.roles.includes(role) ? f.roles.filter(r => r !== role) : [...f.roles, role],
+      type: newType,
+      icon: bt.icon,
+      ...(isNew ? {
+        system_prompt: f.system_prompt || bt.preprompt,
+        model: f.model || bt.default_model,
+      } : {}),
+    }))
+  }
+
+  useEffect(() => {
+    if (isNew && botTypes.length > 0) {
+      const bt = botTypes.find(t => t.name === form.type)
+      if (bt) {
+        setForm(f => ({ ...f, icon: bt.icon }))
+      }
+    }
+  }, [botTypes])
+
+  function toggleModule(id: string) {
+    setForm(f => ({
+      ...f,
+      modules: f.modules.includes(id)
+        ? f.modules.filter(m => m !== id)
+        : [...f.modules, id],
     }))
   }
 
@@ -75,8 +119,10 @@ function BotModal({
     }
   }
 
+  const currentBotType = botTypes.find(t => t.name === form.type)
+
   return (
-    <Modal title={initial ? 'Edit bot' : 'New bot'} onClose={onClose}>
+    <Modal title={isNew ? 'New bot' : 'Edit bot'} onClose={onClose}>
       {error && <ErrorBanner message={error} />}
 
       <div className="grid grid-cols-2 gap-3">
@@ -85,8 +131,15 @@ function BotModal({
           <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="My Bot" />
         </div>
         <div>
-          <Label>Icon</Label>
-          <Input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="🤖" />
+          <Label>Type</Label>
+          <div className="flex items-center gap-2">
+            <span className="text-xl leading-none">{currentBotType?.icon ?? form.icon}</span>
+            <div className="flex-1">
+              <Select value={form.type} onChange={handleTypeChange}>
+                {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+              </Select>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -95,26 +148,18 @@ function BotModal({
         <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this bot do?" />
       </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div>
-          <Label>Type</Label>
-          <Select value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))}>
-            {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-          </Select>
-        </div>
-        <div>
-          <Label>Model</Label>
-          <input
-            list="ollama-models"
-            value={form.model}
-            onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-            placeholder="Default (env var)"
-            className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-          />
-          <datalist id="ollama-models">
-            {models.map(m => <option key={m} value={m} />)}
-          </datalist>
-        </div>
+      <div>
+        <Label>Model</Label>
+        <input
+          list="ollama-models"
+          value={form.model}
+          onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
+          placeholder={currentBotType?.default_model || 'Default (env var)'}
+          className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+        />
+        <datalist id="ollama-models">
+          {models.map(m => <option key={m} value={m} />)}
+        </datalist>
       </div>
 
       <div>
@@ -122,37 +167,57 @@ function BotModal({
         <textarea
           value={form.system_prompt}
           onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))}
-          placeholder="You are a helpful assistant that..."
+          placeholder={currentBotType?.preprompt || 'You are a helpful assistant that...'}
           rows={4}
           className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-y text-sm"
         />
       </div>
 
-      <div className="flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <input
-            id="bot-enabled"
-            type="checkbox"
-            checked={form.enabled}
-            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
-            className="rounded border-slate-400"
-          />
-          <label htmlFor="bot-enabled" className="text-sm text-slate-600 dark:text-slate-300">Enabled</label>
-        </div>
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-slate-600 dark:text-slate-300">Roles:</span>
-          {['user', 'admin'].map(role => (
-            <label key={role} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+      <div>
+        <Label>Modules</Label>
+        <div className="mt-1 max-h-36 overflow-y-auto space-y-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 p-2">
+          {/* Platform core — always first */}
+          <label className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600">
+            <input
+              type="checkbox"
+              checked={form.modules.includes('core')}
+              onChange={() => toggleModule('core')}
+              className="rounded border-slate-400"
+            />
+            <span className="text-sm text-slate-700 dark:text-slate-200">🧩 Platform (core)</span>
+          </label>
+          {installedModules.map(mod => (
+            <label key={mod.id} className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600">
               <input
                 type="checkbox"
-                checked={form.roles.includes(role)}
-                onChange={() => toggleRole(role)}
+                checked={form.modules.includes(mod.id)}
+                onChange={() => toggleModule(mod.id)}
                 className="rounded border-slate-400"
               />
-              {role}
+              <span className="text-sm text-slate-700 dark:text-slate-200">{mod.icon} {mod.name}</span>
             </label>
           ))}
+          {installedModules.length === 0 && (
+            <p className="text-xs text-slate-400 px-1 py-0.5">No installed modules found.</p>
+          )}
         </div>
+        <p className="mt-1 text-xs text-slate-400">
+          Select <code>core</code> to show in ChatBubble. Bots with only core are hidden from /bots.
+        </p>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <input
+          id="bot-active"
+          type="checkbox"
+          checked={form.active}
+          disabled={form.modules.length === 0}
+          onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
+          className="rounded border-slate-400 disabled:opacity-40"
+        />
+        <label htmlFor="bot-active" className={`text-sm ${form.modules.length === 0 ? 'text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
+          Active {form.modules.length === 0 && '(requires at least one module)'}
+        </label>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -176,6 +241,17 @@ export default function BotsAdmin() {
     () => botsService.getBots(),
   )
 
+  const { data: botTypes = [] } = useGet<BotType[]>(
+    ['bot-types'],
+    () => botsService.getBotTypes(),
+  )
+
+  const { data: allModules = [] } = useGet<ModuleConfig[]>(
+    ['modules-list'],
+    () => settingsService.getModules(),
+  )
+  const installedModules = allModules.filter(m => m.enabled)
+
   async function handleSave(payload: BotPayload) {
     if (modal === 'add') {
       await botsService.createBot(payload)
@@ -198,7 +274,8 @@ export default function BotsAdmin() {
 
   async function handleToggle(bot: Bot) {
     try {
-      await botsService.updateBot(bot.id, { ...bot, enabled: !bot.enabled })
+      const { id, created_by, roles, ...payload } = bot
+      await botsService.updateBot(id, { ...payload, active: !bot.active })
       await refetch()
     } catch (err) {
       setError(String(err))
@@ -225,8 +302,8 @@ export default function BotsAdmin() {
                     <th className="pb-2 pr-4">Bot</th>
                     <th className="pb-2 pr-4">Type</th>
                     <th className="pb-2 pr-4">Model</th>
-                    <th className="pb-2 pr-4">Roles</th>
-                    <th className="pb-2 pr-4">Enabled</th>
+                    <th className="pb-2 pr-4">Created by</th>
+                    <th className="pb-2 pr-4">Active</th>
                     <th className="pb-2"></th>
                   </tr>
                 </thead>
@@ -250,11 +327,11 @@ export default function BotsAdmin() {
                       <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400 text-xs">
                         {bot.model || <span className="italic">default</span>}
                       </td>
-                      <td className="py-2 pr-4 text-slate-500 dark:text-slate-400 text-xs">
-                        {bot.roles.join(', ') || 'all'}
+                      <td className="py-2 pr-4 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
+                        {bot.created_by || <span className="italic">system</span>}
                       </td>
                       <td className="py-2 pr-4">
-                        <Toggle checked={bot.enabled} onChange={() => handleToggle(bot)} />
+                        <Toggle checked={bot.active} onChange={() => handleToggle(bot)} disabled={bot.modules.length === 0} />
                       </td>
                       <td className="py-2">
                         <div className="flex gap-2">
@@ -276,6 +353,8 @@ export default function BotsAdmin() {
       {modal !== null && (
         <BotModal
           initial={modal === 'add' ? undefined : modal}
+          botTypes={botTypes}
+          installedModules={installedModules}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />

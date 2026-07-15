@@ -9,22 +9,46 @@ data:
       "dashboard": {
         "content": "Hello welcome"
       },
+      "bot_types": [
+        {"name": "communicator", "icon": "💬", "description": "Conversational chat for Q&A and general assistance.", "preprompt": "", "skills": ["conversational", "reasoning", "summarization"], "tools": [], "output_format": "markdown", "default_model": "", "context_strategy": "conversational"},
+        {"name": "watcher",      "icon": "👁️",  "description": "Monitors data streams and alerts on defined conditions.", "preprompt": "You are a monitoring agent. Analyze the provided data and report anomalies.", "skills": ["analysis", "pattern_recognition"], "tools": ["module_data_read"], "output_format": "structured", "default_model": "", "context_strategy": "stateless"},
+        {"name": "capper",       "icon": "📊", "description": "Summarizes information to defined thresholds or formats.", "preprompt": "You are a summarization agent. Condense information to essential points.", "skills": ["summarization", "compression", "extraction"], "tools": [], "output_format": "markdown", "default_model": "", "context_strategy": "summarize"},
+        {"name": "reader",       "icon": "📖", "description": "Reads and analyzes documents with RAG-capable retrieval.", "preprompt": "You are a document analysis agent. Answer based strictly on the provided content.", "skills": ["reading", "extraction", "rag", "citation"], "tools": ["module_data_read", "rag_search"], "output_format": "markdown", "default_model": "", "context_strategy": "sliding_window"},
+        {"name": "searcher",     "icon": "🔍", "description": "Searches knowledge bases or the web for relevant results.", "preprompt": "You are a search agent. Find and present the most relevant information with sources.", "skills": ["search", "ranking", "retrieval"], "tools": ["web_fetch", "module_data_read"], "output_format": "markdown", "default_model": "", "context_strategy": "stateless"},
+        {"name": "trader",       "icon": "📈", "description": "Analyzes market data and generates structured trade signals.", "preprompt": "You are a trading analysis agent. Generate clear structured signals. Never guarantee future performance.", "skills": ["analysis", "pattern_recognition", "structured_output"], "tools": ["module_data_read", "module_data_write"], "output_format": "json", "default_model": "", "context_strategy": "sliding_window"},
+        {"name": "orchestrator", "icon": "🎛️", "description": "Coordinates agents and composes their outputs.", "preprompt": "You are an orchestration agent. Break down complex tasks, delegate to agents, and synthesize results.", "skills": ["planning", "delegation", "synthesis", "reasoning"], "tools": ["module_data_read", "module_data_write"], "output_format": "structured", "default_model": "", "context_strategy": "conversational"}
+      ],
       "bots": [
         {
           "name": "AI Assistant",
           "description": "General-purpose AI assistant powered by Ollama.",
-          "type": "chatbot",
+          "type": "communicator",
           "model": "qwen2.5:7b",
           "system_prompt": "You are a helpful AI assistant.",
           "icon": "💬",
-          "enabled": true,
-          "roles": ["user", "admin"]
+          "active": true,
+          "restricted": "user",
+          "roles": ["user", "admin"],
+          "modules": ["core"]
         }
       ],
       "settings": {
         "theme": {
           "default_theme": "dark"
         },
-        "modules": []
+        "modules": [
+          {
+            "name": "Hello World",
+            "description": "Example federated micro-frontend module.",
+            "scope": "helloWorld",
+            "component": "./App",
+            "route": "hello-world",
+            "icon": "👋",
+            "enabled": true,
+            "roles": ["user", "admin"],
+            "remote_url": "http://hello-world.spin-core.svc.cluster.local/remoteEntry.js",
+            "presets": { "i18n": {}, "layout": {}, "settings": {} }
+          }
+        ]
       }
     }

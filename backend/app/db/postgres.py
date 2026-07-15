@@ -28,17 +28,34 @@ class PageRow(Base):
     content = Column(Text, nullable=False)
 
 
+class BotTypeRow(Base):
+    __tablename__ = "bot_types"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+    icon = Column(String, nullable=False, default="🤖")
+    description = Column(String, nullable=False, default="")
+    preprompt = Column(Text, nullable=False, default="")
+    skills = Column(ARRAY(String), nullable=False, default=list)
+    tools = Column(ARRAY(String), nullable=False, default=list)
+    output_format = Column(String, nullable=False, default="markdown")
+    default_model = Column(String, nullable=False, default="")
+    context_strategy = Column(String, nullable=False, default="conversational")
+
+
 class BotRow(Base):
     __tablename__ = "bots"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False, default="")
-    type = Column(String, nullable=False, default="chatbot")
+    type = Column(String, nullable=False, default="communicator")
     model = Column(String, nullable=False, default="")
     system_prompt = Column(Text, nullable=False, default="")
     icon = Column(String, nullable=False, default="🤖")
-    enabled = Column(Boolean, nullable=False, default=True)
+    active = Column(Boolean, nullable=False, default=False)
+    restricted = Column(String, nullable=False, default="user")
     roles = Column(ARRAY(String), nullable=False, default=list)
+    modules = Column(ARRAY(String), nullable=False, default=list)
+    created_by = Column(String, nullable=True, default="")
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -95,10 +112,16 @@ class PostgresAdapter:
         self._run_migrations()
 
     def _run_migrations(self) -> None:
+        stmts = [
+            "ALTER TABLE translations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()",
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS restricted VARCHAR NOT NULL DEFAULT 'user'",
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS modules VARCHAR[] NOT NULL DEFAULT '{}'",
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_by VARCHAR DEFAULT ''",
+        ]
         with self._engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE translations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()"
-            ))
+            for stmt in stmts:
+                conn.execute(text(stmt))
             conn.commit()
 
     def test_connection(self) -> None:
@@ -179,25 +202,76 @@ class PostgresAdapter:
             model=row.model,
             system_prompt=row.system_prompt,
             icon=row.icon,
-            enabled=row.enabled,
+            active=row.active,
+            restricted=row.restricted or "user",
             roles=list(row.roles or []),
+            modules=list(row.modules or []),
+            created_by=row.created_by or "",
         )
+
+    def _bot_type_row_to_dict(self, row: BotTypeRow) -> dict:
+        return {
+            "id": row.id,
+            "name": row.name,
+            "icon": row.icon or "🤖",
+            "description": row.description or "",
+            "preprompt": row.preprompt or "",
+            "skills": list(row.skills or []),
+            "tools": list(row.tools or []),
+            "output_format": row.output_format or "markdown",
+            "default_model": row.default_model or "",
+            "context_strategy": row.context_strategy or "conversational",
+        }
 
     def get_bots(self, admin: bool = False, user_roles: list[str] | None = None) -> list[BotRecord]:
         with self._session_ctx() as db:
             q = db.query(BotRow)
             if not admin:
-                q = q.filter(BotRow.enabled == True)
+                q = q.filter(BotRow.active == True)
             rows = q.order_by(BotRow.created_at).all()
             if admin:
                 return [self._bot_row_to_record(r) for r in rows]
-            # Filter by role overlap for non-admins
             result = []
             for r in rows:
                 bot_roles = list(r.roles or [])
                 if not bot_roles or any(role in bot_roles for role in (user_roles or [])):
                     result.append(self._bot_row_to_record(r))
             return result
+
+    def get_bot_types(self) -> list[dict]:
+        with self._session_ctx() as db:
+            rows = db.query(BotTypeRow).order_by(BotTypeRow.name).all()
+            return [self._bot_type_row_to_dict(r) for r in rows]
+
+    def upsert_bot_type(self, data: dict) -> dict:
+        with self._session_ctx() as db:
+            row = db.query(BotTypeRow).filter(BotTypeRow.name == data["name"]).first()
+            if not row:
+                row = BotTypeRow(
+                    id=str(uuid.uuid4()),
+                    name=data["name"],
+                    icon=data.get("icon", "🤖"),
+                    description=data.get("description", ""),
+                    preprompt=data.get("preprompt", ""),
+                    skills=data.get("skills", []),
+                    tools=data.get("tools", []),
+                    output_format=data.get("output_format", "markdown"),
+                    default_model=data.get("default_model", ""),
+                    context_strategy=data.get("context_strategy", "conversational"),
+                )
+                db.add(row)
+            else:
+                row.icon = data.get("icon", row.icon)
+                row.description = data.get("description", row.description)
+                row.preprompt = data.get("preprompt", row.preprompt)
+                row.skills = data.get("skills", row.skills)
+                row.tools = data.get("tools", row.tools)
+                row.output_format = data.get("output_format", row.output_format)
+                row.default_model = data.get("default_model", row.default_model)
+                row.context_strategy = data.get("context_strategy", row.context_strategy)
+            db.commit()
+            db.refresh(row)
+            return self._bot_type_row_to_dict(row)
 
     def get_bot_by_id(self, bot_id: str) -> BotRecord | None:
         with self._session_ctx() as db:
@@ -212,8 +286,10 @@ class PostgresAdapter:
         model: str,
         system_prompt: str,
         icon: str,
-        enabled: bool,
-        roles: list[str],
+        active: bool,
+        restricted: str,
+        modules: list[str],
+        created_by: str = "",
     ) -> BotRecord:
         with self._session_ctx() as db:
             row = BotRow(
@@ -224,8 +300,11 @@ class PostgresAdapter:
                 model=model,
                 system_prompt=system_prompt,
                 icon=icon,
-                enabled=enabled,
-                roles=roles,
+                active=active and bool(modules),
+                restricted=restricted,
+                roles=["user", "admin"],
+                modules=modules,
+                created_by=created_by,
             )
             db.add(row)
             db.commit()
@@ -241,8 +320,9 @@ class PostgresAdapter:
         model: str,
         system_prompt: str,
         icon: str,
-        enabled: bool,
-        roles: list[str],
+        active: bool,
+        restricted: str,
+        modules: list[str],
     ) -> BotRecord | None:
         with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
@@ -254,8 +334,10 @@ class PostgresAdapter:
             row.model = model
             row.system_prompt = system_prompt
             row.icon = icon
-            row.enabled = enabled
-            row.roles = roles
+            row.active = active and bool(modules)
+            row.restricted = restricted
+            row.roles = list(row.roles or ["user", "admin"])
+            row.modules = modules
             db.commit()
             db.refresh(row)
             return self._bot_row_to_record(row)

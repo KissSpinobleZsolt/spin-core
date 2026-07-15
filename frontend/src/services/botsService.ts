@@ -1,5 +1,18 @@
 import { apiService } from './apiService'
 
+export interface BotType {
+  id: string
+  name: string
+  icon: string
+  description: string
+  preprompt: string
+  skills: string[]
+  tools: string[]
+  output_format: string
+  default_model: string
+  context_strategy: string
+}
+
 export interface Bot {
   id: string
   name: string
@@ -8,11 +21,14 @@ export interface Bot {
   model: string
   system_prompt: string
   icon: string
-  enabled: boolean
+  active: boolean
+  restricted: string
   roles: string[]
+  modules: string[]
+  created_by: string
 }
 
-export type BotPayload = Omit<Bot, 'id'>
+export type BotPayload = Omit<Bot, 'id' | 'created_by' | 'roles'>
 
 export const botsService = {
   async getBots(): Promise<Bot[]> {
@@ -21,6 +37,10 @@ export const botsService = {
 
   async getBot(id: string): Promise<Bot> {
     return apiService.get(`/bots/${id}`)
+  },
+
+  async getBotTypes(): Promise<BotType[]> {
+    return apiService.get('/bots/types')
   },
 
   async createBot(payload: BotPayload): Promise<Bot> {
