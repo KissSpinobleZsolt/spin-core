@@ -5,11 +5,11 @@ from datetime import datetime
 from typing import List, Optional
 
 import httpx
-from fastapi import APIRouter, Header, Query
+from fastapi import APIRouter, Header, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.database import get_ch
+from app.database import get_ch, get_pg
 from app.deps import require_admin, require_token
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -27,11 +27,27 @@ class Message(BaseModel):
 class ChatRequest(BaseModel):
     messages: List[Message]
     model: str = OLLAMA_MODEL
+    bot_id: Optional[str] = None
 
 
 @router.post("")
 async def chat(payload: ChatRequest, authorization: str = Header(default="")):
     user_email = require_token(authorization)
+
+    # Resolve bot config if bot_id provided
+    bot_name: Optional[str] = None
+    effective_model = payload.model
+    messages_to_send = list(payload.messages)
+
+    if payload.bot_id:
+        bot = get_pg().get_bot_by_id(payload.bot_id)
+        if not bot or not bot.enabled:
+            raise HTTPException(status_code=404, detail="Bot not found")
+        bot_name = bot.name
+        if bot.model:
+            effective_model = bot.model
+        if bot.system_prompt:
+            messages_to_send = [Message(role="system", content=bot.system_prompt)] + messages_to_send
 
     async def stream():
         start = time.time()
@@ -45,8 +61,8 @@ async def chat(payload: ChatRequest, authorization: str = Header(default="")):
                     "POST",
                     f"{OLLAMA_URL}/api/chat",
                     json={
-                        "model": payload.model,
-                        "messages": [m.model_dump() for m in payload.messages],
+                        "model": effective_model,
+                        "messages": [m.model_dump() for m in messages_to_send],
                         "stream": True,
                     },
                 ) as resp:
@@ -73,18 +89,22 @@ async def chat(payload: ChatRequest, authorization: str = Header(default="")):
             return
 
         try:
+            log_details = {
+                "model": effective_model,
+                "messages": [m.model_dump() for m in payload.messages],
+                "response": "".join(response_parts),
+                "prompt_tokens": prompt_tokens,
+                "eval_tokens": eval_tokens,
+                "duration_ms": round((time.time() - start) * 1000, 2),
+            }
+            if payload.bot_id:
+                log_details["bot_id"] = payload.bot_id
+                log_details["bot_name"] = bot_name
             get_ch().write_module_log(
                 scope=_CHATBOT_SCOPE,
                 user_email=user_email,
                 event_type="chat.completion",
-                details={
-                    "model": payload.model,
-                    "messages": [m.model_dump() for m in payload.messages],
-                    "response": "".join(response_parts),
-                    "prompt_tokens": prompt_tokens,
-                    "eval_tokens": eval_tokens,
-                    "duration_ms": round((time.time() - start) * 1000, 2),
-                },
+                details=log_details,
             )
         except Exception:
             pass

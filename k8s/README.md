@@ -51,7 +51,7 @@ bash scripts/k8s-deploy.sh
 
 This script:
 1. Points Docker at minikube's daemon (`eval $(minikube docker-env)`)
-2. Builds `spin-core-backend`, `spin-core-frontend`, `spin-core-hello-world`, `spin-core-chatbot` inside minikube
+2. Builds `spin-core-backend`, `spin-core-frontend`, `spin-core-hello-world` inside minikube
 3. Applies all manifests via `kubectl apply -k k8s/`
 4. Waits for backend and frontend rollouts
 5. Prints the app URL
@@ -73,7 +73,6 @@ Subsequent deploys are instant — the volume persists between restarts.
 | `frontend` | 30080 | `http://$(minikube ip):30080` |
 | `backend` | 30800 | `http://$(minikube ip):30800` |
 | `hello-world` | 30001 | `http://$(minikube ip):30001` |
-| `chatbot` | 30002 | `http://$(minikube ip):30002` |
 
 Get the frontend URL:
 
@@ -109,7 +108,6 @@ k8s/
 │   └── model-downloader-job.yaml  # Job: pulls models via OLLAMA_HOST, then exits
 ├── backend/                  # Deployment + Service (NodePort 30800)
 ├── frontend/                 # Deployment + Service (NodePort 30080)
-├── chatbot/                  # Deployment + Service (NodePort 30002)
 └── hello-world/              # Deployment + Service (NodePort 30001)
 ```
 

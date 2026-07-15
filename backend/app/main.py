@@ -12,7 +12,7 @@ from app.model_tracker import run_sequential_trackers
 from app.settings import read_settings
 from app.state import set_settings
 
-from app.routes import auth, dashboard, ingestion, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status
+from app.routes import auth, dashboard, ingestion, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status, bots
 from app.routes.model_status import _required_models
 from app.settings import write_settings
 from app.state import get_settings
@@ -44,6 +44,21 @@ async def lifespan(app: FastAPI):
 
     if not pg.get_page("dashboard"):
         pg.upsert_page("dashboard", "Hello welcome")
+
+    # Seed default chatbot on first run
+    if not pg.get_bots(admin=True):
+        from app.routes.chat import OLLAMA_MODEL
+        pg.create_bot(
+            name="AI Assistant",
+            description="General-purpose AI assistant powered by Ollama.",
+            type="chatbot",
+            model=OLLAMA_MODEL,
+            system_prompt="You are a helpful AI assistant.",
+            icon="💬",
+            enabled=True,
+            roles=["user", "admin"],
+        )
+        print("[spin-core] Seeded default AI Assistant bot", file=sys.stderr)
 
     # Seed default translations into MongoDB on first run
     from app.i18n_defaults import DEFAULT_TRANSLATIONS
@@ -131,3 +146,4 @@ app.include_router(i18n_router.router)
 app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(model_status.router)
+app.include_router(bots.router)

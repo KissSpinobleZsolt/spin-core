@@ -176,3 +176,11 @@ async def _track_model(model: str) -> None:
 async def run_sequential_trackers(models: list[str]) -> None:
     for model in models:
         await _track_model(model)
+
+
+def start_pull(model: str) -> None:
+    """Fire-and-forget pull for an arbitrary model name."""
+    existing = _model_progress.get(model)
+    if existing and existing.phase in ("pending", "pulling", "verifying", "writing"):
+        return
+    asyncio.create_task(_track_model(model))

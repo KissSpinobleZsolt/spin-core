@@ -105,20 +105,6 @@ services:
       retries: 10
     restart: unless-stopped
 
-  chatbot:
-    build: ./modules/chatbot
-    ports:
-      - "3002:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      ollama:
-        condition: service_healthy
-    restart: unless-stopped
-
   backend:
     build: ./backend
     ports:
@@ -130,8 +116,7 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      CHATBOT_REMOTE_URL: http://localhost:3002/remoteEntry.js
-      MODULE_REGISTRY_URLS: http://hello-world,http://chatbot
+      MODULE_REGISTRY_URLS: http://hello-world
     volumes:
       - app_data:/app/data
     healthcheck:
@@ -146,19 +131,17 @@ services:
         condition: service_healthy
       clickhouse:
         condition: service_healthy
+      ollama:
+        condition: service_healthy
     restart: unless-stopped
 
   frontend:
     build:
       context: ./frontend
-      args:
-        VITE_CHATBOT_REMOTE_URL: http://localhost:3002/remoteEntry.js
     ports:
       - "3000:80"
     depends_on:
       backend:
-        condition: service_healthy
-      chatbot:
         condition: service_healthy
       hello-world:
         condition: service_healthy
@@ -177,8 +160,6 @@ services:
       - /app/node_modules
     depends_on:
       backend:
-        condition: service_healthy
-      chatbot:
         condition: service_healthy
       hello-world:
         condition: service_healthy

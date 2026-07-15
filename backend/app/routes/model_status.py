@@ -4,10 +4,12 @@ import os
 from datetime import datetime, timezone
 
 import httpx
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from pydantic import BaseModel
 
-from app.model_tracker import get_model_progress
+from app.deps import require_admin
+from app.model_tracker import get_model_progress, start_pull
 
 router = APIRouter(prefix="/api/model-status", tags=["model-status"])
 
@@ -91,6 +93,38 @@ async def installed_models():
         })
 
     return {"ollama": "ok", "models": models}
+
+
+class PullPayload(BaseModel):
+    name: str
+
+
+@router.post("/pull")
+async def pull_model(payload: PullPayload, _: str = Depends(require_admin)):
+    name = payload.name.strip()
+    if not name:
+        raise HTTPException(status_code=400, detail="model name is required")
+    start_pull(name)
+    return {"status": "started", "model": name}
+
+
+@router.delete("/{model_name:path}")
+async def delete_model(model_name: str, _: str = Depends(require_admin)):
+    try:
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            resp = await client.request(
+                "DELETE",
+                f"{OLLAMA_URL}/api/delete",
+                json={"name": model_name},
+            )
+            if resp.status_code == 404:
+                raise HTTPException(status_code=404, detail="model not found")
+            resp.raise_for_status()
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Ollama error: {exc}") from exc
+    return {"status": "deleted", "model": model_name}
 
 
 @router.get("/stream")
