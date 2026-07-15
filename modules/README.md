@@ -7,6 +7,7 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 | Module | Port | Scope | Description |
 |--------|------|-------|-------------|
 | [hello-world](hello-world/README.md) | 3001 | `helloWorld` | Reference remote — counter widget |
+| [data-ingestion](data-ingestion/README.md) | 3002 | `dataIngestion` | Data source upload, processing, and management |
 
 > The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
 

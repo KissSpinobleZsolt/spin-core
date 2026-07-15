@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+from datetime import datetime
 
 
 @dataclass
@@ -12,9 +13,9 @@ class BotRecord:
     icon: str
     active: bool
     restricted: str
-    roles: list[str]
     modules: list[str]
     created_by: str
+    created_at: datetime | None = None
 
 
 @dataclass

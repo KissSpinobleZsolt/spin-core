@@ -12,7 +12,7 @@ _FALLBACK_BOT = {
     "description": "General-purpose AI assistant powered by Ollama.",
     "type": "communicator",
     "model": "qwen2.5:7b",
-    "system_prompt": "You are a helpful AI assistant.",
+    "system_prompt": "You are a helpful AI assistant for this platform. Use the platform context above to help users understand what they can do, which pages to visit, and which bots or modules are available. Be concise and friendly.",
     "icon": "💬",
     "active": True,
     "restricted": "user",

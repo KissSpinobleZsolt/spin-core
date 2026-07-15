@@ -1,0 +1,109 @@
+{
+  "version": "2.0.0",
+  "inputs": [
+    {
+      "id": "downFlags",
+      "type": "pickString",
+      "description": "docker compose down options",
+      "options": [
+        { "label": "down (keep volumes)", "value": "" },
+        { "label": "down --volumes (delete volumes)", "value": "--volumes" }
+      ],
+      "default": "down (keep volumes)"
+    },
+    {
+      "id": "restartMode",
+      "type": "pickString",
+      "description": "Restart mode",
+      "options": [
+        { "label": "clean restart all", "value": "--rebuild" },
+        { "label": "restart all", "value": "" },
+        { "label": "restart backend", "value": "backend" },
+        { "label": "restart frontend-dev", "value": "frontend-dev" },
+        { "label": "rebuild backend", "value": "--rebuild backend" },
+        { "label": "rebuild frontend-dev", "value": "--rebuild frontend-dev" }
+      ],
+      "default": "clean restart all"
+    }
+  ],
+  "tasks": [
+    {
+      "label": "Down",
+      "type": "shell",
+      "command": "docker compose down ${input:downFlags}",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Restart",
+      "type": "shell",
+      "command": "bash scripts/restart.sh ${input:restartMode}",
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "BE",
+      "type": "shell",
+      "command": "docker compose up --build backend",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "dev",
+        "close": false
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Wait-BE",
+      "type": "shell",
+      "command": "until curl -sf http://localhost:8000/api/health > /dev/null; do sleep 1; done",
+      "presentation": {
+        "reveal": "silent",
+        "panel": "shared",
+        "group": "dev",
+        "close": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "FE",
+      "type": "shell",
+      "command": "docker compose up --build frontend-dev",
+      "isBackground": true,
+      "presentation": {
+        "reveal": "always",
+        "panel": "shared",
+        "group": "dev",
+        "close": false
+      },
+      "dependsOn": ["Wait-BE"],
+      "problemMatcher": []
+    },
+    {
+      "label": "DEV",
+      "dependsOn": ["BE", "FE"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "deploy to kubectl",
+      "type": "shell",
+      "command": "kubectl apply -k k8s/",
+      "presentation": {
+        "reveal": "always",
+        "panel": "new",
+        "close": false
+      },
+      "problemMatcher": []
+    }
+  ]
+}

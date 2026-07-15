@@ -122,7 +122,9 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`/bots`** (`src/pages/Bots.tsx`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
 
-**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model.
+**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots render a `BotConfigSkeleton` placeholder instead of the chat UI.
+
+**`ModuleBotPanel`** (`src/components/modules/ModuleBotPanel.tsx`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
 
 **`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default "AI Assistant" bot is seeded on first backend startup.
 
@@ -170,7 +172,7 @@ All reusable primitives live in `src/components/ui/`. Always import from there �
 | `src/utils/safeJsonParse.ts` | `safeJsonParse<T>(raw, fallback)` |
 | `src/constants/botConstants.ts` | `BOT_TYPES`, `TYPE_BADGE` |
 | `src/services/modelStatusService.ts` | `InstalledModel`, `InstalledModelsData` types |
-| `src/hooks/useChatStream.ts` | `useChatStream(botId, model)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
+| `src/hooks/useChatStream.ts` | `useChatStream(botId, model, moduleId?)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
 | `src/hooks/useModelStatus.ts` | `useModelStatus()` → `{ status, dismissed, dismiss }` |
 
 ## First-visit modals

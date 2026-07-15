@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { useSettings } from '../../context/SettingsContext'
 import { loadFederatedModule } from '../../utils/federationLoader'
 import { Spinner } from '../ui/Spinner'
+import { ModuleBotPanel } from './ModuleBotPanel'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -67,14 +68,17 @@ export function FederatedPage() {
   }
 
   return (
-    <ErrorBoundary fallback={<ModuleErrorFallback name={mod.name} />}>
-      <Suspense fallback={
-        <div className="flex items-center justify-center h-64 text-slate-400">
-          <Spinner size="lg" />
-        </div>
-      }>
-        <RemoteComponent presets={mod.presets as unknown as Record<string, unknown>} />
-      </Suspense>
-    </ErrorBoundary>
+    <>
+      <ErrorBoundary fallback={<ModuleErrorFallback name={mod.name} />}>
+        <Suspense fallback={
+          <div className="flex items-center justify-center h-64 text-slate-400">
+            <Spinner size="lg" />
+          </div>
+        }>
+          <RemoteComponent presets={mod.presets as unknown as Record<string, unknown>} />
+        </Suspense>
+      </ErrorBoundary>
+      <ModuleBotPanel moduleId={mod.id} />
+    </>
   )
 }

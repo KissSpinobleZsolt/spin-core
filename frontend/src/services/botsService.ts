@@ -23,12 +23,12 @@ export interface Bot {
   icon: string
   active: boolean
   restricted: string
-  roles: string[]
   modules: string[]
   created_by: string
+  created_at: string | null
 }
 
-export type BotPayload = Omit<Bot, 'id' | 'created_by' | 'roles'>
+export type BotPayload = Omit<Bot, 'id' | 'created_by' | 'created_at'>
 
 export const botsService = {
   async getBots(): Promise<Bot[]> {
@@ -53,5 +53,9 @@ export const botsService = {
 
   async deleteBot(id: string): Promise<void> {
     await apiService.delete(`/bots/${id}`)
+  },
+
+  async getBotsForModule(moduleId: string): Promise<Bot[]> {
+    return apiService.get(`/bots?module_id=${encodeURIComponent(moduleId)}`)
   },
 }

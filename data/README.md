@@ -25,6 +25,7 @@ Each entry is inserted into the PostgreSQL `modules` table on first startup (ski
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
+| `id` | UUID string | No | Stable primary key. Set explicitly to pin a known UUID (required when seed bots must reference the module by ID). If omitted, a random UUID is generated on first creation. |
 | `name` | string | Yes | Display name shown in the sidebar |
 | `description` | string | No | Short description shown in the discovery panel and admin list |
 | `scope` | string | Yes | Webpack container scope — must match `name` in `webpack.config.js` |

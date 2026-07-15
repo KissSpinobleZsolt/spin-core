@@ -1,6 +1,7 @@
-from typing import List
+from datetime import datetime
+from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.database import get_pg
@@ -31,9 +32,9 @@ class BotOut(BaseModel):
     icon: str
     active: bool
     restricted: str
-    roles: List[str]
     modules: List[str]
     created_by: str
+    created_at: Optional[datetime] = None
 
 
 @router.get("/types")
@@ -42,12 +43,15 @@ def list_bot_types(_: str = Depends(token_dep)):
 
 
 @router.get("", response_model=List[BotOut])
-def list_bots(email: str = Depends(token_dep)):
+def list_bots(email: str = Depends(token_dep), module_id: Optional[str] = Query(default=None)):
     pg = get_pg()
     user = pg.get_user_by_email(email)
     user_roles = user.roles if user else []
     is_admin = "admin" in user_roles
-    bots = pg.get_bots(admin=is_admin, user_roles=user_roles)
+    if module_id:
+        bots = pg.get_bots_for_module(module_id, user_roles=user_roles)
+    else:
+        bots = pg.get_bots(admin=is_admin, user_roles=user_roles)
     return [BotOut(**b.__dict__) for b in bots]
 
 
@@ -82,7 +86,7 @@ def get_bot(bot_id: str, email: str = Depends(token_dep)):
     if not is_admin:
         if not bot.active:
             raise HTTPException(status_code=404, detail="Bot not found")
-        if bot.roles and not any(r in bot.roles for r in user_roles):
+        if bot.restricted == "admin" and "admin" not in user_roles:
             raise HTTPException(status_code=403, detail="Access denied")
 
     return BotOut(**bot.__dict__)

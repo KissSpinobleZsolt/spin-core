@@ -20,6 +20,7 @@ from app.routes.model_status import _required_models
 
 def _build_module_dict(m: dict) -> dict:
     return {
+        "id": m.get("id"),
         "name": m.get("name", ""),
         "description": m.get("description", ""),
         "remote_url": m.get("remote_url", ""),
@@ -137,8 +138,6 @@ async def lifespan(app: FastAPI):
     # Ensure ClickHouse tables + materialized views for app_logs, chatbot, and all registered modules
     ch = get_ch()
     ch.ensure_app_logs_mv()
-    ch.ensure_module_table("chatbot")
-    ch.ensure_module_mv("chatbot")
     for m in pg.get_modules():
         ch.ensure_module_table(m["scope"])
         ch.ensure_module_mv(m["scope"])

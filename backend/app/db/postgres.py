@@ -53,7 +53,6 @@ class BotRow(Base):
     icon = Column(String, nullable=False, default="🤖")
     active = Column(Boolean, nullable=False, default=False)
     restricted = Column(String, nullable=False, default="user")
-    roles = Column(ARRAY(String), nullable=False, default=list)
     modules = Column(ARRAY(String), nullable=False, default=list)
     created_by = Column(String, nullable=True, default="")
     created_at = Column(DateTime, server_default=func.now())
@@ -118,6 +117,7 @@ class PostgresAdapter:
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS restricted VARCHAR NOT NULL DEFAULT 'user'",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS modules VARCHAR[] NOT NULL DEFAULT '{}'",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_by VARCHAR DEFAULT ''",
+            "ALTER TABLE bots DROP COLUMN IF EXISTS roles",
         ]
         with self._engine.connect() as conn:
             for stmt in stmts:
@@ -204,9 +204,9 @@ class PostgresAdapter:
             icon=row.icon,
             active=row.active,
             restricted=row.restricted or "user",
-            roles=list(row.roles or []),
             modules=list(row.modules or []),
             created_by=row.created_by or "",
+            created_at=row.created_at,
         )
 
     def _bot_type_row_to_dict(self, row: BotTypeRow) -> dict:
@@ -233,9 +233,24 @@ class PostgresAdapter:
                 return [self._bot_row_to_record(r) for r in rows]
             result = []
             for r in rows:
-                bot_roles = list(r.roles or [])
-                if not bot_roles or any(role in bot_roles for role in (user_roles or [])):
-                    result.append(self._bot_row_to_record(r))
+                if r.restricted == "admin" and "admin" not in (user_roles or []):
+                    continue
+                result.append(self._bot_row_to_record(r))
+            return result
+
+    def get_bots_for_module(self, module_id: str, user_roles: list[str] | None = None) -> list[BotRecord]:
+        with self._session_ctx() as db:
+            rows = (
+                db.query(BotRow)
+                .filter(BotRow.active == True, BotRow.modules.contains([module_id]))
+                .order_by(BotRow.created_at)
+                .all()
+            )
+            result = []
+            for r in rows:
+                if r.restricted == "admin" and "admin" not in (user_roles or []):
+                    continue
+                result.append(self._bot_row_to_record(r))
             return result
 
     def get_bot_types(self) -> list[dict]:
@@ -302,7 +317,6 @@ class PostgresAdapter:
                 icon=icon,
                 active=active and bool(modules),
                 restricted=restricted,
-                roles=["user", "admin"],
                 modules=modules,
                 created_by=created_by,
             )
@@ -336,7 +350,6 @@ class PostgresAdapter:
             row.icon = icon
             row.active = active and bool(modules)
             row.restricted = restricted
-            row.roles = list(row.roles or ["user", "admin"])
             row.modules = modules
             db.commit()
             db.refresh(row)

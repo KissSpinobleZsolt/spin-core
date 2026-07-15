@@ -25,6 +25,7 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
 | `hello-world` | 3001 | Reference MF remote |
+| `data-ingestion` | 3002 | Data ingestion MF remote |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -119,7 +120,8 @@ Browser
        │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs
        └─ Module Federation (optional third-party remotes)
-            └─ hello-world remote (port 3001)  — reference implementation
+            ├─ hello-world remote (port 3001)     — reference implementation
+            └─ data-ingestion remote (port 3002)  — data source upload and management
 
 Ollama stack:
   ollama (pure server)  ◄──  model-downloader (HTTP client via OLLAMA_HOST)
@@ -173,7 +175,8 @@ spin-core/
 ├── frontend/         # React SPA — see frontend/README.md
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
-│   └── hello-world/  # Reference MF remote — see modules/hello-world/README.md
+│   ├── hello-world/      # Reference MF remote — see modules/hello-world/README.md
+│   └── data-ingestion/   # Data ingestion MF remote — see modules/data-ingestion/README.md
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml

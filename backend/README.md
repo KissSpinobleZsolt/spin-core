@@ -215,7 +215,7 @@ CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `GET` | `/api/bots/types` | Bearer | List all bot type definitions (from `bot_types` table) |
-| `GET` | `/api/bots` | Bearer | List bots. Admins see all; others see only active bots matching their roles. |
+| `GET` | `/api/bots` | Bearer | List bots. Admins see all; others see only active bots matching their roles. Optional `?module_id={uuid}` returns only active bots assigned to that module (role-filtered). |
 | `POST` | `/api/bots` | Admin | Create a bot |
 | `GET` | `/api/bots/{id}` | Bearer | Get one bot (active + role-checked for non-admins) |
 | `PUT` | `/api/bots/{id}` | Admin | Replace a bot |
@@ -238,9 +238,12 @@ Request body for `POST /api/chat`:
 {
   "messages": [{ "role": "user", "content": "Hello" }],
   "model": "qwen2.5:7b",
-  "bot_id": "optional-bot-uuid"
+  "bot_id": "optional-bot-uuid",
+  "module_id": "optional-module-uuid"
 }
 ```
+
+When both `bot_id` and `module_id` are provided, the module's name and description are injected into the bot's system prompt as a "Current Module" context section. `module_id` is also recorded in the ClickHouse chat log.
 
 When `bot_id` is provided the backend looks up the bot's configured model and system prompt. The model overrides the `model` field; the system prompt is prepended as a `system` role message before calling Ollama. `model` defaults to `OLLAMA_MODEL` when no bot is selected or the bot has no model set.
 

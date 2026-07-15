@@ -18,6 +18,69 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 _CHATBOT_SCOPE = "chatbot"
 
+_NAV_PUBLIC = [
+    ("/",               "Dashboard",    "admin-editable welcome page"),
+    ("/bots",           "Bots",         "browse and launch AI bots"),
+]
+_NAV_ADMIN = [
+    ("/logs",           "Logs",         "HTTP and chat log viewer"),
+    ("/translations",   "Translations", "live i18n string editor"),
+    ("/bots-admin",     "Bot Admin",    "create and manage bots"),
+    ("/admin/llms",     "LLM Models",   "Ollama model management"),
+    ("/admin/users",    "Users",        "user management"),
+    ("/admin/modules",  "Modules",      "micro-frontend registration and logs"),
+    ("/admin/status",   "Status",       "live health dashboard"),
+]
+
+
+def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = None) -> str:
+    is_admin = "admin" in user_roles
+
+    preprompt = ""
+    for bt in pg.get_bot_types():
+        if bt["name"] == bot.type:
+            preprompt = bt.get("preprompt") or ""
+            break
+
+    modules = pg.get_modules(enabled_only=True, user_roles=user_roles)
+    bots = pg.get_bots(admin=False, user_roles=user_roles)
+
+    nav = _NAV_PUBLIC + (_NAV_ADMIN if is_admin else [])
+    module_lines = []
+    if module:
+        module_lines = [
+            "",
+            "### Current Module",
+            f"You are embedded in the '{module['name']}' module: {module['description']}",
+            f"Module route: /modules/{module['route']}",
+        ]
+    ctx_lines = [
+        "## PLATFORM CONTEXT (injected) ##",
+        "",
+        "You are running inside spin-core, a full-stack AI platform.",
+        "",
+        "### Pages",
+        *[f"- [{name}]({route}): {desc}" for route, name, desc in nav],
+        "",
+        "### Installed Modules",
+        *(
+            [f"- {m['icon']} [{m['name']}](/modules/{m['route']}): {m['description']}" for m in modules]
+            if modules else ["- (none installed)"]
+        ),
+        "",
+        "### Available Bots",
+        *(
+            [f"- {b.icon} {b.name} [{b.type}]: {b.description}" for b in bots]
+            if bots else ["- (none available)"]
+        ),
+        *module_lines,
+        "",
+        "## END PLATFORM CONTEXT ##",
+    ]
+
+    parts = [p for p in [preprompt, "\n".join(ctx_lines), bot.system_prompt] if p]
+    return "\n\n".join(parts)
+
 
 class Message(BaseModel):
     role: str
@@ -28,6 +91,7 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     model: str = OLLAMA_MODEL
     bot_id: Optional[str] = None
+    module_id: Optional[str] = None
 
 
 @router.post("")
@@ -45,13 +109,17 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
             raise HTTPException(status_code=404, detail="Bot not found")
         user = pg.get_user_by_email(user_email)
         user_roles = user.roles if user else []
-        if "admin" not in user_roles and bot.roles and not any(r in bot.roles for r in user_roles):
-            raise HTTPException(status_code=403, detail="Access denied")
+        if "admin" not in user_roles:
+            if not bot.active:
+                raise HTTPException(status_code=404, detail="Bot not found")
+            if bot.restricted == "admin":
+                raise HTTPException(status_code=403, detail="Access denied")
         bot_name = bot.name
         if bot.model:
             effective_model = bot.model
-        if bot.system_prompt:
-            messages_to_send = [Message(role="system", content=bot.system_prompt)] + messages_to_send
+        module = pg.get_module(payload.module_id) if payload.module_id else None
+        system_content = _build_system_message(pg, bot, user_roles, module=module)
+        messages_to_send = [Message(role="system", content=system_content)] + messages_to_send
 
     async def stream():
         start = time.time()
@@ -104,6 +172,8 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
             if payload.bot_id:
                 log_details["bot_id"] = payload.bot_id
                 log_details["bot_name"] = bot_name
+            if payload.module_id:
+                log_details["module_id"] = payload.module_id
             get_ch().write_module_log(
                 scope=_CHATBOT_SCOPE,
                 user_email=user_email,

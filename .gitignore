@@ -18,3 +18,7 @@ Thumbs.db
 # Claude Code — ignore entirely
 .claude/
 CLAUDE.*
+
+# Modules — exclude everything except README and tracked modules
+modules/*
+!modules/README.md
