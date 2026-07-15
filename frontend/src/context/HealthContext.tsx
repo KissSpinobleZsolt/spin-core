@@ -7,7 +7,6 @@ const DEFAULT: HealthState = {
   api: true,
   postgres: true,
   clickhouse: true,
-  mongo: true,
   checkedAt: null,
 }
 

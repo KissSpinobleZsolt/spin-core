@@ -9,7 +9,7 @@ React 19 SPA for the spin-core platform.
 - **Styling**: Tailwind CSS v4
 - **Routing**: React Router v7
 - **Data fetching**: TanStack React Query v5
-- **i18n**: i18next + react-i18next — translations stored in MongoDB, live-editable by admins; static locale files serve as instant-render fallback
+- **i18n**: i18next + react-i18next — translations fetched from `GET /api/i18n/{lang}` (PostgreSQL-backed), live-editable by admins
 - **Package manager**: pnpm 9
 
 ## Pages & routes
@@ -46,8 +46,14 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 
 `src/workers/healthWorker.ts` is a **Web Worker** that runs off the main thread. It pings `GET /api/health` immediately on startup, then every 30 s (5 s timeout). Results are sent back via `postMessage` and consumed by `HealthContext`.
 
+The health payload includes a `translations` map (`lang → ISO timestamp`) alongside the DB liveness flags. `useI18nSync` watches this map and reloads the active language's bundle only when its timestamp changes — no polling, no unnecessary fetches.
+
 - **Header**: shows a red "API offline" or "DB degraded" pill when any service is down; invisible when everything is healthy.
 - **Settings → Databases**: each row shows a live badge — grey pulsing "checking…" before the first result, green "online", or red pulsing "unreachable" — plus a "Last checked" timestamp.
+
+## i18n
+
+Translations are fetched from `GET /api/i18n/{lang}` (PostgreSQL-backed) — there are no bundled locale files. On first render `App` shows a full-screen spinner while the initial fetch completes, then unmounts it. Subsequent reloads happen automatically when the health worker detects a `translations` timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.
 
 ## Ollama model status banner
 

@@ -5,23 +5,21 @@ FastAPI backend for the spin-core platform.
 ## Tech
 
 - **Framework**: FastAPI, Python 3.12, uvicorn
-- **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages)
+- **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages, i18n translations, module data)
 - **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log + per-module log tables + refreshable materialized views)
-- **Module DB**: MongoDB 7 via pymongo (generic document store for installed modules)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
 - **AI proxy**: httpx — async streaming proxy to Ollama for the `/api/chat` endpoint
 - **Config**: `/app/data/settings.json` on a Docker / Kubernetes volume
 
 ## Architecture
 
-All three databases are always initialised at startup via `init_db()`. Each has a fixed role — there is no user-selectable DB mode.
+Both databases are always initialised at startup via `init_db()`. Each has a fixed role — there is no user-selectable DB mode.
 
 ```
-get_pg()    → PostgresAdapter      — users, pages, admin ops
+get_pg()    → PostgresAdapter      — users, pages, admin ops, i18n translations, module data
 get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_logs_mv()
                                      ensure_module_table() / write_module_log()
                                      query_module_logs() / query_module_logs_mv()
-get_mongo() → MongoDataAdapter     — get/insert/update/delete documents per module
 ```
 
 Every HTTP request is automatically appended to `app_logs` by the middleware in `main.py`.
@@ -46,7 +44,6 @@ JWT_SECRET_KEY=change-me \
 ADMIN_EMAIL=admin@spin.local \
 ADMIN_PASSWORD=change-me \
 POSTGRES_URL=postgresql://core-postgres:core-postgres@localhost:5432/core-postgres \
-MONGO_URL=mongodb://core-mongo:core-mongo@localhost:27017/core-mongo?authSource=admin \
 CLICKHOUSE_URL=clickhouse://core-ch:core-ch@localhost:9000/core \
 uvicorn app.main:app --reload --port 8000
 ```
@@ -54,7 +51,7 @@ uvicorn app.main:app --reload --port 8000
 Or via Docker Compose from the project root:
 
 ```bash
-docker compose up backend postgres mongo clickhouse
+docker compose up backend postgres clickhouse
 ```
 
 ## Environment variables
@@ -66,8 +63,8 @@ docker compose up backend postgres mongo clickhouse
 | `ADMIN_NAME` | `Admin` | Admin display name |
 | `JWT_SECRET_KEY` | `change-me-in-production` | JWT signing secret — **change before deploying** |
 | `SETTINGS_PATH` | `/app/data/settings.json` | Path to the settings file |
+| `SEED_PATH` | `/app/seed-data/seed.json` | Path to the first-run seed file (see `./data/seed.json`) |
 | `POSTGRES_URL` | `postgresql://core-postgres:core-postgres@db:5432/core-postgres` | Primary DB |
-| `MONGO_URL` | `mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin` | Module data store |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
@@ -80,10 +77,12 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | What | Guard | Log line |
 |------|-------|----------|
 | Admin user | email not in PostgreSQL | `[spin-core] Admin user created: …` |
-| i18n translations (EN + RO) | language key absent in MongoDB | _(silent)_ |
-| Default "AI Assistant" bot | `bots` table is empty | `[spin-core] Seeded default AI Assistant bot` |
+| Dashboard page | `page_responses` row absent | _(silent)_ |
+| Default bots | `bots` table is empty | `[spin-core] Seeded bot: …` (one line per bot) |
+| Settings file | `settings.json` absent | _(silent)_ |
+| i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
 
-The default bot is a general-purpose chatbot that uses `OLLAMA_MODEL` and carries no system prompt. Admins can edit or delete it, and create additional bots at `/bots-admin`.
+Default values for dashboard content, bots, theme, and modules come from **`./data/seed.json`** (mounted read-only at `SEED_PATH`). Edit that file before first run to customise defaults. If the file is absent or malformed, the backend falls back to built-in defaults and logs a warning.
 
 ## API reference
 
@@ -103,14 +102,19 @@ All routes are prefixed with `/api`.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/health` | Returns liveness of the API and all three databases |
+| `GET` | `/api/health` | Returns liveness of the API and both databases |
 
 Response:
 ```json
-{ "api": true, "postgres": true, "clickhouse": true, "mongo": false }
+{
+  "api": true,
+  "postgres": true,
+  "clickhouse": true,
+  "translations": { "en": "2026-07-15T10:00:00", "ro": "2026-07-15T09:58:00" }
+}
 ```
 
-Each field is `true` if the connection check passed, `false` otherwise. `api` is always `true` when the endpoint itself responds. Used by the frontend Web Worker to drive the status indicator in the header and the per-DB badges in Settings.
+Each DB field is `true` if the connection check passed, `false` otherwise. `api` is always `true` when the endpoint itself responds. `translations` maps each seeded language to its last-modified ISO timestamp — the frontend compares this against a stored value and reloads translation bundles only when the timestamp changes, avoiding unnecessary fetches.
 
 ### Auth
 
@@ -160,7 +164,7 @@ Module log tables and their MVs are created automatically when a module is regis
 
 ### Translations (i18n)
 
-Translations are stored in MongoDB (`system__i18n` collection) and seeded from `app/i18n_defaults.py` on first startup.
+Translations are stored in PostgreSQL (`translations` table) and deep-merged from `app/i18n_defaults.py` on every startup (new keys are added; admin-edited values are preserved).
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
@@ -171,7 +175,7 @@ Translations are stored in MongoDB (`system__i18n` collection) and seeded from `
 
 ### Module data (any authenticated user)
 
-Namespaced MongoDB collections for installed modules. Collections are stored as `{module_id}__{collection}`.
+Namespaced document store in PostgreSQL (`module_documents` table). Documents are scoped by `module_id` and `collection`.
 
 | Method | Path | Description |
 |--------|------|-------------|
@@ -248,17 +252,17 @@ backend/
 ├── app/
 │   ├── main.py           # App factory, HTTP logging middleware, router registration
 │   ├── settings.py       # AppSettings dataclass, read/write settings.json
-│   ├── database.py       # init_db(), get_pg() / get_ch() / get_mongo()
+│   ├── seed_loader.py    # Loads ./data/seed.json → SeedData (dashboard, bots, theme, modules)
+│   ├── database.py       # init_db(), get_pg() / get_ch()
 │   ├── auth.py           # JWT creation/validation, password hashing
 │   ├── deps.py           # require_token / require_admin
 │   ├── state.py          # In-process AppSettings singleton
-│   ├── i18n_defaults.py  # Default EN + RO translations (seeded into MongoDB on first run)
+│   ├── i18n_defaults.py  # Default EN + RO translations (deep-merged into PostgreSQL every startup)
 │   ├── model_tracker.py  # Background async pull tracker — progress dict consumed by the SSE stream
 │   ├── db/
 │   │   ├── interface.py  # AppAdapter protocol + UserRecord + BotRecord dataclasses
-│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots via SQLAlchemy
-│   │   ├── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
-│   │   └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
+│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots, i18n, module data via SQLAlchemy
+│   │   └── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
 │   └── routes/
 │       ├── auth.py           # /api/auth/login
 │       ├── dashboard.py      # /api/dashboard, /api/user/theme

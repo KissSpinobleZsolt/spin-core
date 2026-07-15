@@ -5,8 +5,8 @@ metadata:
   namespace: spin-core
 data:
   SETTINGS_PATH: "/app/data/settings.json"
+  SEED_PATH: "/app/seed-data/seed.json"
   POSTGRES_URL: "postgresql://core-postgres:core-postgres@postgres:5432/core-postgres"
-  MONGO_URL: "mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin"
   CLICKHOUSE_URL: "clickhouse://core-ch:core-ch@clickhouse:9000/core"
   OLLAMA_URL: "http://ollama.spin-core.svc.cluster.local:11434"
   MODULE_REGISTRY_URLS: "http://hello-world.spin-core.svc.cluster.local"

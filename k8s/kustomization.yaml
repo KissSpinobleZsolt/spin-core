@@ -11,13 +11,11 @@ secretGenerator:
 resources:
   - namespace.yaml
   - configmap.yaml
+  - seed-data-cm.yaml
   - app-data-pvc.yaml
   - postgres/pvc.yaml
   - postgres/service.yaml
   - postgres/statefulset.yaml
-  - mongo/pvc.yaml
-  - mongo/service.yaml
-  - mongo/statefulset.yaml
   - clickhouse/pvc.yaml
   - clickhouse/service.yaml
   - clickhouse/statefulset.yaml
@@ -27,8 +25,6 @@ resources:
   - ollama/model-downloader-job.yaml
   - backend/service.yaml
   - backend/deployment.yaml
-  - chatbot/service.yaml
-  - chatbot/deployment.yaml
   - hello-world/service.yaml
   - hello-world/deployment.yaml
   - frontend/service.yaml

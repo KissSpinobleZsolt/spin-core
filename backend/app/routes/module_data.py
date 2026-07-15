@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Header, HTTPException, Query
 from pydantic import BaseModel
 
-from app.database import get_mongo
+from app.database import get_pg
 from app.deps import require_token
 from app.state import get_settings
 
@@ -28,7 +28,7 @@ async def list_documents(
 ):
     require_token(authorization)
     _check_module(module_id)
-    return get_mongo().get_documents(module_id, collection, {}, limit=limit, skip=skip)
+    return get_pg().get_documents(module_id, collection, {}, limit=limit, skip=skip)
 
 
 @router.post("/{module_id}/{collection}", status_code=201)
@@ -40,7 +40,7 @@ async def create_document(
 ):
     require_token(authorization)
     _check_module(module_id)
-    inserted_id = get_mongo().insert_document(module_id, collection, payload.data)
+    inserted_id = get_pg().insert_document(module_id, collection, payload.data)
     return {"_id": inserted_id}
 
 
@@ -54,7 +54,7 @@ async def update_document(
 ):
     require_token(authorization)
     _check_module(module_id)
-    updated = get_mongo().update_document(module_id, collection, doc_id, payload.data)
+    updated = get_pg().update_document(module_id, collection, doc_id, payload.data)
     if not updated:
         raise HTTPException(status_code=404, detail="Document not found")
     return {"updated": True}
@@ -69,6 +69,6 @@ async def delete_document(
 ):
     require_token(authorization)
     _check_module(module_id)
-    deleted = get_mongo().delete_document(module_id, collection, doc_id)
+    deleted = get_pg().delete_document(module_id, collection, doc_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Document not found")

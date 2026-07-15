@@ -7,15 +7,14 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import init_db, get_pg, get_ch, get_mongo
+from app.database import init_db, get_pg, get_ch
 from app.model_tracker import run_sequential_trackers
-from app.settings import read_settings
-from app.state import set_settings
+from app.seed_loader import load_seed
+from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, ModuleConfig, read_settings, write_settings
+from app.state import get_settings, set_settings
 
 from app.routes import auth, dashboard, ingestion, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status, bots
 from app.routes.model_status import _required_models
-from app.settings import write_settings
-from app.state import get_settings
 
 
 @asynccontextmanager
@@ -24,6 +23,7 @@ async def lifespan(app: FastAPI):
     init_db()
 
     pg = get_pg()
+    seed = load_seed()
 
     # Seed admin from env vars on first run
     admin_email = os.getenv("ADMIN_EMAIL")
@@ -36,36 +36,33 @@ async def lifespan(app: FastAPI):
                 name=os.getenv("ADMIN_NAME", "Admin"),
                 hashed_password=hash_password(admin_password),
                 roles=["user", "admin"],
-                default_theme="dark",
+                default_theme=seed.default_theme,
             )
             print(f"[spin-core] Admin user created: {admin_email}", file=sys.stderr)
     else:
         print("[spin-core] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin seed", file=sys.stderr)
 
     if not pg.get_page("dashboard"):
-        pg.upsert_page("dashboard", "Hello welcome")
+        pg.upsert_page("dashboard", seed.dashboard_content)
 
-    # Seed default chatbot on first run
+    # Seed default bots on first run
     if not pg.get_bots(admin=True):
-        from app.routes.chat import OLLAMA_MODEL
-        pg.create_bot(
-            name="AI Assistant",
-            description="General-purpose AI assistant powered by Ollama.",
-            type="chatbot",
-            model=OLLAMA_MODEL,
-            system_prompt="You are a helpful AI assistant.",
-            icon="💬",
-            enabled=True,
-            roles=["user", "admin"],
-        )
-        print("[spin-core] Seeded default AI Assistant bot", file=sys.stderr)
+        import dataclasses
+        for bot in seed.bots:
+            pg.create_bot(**dataclasses.asdict(bot))
+            print(f"[spin-core] Seeded bot: {bot.name}", file=sys.stderr)
 
-    # Seed default translations into MongoDB on first run
+    # Apply seed settings on very first run (before settings.json exists)
+    if not SETTINGS_PATH.exists():
+        write_settings(AppSettings(
+            theme=ThemeConfig(default_theme=seed.default_theme),
+            modules=[ModuleConfig(**m) for m in seed.modules],
+        ))
+
+    # Seed / merge default translations into PostgreSQL on every startup
     from app.i18n_defaults import DEFAULT_TRANSLATIONS
-    mongo = get_mongo()
     for lang, data in DEFAULT_TRANSLATIONS.items():
-        if mongo.get_i18n_data(lang) is None:
-            mongo.set_i18n_data(lang, data)
+        pg.merge_i18n_data(lang, data)
 
     # Remove legacy chatbot module entry — chatbot is now a core widget, not a registered module
     s = get_settings()

@@ -8,9 +8,8 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, React Query, React Router v7, i18next |
 | Backend | FastAPI, Python 3.12, uvicorn |
-| Primary DB | PostgreSQL 16 — users, auth, app settings |
+| Primary DB | PostgreSQL 16 — users, auth, app settings, i18n translations, module data |
 | Log DB | ClickHouse 24 — append-only event log, 30-day TTL |
-| Module DB | MongoDB 7 — data store for installed modules |
 | AI | Ollama (`qwen2.5:7b`) — local LLM, no external API keys |
 | Containers | Docker Compose (dev/prod) · Kubernetes / minikube |
 
@@ -22,7 +21,6 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 | `frontend-dev` | 3000 | Vite dev server with HMR |
 | `backend` | 8000 | FastAPI REST + WebSocket API |
 | `postgres` | 5432 | PostgreSQL |
-| `mongo` | 27017 | MongoDB |
 | `clickhouse` | 8123/9000 | ClickHouse HTTP + native |
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
@@ -80,6 +78,8 @@ There is no setup wizard. The backend seeds an admin user on first startup from 
 
 Go to `/login` and sign in. The seed is idempotent — subsequent restarts skip it if the email already exists.
 
+To customise first-run defaults (bots, dashboard content, theme), edit **`./data/seed.json`** before running `docker compose up`.
+
 To start fresh: `docker compose down -v`
 
 ## Package documentation
@@ -113,7 +113,6 @@ Browser
        │                  │               refreshable MVs rebuilt every 10 min:
        │                  │                 app_logs_mv           — hourly HTTP stats
        │                  │                 module_{scope}_logs_mv — hourly module stats
-       │                  ├─ MongoDB     — module data + i18n translations
        │                  └─ Ollama      — streaming LLM proxy (/api/chat)
        │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs

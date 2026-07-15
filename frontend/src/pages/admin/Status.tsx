@@ -76,10 +76,9 @@ function AppHealthSection() {
   )
 }
 
-const DB_ROWS: { key: 'postgres' | 'clickhouse' | 'mongo'; icon: string; name: string; role: string }[] = [
+const DB_ROWS: { key: 'postgres' | 'clickhouse'; icon: string; name: string; role: string }[] = [
   { key: 'postgres',   icon: '🐘', name: 'PostgreSQL',  role: 'Users & application data' },
   { key: 'clickhouse', icon: '🏠', name: 'ClickHouse',  role: 'Event logs & audit trail' },
-  { key: 'mongo',      icon: '🍃', name: 'MongoDB',     role: 'Module data store' },
 ]
 
 function DbStatusSection() {
