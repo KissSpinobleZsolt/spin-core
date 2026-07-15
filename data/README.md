@@ -38,12 +38,13 @@ Fields:
 | `roles` | string[] | No | RBAC roles that can access the module (default `["user", "admin"]`) |
 | `remote_url` | string | Yes | Browser-accessible URL of `remoteEntry.js` |
 | `presets` | object | No | `{ "i18n": {}, "layout": {}, "settings": {} }` — JSON blobs injected as props into the remote component |
+| `backend_url` | string | No | URL of the module's own plugin backend service. When set, the core backend proxies `/api/plugin/{scope}/…` requests to it. Omit for frontend-only modules. |
 
 ### `bots` — global bot entries
 
 Each entry is inserted into the PostgreSQL `bots` table when the table is empty. Only add bots here that are not tied to a specific module (e.g. the "AI Assistant" with `"modules": ["core"]`). Module-specific bots belong in the module's `manifest.json` — they are created automatically when the module is registered.
 
-Fields: `name`, `description`, `type`, `model`, `system_prompt`, `icon`, `active`, `restricted`, `modules`.
+Fields: `name`, `description`, `type`, `provider` (`"ollama"` | `"anthropic"` | `"openai"` — defaults to `"ollama"`), `model`, `system_prompt`, `icon`, `active`, `restricted`, `modules`.
 
 ### Module-carried bots
 

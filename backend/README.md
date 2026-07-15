@@ -8,7 +8,7 @@ FastAPI backend for the spin-core platform.
 - **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages, modules, i18n translations, module data)
 - **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log + per-module log tables + refreshable materialized views)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
-- **AI proxy**: httpx — async streaming proxy to Ollama for the `/api/chat` endpoint
+- **LLM providers**: Ollama (self-hosted, default), Anthropic, and any OpenAI-compatible endpoint (Groq, Mistral, Azure, vLLM) — selected per-bot via the `provider` field; streamed via httpx
 - **Config**: `/app/data/settings.json` on a Docker / Kubernetes volume
 
 ## Architecture
@@ -44,6 +44,8 @@ Every HTTP request is automatically appended to `app_logs` by the middleware in 
 | `app_logs_mv` | Refreshable MV — hourly aggregates of `app_logs` (request count, avg/max duration, error count). Rebuilt every 10 minutes. |
 | `module_{scope}_logs` | Per-module event log — created automatically when a module is registered |
 | `module_{scope}_logs_mv` | Refreshable MV — hourly aggregates per module (event count, unique users). Rebuilt every 10 minutes. |
+| `module_chatbot_logs` | Chat completions — provider, model, messages, response, token counts, duration |
+| `module_chatbot_logs_mv` | Refreshable MV — hourly chat aggregates (completion count, avg/total tokens, avg duration). Rebuilt every 10 minutes. |
 
 All raw tables have a 30-day TTL. All `from`/`to` query params default to the start of the current month → now.
 

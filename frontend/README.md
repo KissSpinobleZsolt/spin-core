@@ -40,6 +40,7 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 | `SettingsContext` | — | Polls `GET /api/settings` |
 | `UIPrefsContext` | `ui_prefs` (localStorage) | Sidebar collapsed state, cross-tab sync |
 | `HealthContext` | — | Receives DB liveness updates from the health Web Worker |
+| `ModelStatusContext` | — | Provides Ollama model readiness state — consumed by `ChatBubble` to decide visibility |
 
 ## Health monitoring
 
@@ -126,7 +127,7 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`ModuleBotPanel`** (`src/components/modules/ModuleBotPanel.tsx`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
 
-**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default "AI Assistant" bot is seeded on first backend startup.
+**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
 
 ### Module presets
 
