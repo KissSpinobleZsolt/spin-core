@@ -70,8 +70,7 @@ docker compose up backend postgres mongo clickhouse
 | `MONGO_URL` | `mongodb://core-mongo:core-mongo@mongo:27017/core-mongo?authSource=admin` | Module data store |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | Model used as the default for `POST /api/chat`. Override to switch models without a code change. |
-| `CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Browser-accessible URL of the chatbot MF remote, stored in settings on first run |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
 | `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` by `GET /api/settings/modules/discover` |
 
 ## Admin bootstrap
@@ -82,13 +81,23 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 |------|-------|----------|
 | Admin user | email not in PostgreSQL | `[spin-core] Admin user created: …` |
 | i18n translations (EN + RO) | language key absent in MongoDB | _(silent)_ |
-| Chatbot module | no module with `scope == "chatbot"` in `settings.json` | `[spin-core] Chatbot module seeded` |
+| Default "AI Assistant" bot | `bots` table is empty | `[spin-core] Seeded default AI Assistant bot` |
 
-If you need to re-seed the chatbot module (e.g. after manually deleting a stale entry in Settings), restart the backend — the guard will trigger and insert the correct entry.
+The default bot is a general-purpose chatbot that uses `OLLAMA_MODEL` and carries no system prompt. Admins can edit or delete it, and create additional bots at `/bots-admin`.
 
 ## API reference
 
 All routes are prefixed with `/api`.
+
+### Model status & LLM management
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/model-status` | No | Check whether required Ollama models (`OLLAMA_MODEL`, `OLLAMA_EMBED_MODEL`) are pulled and ready |
+| `GET` | `/api/model-status/installed` | No | List all models currently installed in Ollama (name, family, params, quantization, size) |
+| `GET` | `/api/model-status/stream` | No | SSE stream — pushes pull progress every second until all required models are ready |
+| `POST` | `/api/model-status/pull` | Admin | Trigger a background pull of an arbitrary Ollama model. Body: `{ "name": "llama3.2:3b" }`. Returns immediately; progress is tracked internally. |
+| `DELETE` | `/api/model-status/{model_name}` | Admin | Delete a model from Ollama. Proxies to `DELETE /api/delete`. |
 
 ### Health (no auth)
 
@@ -171,6 +180,20 @@ Namespaced MongoDB collections for installed modules. Collections are stored as 
 | `PUT` | `/api/module-data/{moduleId}/{collection}/{docId}` | Update document |
 | `DELETE` | `/api/module-data/{moduleId}/{collection}/{docId}` | Delete document |
 
+### Bots
+
+CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table). Each bot has a name, type, Ollama model, system prompt, enabled flag, and a list of roles that can access it.
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/bots` | Bearer | List bots. Admins see all; others see only enabled bots matching their roles. |
+| `POST` | `/api/bots` | Admin | Create a bot |
+| `GET` | `/api/bots/{id}` | Bearer | Get one bot (role-checked for non-admins) |
+| `PUT` | `/api/bots/{id}` | Admin | Replace a bot |
+| `DELETE` | `/api/bots/{id}` | Admin | Delete a bot |
+
+Bot types (`chatbot`, `watchbot`, `tradebot`, `custom`) are metadata — all currently use the same streaming chat interface. The type field is available for future specialisation.
+
 ### Chat (AI assistant)
 
 Streams responses from a local Ollama instance. Requires `OLLAMA_URL` to point at a running Ollama server. Every completed conversation is persisted to `module_chatbot_logs` in ClickHouse.
@@ -185,13 +208,14 @@ Request body for `POST /api/chat`:
 ```json
 {
   "messages": [{ "role": "user", "content": "Hello" }],
-  "model": "qwen2.5:7b"
+  "model": "qwen2.5:7b",
+  "bot_id": "optional-bot-uuid"
 }
 ```
 
-`model` defaults to the value of `OLLAMA_MODEL` (env var). Callers can override it per-request.
+When `bot_id` is provided the backend looks up the bot's configured model and system prompt. The model overrides the `model` field; the system prompt is prepended as a `system` role message before calling Ollama. `model` defaults to `OLLAMA_MODEL` when no bot is selected or the bot has no model set.
 
-Each streamed line is a raw Ollama NDJSON chunk. If Ollama is unreachable the stream yields `{"error": "..."}` and closes. After streaming finishes, the full conversation (messages, response, token counts, duration) is written to ClickHouse — this never blocks or breaks the stream.
+Each streamed line is a raw Ollama NDJSON chunk. If Ollama is unreachable the stream yields `{"error": "..."}` and closes. After streaming finishes, the full conversation is written to ClickHouse — this never blocks or breaks the stream.
 
 The chat log `details` field is JSON with the shape:
 ```json
@@ -201,9 +225,13 @@ The chat log `details` field is JSON with the shape:
   "response": "…",
   "prompt_tokens": 42,
   "eval_tokens": 123,
-  "duration_ms": 1842.5
+  "duration_ms": 1842.5,
+  "bot_id": "uuid",
+  "bot_name": "Trade Bot"
 }
 ```
+
+`bot_id` and `bot_name` are only present when the request included a `bot_id`.
 
 ### Data ingestion (WebSocket)
 
@@ -225,9 +253,10 @@ backend/
 │   ├── deps.py           # require_token / require_admin
 │   ├── state.py          # In-process AppSettings singleton
 │   ├── i18n_defaults.py  # Default EN + RO translations (seeded into MongoDB on first run)
+│   ├── model_tracker.py  # Background async pull tracker — progress dict consumed by the SSE stream
 │   ├── db/
-│   │   ├── interface.py  # AppAdapter protocol + UserRecord dataclass
-│   │   ├── postgres.py   # PostgresAdapter — users + pages via SQLAlchemy
+│   │   ├── interface.py  # AppAdapter protocol + UserRecord + BotRecord dataclasses
+│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots via SQLAlchemy
 │   │   ├── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
 │   │   └── mongo.py      # MongoDataAdapter — generic collection CRUD + i18n helpers
 │   └── routes/
@@ -240,7 +269,9 @@ backend/
 │       ├── i18n.py           # /api/i18n/{lang}
 │       ├── health.py         # /api/health — DB liveness checks
 │       ├── ingestion.py      # /api/data-ingestion + WebSocket
-│       └── chat.py           # /api/chat — streaming Ollama proxy, logs to module_chatbot_logs
+│       ├── bots.py           # /api/bots — bot CRUD (stored in PostgreSQL)
+│       ├── model_status.py   # /api/model-status — Ollama readiness, installed models, pull/delete, SSE stream
+│       └── chat.py           # /api/chat — streaming Ollama proxy, bot system prompt injection
 ├── requirements.txt
 └── Dockerfile
 ```

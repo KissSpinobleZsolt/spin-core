@@ -7,7 +7,8 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 | Module | Port | Scope | Description |
 |--------|------|-------|-------------|
 | [hello-world](hello-world/README.md) | 3001 | `helloWorld` | Reference remote — counter widget |
-| [chatbot](chatbot/README.md) | 3002 | `chatbot` | AI assistant powered by Ollama |
+
+> The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
 
 ## How modules work
 
@@ -25,7 +26,7 @@ The host never rebuilds when modules change — it loads them live from their ru
 
 ## Registering a module
 
-Modules are registered in **Settings → Modules**. Two ways:
+Modules are registered in **Admin → Modules** (`/admin/modules`). Two ways:
 
 **Automatic (scan):** Click **🔍 Scan for modules**. The backend fetches `manifest.json` from each URL in `MODULE_REGISTRY_URLS` and returns a list. New modules show an **Add** button pre-filled from the manifest.
 

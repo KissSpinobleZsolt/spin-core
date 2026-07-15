@@ -27,7 +27,6 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
 | `hello-world` | 3001 | Reference MF remote |
-| `chatbot` | 3002 | Legacy MF remote — no longer loaded by the core app; chatbot is now a native widget |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -92,7 +91,6 @@ To start fresh: `docker compose down -v`
 | `frontend/` | [frontend/README.md](frontend/README.md) | Pages, context providers, module federation loader, build |
 | `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract |
 | `modules/hello-world/` | [modules/hello-world/README.md](modules/hello-world/README.md) | Reference remote — how to build and register |
-| `modules/chatbot/` | [modules/chatbot/README.md](modules/chatbot/README.md) | AI chatbot remote — components, Ollama wiring, auto-seeding |
 | `k8s/` | [k8s/README.md](k8s/README.md) | Kubernetes deploy guide, secrets, day-to-day ops |
 
 ## Architecture overview
@@ -100,9 +98,15 @@ To start fresh: `docker compose down -v`
 ```
 Browser
   └─ Frontend (React 19 + Vite)
-       ├─ ChatBubble — native floating widget, history persisted in localStorage
+       ├─ ChatBubble — floating widget; bot + model selectable, history in localStorage
+       ├─ /bots      — user card grid (launch any available bot into full-page chat)
+       ├─ /bots-admin — admin CRUD for bots (name, type, model, system prompt, roles)
+       ├─ /admin/llms     — pull / list / delete Ollama models
+       ├─ /admin/users    — user listing (stub)
+       ├─ /admin/modules  — module CRUD (register, edit, scan)
+       ├─ /admin/status   — live system overview with clickable navigation
        ├─ /api/*  ──►  Backend (FastAPI)
-       │                  ├─ PostgreSQL  — users, pages, settings
+       │                  ├─ PostgreSQL  — users, pages, settings, bots
        │                  ├─ ClickHouse  — HTTP request log (app_logs)
        │                  │               per-module log tables (module_{scope}_logs)
        │                  │               chat completion log (module_chatbot_logs)
@@ -111,6 +115,7 @@ Browser
        │                  │                 module_{scope}_logs_mv — hourly module stats
        │                  ├─ MongoDB     — module data + i18n translations
        │                  └─ Ollama      — streaming LLM proxy (/api/chat)
+       │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs
        └─ Module Federation (optional third-party remotes)
             └─ hello-world remote (port 3001)  — reference implementation
@@ -131,7 +136,7 @@ bash scripts/restart.sh backend clickhouse
 
 # Rebuild an image then restart (after code changes)
 bash scripts/restart.sh --rebuild backend
-bash scripts/restart.sh --rebuild frontend chatbot
+bash scripts/restart.sh --rebuild frontend
 
 # Wipe all data and restart fresh
 docker compose down -v
@@ -141,6 +146,9 @@ docker compose logs -f backend
 
 # Rebuild a single service
 docker compose up --build backend
+
+# Rebuild frontend after code changes
+bash scripts/restart.sh --rebuild frontend
 
 # Check health status of all running services
 docker compose ps
@@ -163,8 +171,7 @@ spin-core/
 ├── backend/          # FastAPI app — see backend/README.md
 ├── frontend/         # React SPA — see frontend/README.md
 ├── modules/
-│   ├── hello-world/  # Reference MF remote — see modules/hello-world/README.md
-│   └── chatbot/      # AI chatbot MF remote — see modules/chatbot/README.md
+│   └── hello-world/  # Reference MF remote — see modules/hello-world/README.md
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/
 │   └── k8s-deploy.sh

@@ -18,9 +18,16 @@ React 19 SPA for the spin-core platform.
 |-------|------|------|-------|
 | `/login` | Login | No | |
 | `/` | Dashboard | Yes | |
-| `/settings` | Settings | Admin | Tri-DB panel with live health badges + modules; includes "Scan for modules" discovery panel |
+| `/bots` | Bots | Yes | Card grid of enabled bots the user can launch |
+| `/bots/:botId` | Bot chat | Yes | Full-page streaming chat with a specific bot |
+| `/admin/llms` | LLMs | Admin | Ollama model management — pull, list, delete |
+| `/admin/users` | Users | Admin | User listing (stub) |
+| `/admin/modules` | Modules | Admin | Module CRUD — register, edit, delete, toggle, scan for new modules |
+| `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
+| `/settings` | Settings | Admin | Appearance + DB health badges + installed Ollama models |
 | `/logs` | Logs | Admin | ClickHouse event log viewer |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
+| `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
 | `/modules/:id` | Federated module | Yes | Webpack container protocol |
 
 All authenticated routes redirect to `/login` if no token is present. The admin user is seeded by the backend from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars — there is no setup wizard.
@@ -102,28 +109,23 @@ Bundling a second React alongside the host's renderer causes the `Invalid hook c
 
 For standalone testing of a remote at its own port, add the React 18 UMD scripts to the remote's `public/index.html` — they set `window.React` and `window.ReactDOM` automatically. See `modules/hello-world/` for a working example.
 
-### Built-in chatbot remote
+### Native bot system
 
-`modules/chatbot/` is a built-in MF remote that exposes two components:
+The platform ships with a built-in bot system — no Module Federation required.
 
-| Component | Used by | Purpose |
-|-----------|---------|---------|
-| `./ChatPage` | `FederatedPage` (sidebar link) | Full-page chat interface |
-| `./ChatWidget` | `ChatBubble` in Layout | Floating bubble on every authenticated page |
+**`ChatBubble`** (`src/components/chat/ChatBubble.tsx`) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to `localStorage`; the selected bot/model are also persisted.
 
-```bash
-cd modules/chatbot && npm install && npm start   # http://localhost:3002
-```
+**`/bots`** (`src/pages/Bots.tsx`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
 
-**Settings-aware bubble** — `ChatBubble.tsx` reads the chatbot module entry from `SettingsContext`. It uses `mod.remote_url` when available (admin-configurable), and falls back to `VITE_CHATBOT_REMOTE_URL` for non-admin users whose modules list is empty. Disabling the module in Settings hides the bubble entirely. The active model is controlled server-side via `OLLAMA_MODEL` — the frontend has no knowledge of which model is running.
+**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model.
 
-**Auto-seeded** — the backend seeds the chatbot as a default module on first run. No manual registration in Settings is required.
+**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default "AI Assistant" bot is seeded on first backend startup.
 
 ### Module discovery
 
 `src/services/settingsService.ts` exposes `discoverModules()` which calls `GET /api/settings/modules/discover`. The backend concurrently fetches `manifest.json` from every URL in `MODULE_REGISTRY_URLS` and returns a `DiscoveredModule[]` with an `already_registered` flag per entry.
 
-**Settings → Modules** surfaces this via a **🔍 Scan for modules** button. After a scan:
+**Admin → Modules** (`/admin/modules`) surfaces this via a **🔍 Scan for modules** button. After a scan:
 - Modules whose `scope` is already registered show a green **Registered** badge.
 - New modules show an **Add** button that opens the module form pre-filled from the manifest — the admin adjusts the `remote_url` if needed (e.g. NodePort URL in K8s) and clicks Save.
 
@@ -154,7 +156,6 @@ Source files are mounted into the container — edits are reflected immediately 
 |----------|---------|-------------|
 | `API_PROXY_TARGET` | `http://localhost:8000` | Backend URL for Vite dev proxy |
 | `VITE_API_BASE_URL` | `/api` | API base URL (build-time) |
-| `VITE_CHATBOT_REMOTE_URL` | `http://localhost:3002/remoteEntry.js` | Chatbot MF remote entry URL (build-time) |
 
 `API_PROXY_TARGET` is set to `http://backend:8000` automatically when running via Docker Compose.
 
