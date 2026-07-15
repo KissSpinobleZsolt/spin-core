@@ -10,12 +10,13 @@ SEED_PATH = Path(os.getenv("SEED_PATH", "./data/seed.json"))
 _FALLBACK_BOT = {
     "name": "AI Assistant",
     "description": "General-purpose AI assistant powered by Ollama.",
-    "type": "chatbot",
+    "type": "communicator",
     "model": "qwen2.5:7b",
     "system_prompt": "You are a helpful AI assistant.",
     "icon": "💬",
-    "enabled": True,
-    "roles": ["user", "admin"],
+    "active": True,
+    "restricted": "user",
+    "modules": ["core"],
 }
 
 
@@ -27,13 +28,15 @@ class BotSeed:
     model: str
     system_prompt: str
     icon: str
-    enabled: bool
-    roles: list[str]
+    active: bool
+    restricted: str
+    modules: list[str]
 
 
 @dataclass
 class SeedData:
     dashboard_content: str = "Hello welcome"
+    bot_types: list[dict] = field(default_factory=list)
     bots: list[BotSeed] = field(default_factory=lambda: [BotSeed(**_FALLBACK_BOT)])
     default_theme: Literal["dark", "light"] = "dark"
     modules: list[dict] = field(default_factory=list)
@@ -50,6 +53,7 @@ def load_seed() -> SeedData:
         return SeedData()
 
     dashboard_content = raw.get("dashboard", {}).get("content", "Hello welcome")
+    bot_types: list[dict] = raw.get("bot_types", [])
 
     bots: list[BotSeed] = []
     for b in raw.get("bots", []):
@@ -57,12 +61,13 @@ def load_seed() -> SeedData:
             bots.append(BotSeed(
                 name=b["name"],
                 description=b.get("description", ""),
-                type=b.get("type", "chatbot"),
+                type=b.get("type", "communicator"),
                 model=b.get("model", "qwen2.5:7b"),
                 system_prompt=b.get("system_prompt", ""),
                 icon=b.get("icon", "🤖"),
-                enabled=b.get("enabled", True),
-                roles=b.get("roles", ["user", "admin"]),
+                active=b.get("active", False),
+                restricted=b.get("restricted", "user"),
+                modules=b.get("modules", []),
             ))
         except Exception as exc:
             print(f"[spin-core] seed.json bot entry invalid, skipping: {exc}", file=sys.stderr)
@@ -76,6 +81,7 @@ def load_seed() -> SeedData:
 
     return SeedData(
         dashboard_content=dashboard_content,
+        bot_types=bot_types,
         bots=bots,
         default_theme=default_theme,
         modules=modules,

@@ -9,4 +9,6 @@ data:
   POSTGRES_URL: "postgresql://core-postgres:core-postgres@postgres:5432/core-postgres"
   CLICKHOUSE_URL: "clickhouse://core-ch:core-ch@clickhouse:9000/core"
   OLLAMA_URL: "http://ollama.spin-core.svc.cluster.local:11434"
+  OLLAMA_MODEL: "qwen2.5:7b"
+  OLLAMA_EMBED_MODEL: "nomic-embed-text:latest"
   MODULE_REGISTRY_URLS: "http://hello-world.spin-core.svc.cluster.local"

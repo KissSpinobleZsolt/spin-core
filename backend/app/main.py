@@ -61,6 +61,9 @@ async def lifespan(app: FastAPI):
     if not pg.get_page("dashboard"):
         pg.upsert_page("dashboard", seed.dashboard_content)
 
+    for bt in seed.bot_types:
+        pg.upsert_bot_type(bt)
+
     # Seed default bots on first run
     if not pg.get_bots(admin=True):
         import dataclasses

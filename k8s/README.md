@@ -93,10 +93,11 @@ OLLAMA_URL: http://ollama.spin-core.svc.cluster.local:11434
 k8s/
 ├── kustomization.yaml        # Kustomize entry point — secretGenerator + resource list
 ├── namespace.yaml
-├── configmap.yaml            # Non-secret env vars (URLs, paths)
+├── configmap.yaml            # Non-secret env vars (URLs, paths, model names)
+├── seed-data-cm.yaml         # First-run seed data (bot_types, bots, modules, theme) — keep in sync with data/seed.json
 ├── .env.example              # Credentials template — copy to .env and fill in
 ├── .env                      # Your credentials (gitignored)
-├── app-data-pvc.yaml         # Backend settings.json volume
+├── app-data-pvc.yaml         # Backend persistent data volume (settings.json + app data)
 ├── postgres/                 # StatefulSet + Service + PVC
 ├── clickhouse/               # StatefulSet + Service + PVC
 ├── ollama/

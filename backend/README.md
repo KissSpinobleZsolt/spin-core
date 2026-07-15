@@ -28,7 +28,8 @@ get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_
 |-------|-------------|
 | `users` | Auth users — email, hashed password, roles, theme preference |
 | `page_responses` | Dashboard page content (editable by admins) |
-| `bots` | Bot configurations — name, model, system prompt, roles |
+| `bot_types` | Built-in bot type definitions — name, icon, description, preprompt, skills, tools, output_format, default_model, context_strategy |
+| `bots` | Bot configurations — name, type, model, system_prompt, icon, active, restricted, roles, modules, created_by |
 | `modules` | Registered MF modules — **source of truth** (not `settings.json`) |
 | `translations` | EN + RO i18n bundles — deep-merged from `i18n_defaults.py` every startup |
 | `module_documents` | Per-module namespaced document store (scoped by `module_id` + `collection`) |
@@ -89,6 +90,7 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 |------|-------|----------|
 | Admin user | email not in PostgreSQL | `[spin-core] Admin user created: …` |
 | Dashboard page | `page_responses` row absent | _(silent)_ |
+| Bot types | upsert by name from `data/seed.json` `bot_types` — always syncs on restart | _(silent)_ |
 | Default bots | `bots` table is empty | `[spin-core] Seeded bot: …` (one line per bot) |
 | Modules (migration) | `settings.json` contains `modules` array | migrated to PostgreSQL; `settings.json` rewritten without `modules` |
 | Modules (seed) | `modules` table is empty after migration | seeded from `data/seed.json` |
@@ -206,17 +208,20 @@ Namespaced document store in PostgreSQL (`module_documents` table). Documents ar
 
 ### Bots
 
-CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table). Each bot has a name, type, Ollama model, system prompt, enabled flag, and a list of roles that can access it.
+CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
+
+**Bot fields:** `id`, `name`, `description`, `type` (references `bot_types.name`), `model`, `system_prompt`, `icon`, `active` (bool — requires at least one module), `restricted`, `roles`, `modules` (string array of module IDs; `"core"` = visible in ChatBubble only, other IDs = visible on `/bots` page), `created_by`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/bots` | Bearer | List bots. Admins see all; others see only enabled bots matching their roles. |
+| `GET` | `/api/bots/types` | Bearer | List all bot type definitions (from `bot_types` table) |
+| `GET` | `/api/bots` | Bearer | List bots. Admins see all; others see only active bots matching their roles. |
 | `POST` | `/api/bots` | Admin | Create a bot |
-| `GET` | `/api/bots/{id}` | Bearer | Get one bot (role-checked for non-admins) |
+| `GET` | `/api/bots/{id}` | Bearer | Get one bot (active + role-checked for non-admins) |
 | `PUT` | `/api/bots/{id}` | Admin | Replace a bot |
 | `DELETE` | `/api/bots/{id}` | Admin | Delete a bot |
 
-Bot types (`chatbot`, `watchbot`, `tradebot`, `custom`) are metadata — all currently use the same streaming chat interface. The type field is available for future specialisation.
+`active` is stored as `active AND bool(modules)` — a bot with no modules is always inactive regardless of the payload value.
 
 ### Chat (AI assistant)
 

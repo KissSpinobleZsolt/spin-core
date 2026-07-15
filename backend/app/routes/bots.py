@@ -12,12 +12,13 @@ router = APIRouter(prefix="/api/bots", tags=["bots"])
 class BotPayload(BaseModel):
     name: str
     description: str = ""
-    type: str = "chatbot"
+    type: str = "communicator"
     model: str = ""
     system_prompt: str = ""
     icon: str = "🤖"
-    enabled: bool = True
-    roles: List[str] = ["user", "admin"]
+    active: bool = False
+    restricted: str = "user"
+    modules: List[str] = []
 
 
 class BotOut(BaseModel):
@@ -28,24 +29,30 @@ class BotOut(BaseModel):
     model: str
     system_prompt: str
     icon: str
-    enabled: bool
+    active: bool
+    restricted: str
     roles: List[str]
+    modules: List[str]
+    created_by: str
+
+
+@router.get("/types")
+def list_bot_types(_: str = Depends(token_dep)):
+    return get_pg().get_bot_types()
 
 
 @router.get("", response_model=List[BotOut])
 def list_bots(email: str = Depends(token_dep)):
     pg = get_pg()
-
     user = pg.get_user_by_email(email)
     user_roles = user.roles if user else []
     is_admin = "admin" in user_roles
-
     bots = pg.get_bots(admin=is_admin, user_roles=user_roles)
     return [BotOut(**b.__dict__) for b in bots]
 
 
 @router.post("", response_model=BotOut, status_code=201)
-def create_bot(payload: BotPayload, _: str = Depends(admin_dep)):
+def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
     bot = get_pg().create_bot(
         name=payload.name,
         description=payload.description,
@@ -53,8 +60,10 @@ def create_bot(payload: BotPayload, _: str = Depends(admin_dep)):
         model=payload.model,
         system_prompt=payload.system_prompt,
         icon=payload.icon,
-        enabled=payload.enabled,
-        roles=payload.roles,
+        active=payload.active,
+        restricted=payload.restricted,
+        modules=payload.modules,
+        created_by=admin_email,
     )
     return BotOut(**bot.__dict__)
 
@@ -71,7 +80,7 @@ def get_bot(bot_id: str, email: str = Depends(token_dep)):
     is_admin = "admin" in user_roles
 
     if not is_admin:
-        if not bot.enabled:
+        if not bot.active:
             raise HTTPException(status_code=404, detail="Bot not found")
         if bot.roles and not any(r in bot.roles for r in user_roles):
             raise HTTPException(status_code=403, detail="Access denied")
@@ -89,8 +98,9 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
         model=payload.model,
         system_prompt=payload.system_prompt,
         icon=payload.icon,
-        enabled=payload.enabled,
-        roles=payload.roles,
+        active=payload.active,
+        restricted=payload.restricted,
+        modules=payload.modules,
     )
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
@@ -99,6 +109,5 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
 
 @router.delete("/{bot_id}", status_code=204)
 def delete_bot(bot_id: str, _: str = Depends(admin_dep)):
-    deleted = get_pg().delete_bot(bot_id)
-    if not deleted:
+    if not get_pg().delete_bot(bot_id):
         raise HTTPException(status_code=404, detail="Bot not found")

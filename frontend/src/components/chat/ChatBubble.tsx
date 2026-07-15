@@ -45,7 +45,8 @@ export function ChatBubble() {
   useEffect(() => {
     if (!open) return
     botsService.getBots()
-      .then(list => {
+      .then(allBots => {
+        const list = allBots.filter(b => b.modules.includes('core'))
         setBots(list)
         const savedId = localStorage.getItem(STORAGE_BOT_KEY) ?? ''
         if (savedId && !list.find(b => b.id === savedId)) {

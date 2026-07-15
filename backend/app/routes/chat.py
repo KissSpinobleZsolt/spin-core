@@ -39,9 +39,14 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
     messages_to_send = list(payload.messages)
 
     if payload.bot_id:
-        bot = get_pg().get_bot_by_id(payload.bot_id)
-        if not bot or not bot.enabled:
+        pg = get_pg()
+        bot = pg.get_bot_by_id(payload.bot_id)
+        if not bot or not bot.active:
             raise HTTPException(status_code=404, detail="Bot not found")
+        user = pg.get_user_by_email(user_email)
+        user_roles = user.roles if user else []
+        if "admin" not in user_roles and bot.roles and not any(r in bot.roles for r in user_roles):
+            raise HTTPException(status_code=403, detail="Access denied")
         bot_name = bot.name
         if bot.model:
             effective_model = bot.model
