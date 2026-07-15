@@ -16,6 +16,7 @@
       "name": "AI Assistant",
       "description": "General-purpose AI assistant powered by Ollama.",
       "type": "communicator",
+      "provider": "ollama",
       "model": "qwen2.5:7b",
       "system_prompt": "You are a helpful AI assistant for this platform. Use the platform context above to help users understand what they can do, which pages to visit, and which bots or modules are available. Be concise and friendly.",
       "icon": "💬",
