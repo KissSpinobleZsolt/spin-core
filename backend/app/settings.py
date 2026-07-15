@@ -1,6 +1,5 @@
 import json
 import os
-import uuid
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Literal
@@ -12,19 +11,6 @@ DEFAULT_CLICKHOUSE_URL = "clickhouse://core-ch:core-ch@clickhouse:9000/core"
 
 
 @dataclass
-class ModuleConfig:
-    id: str
-    name: str
-    remote_url: str
-    scope: str
-    component: str
-    route: str
-    icon: str
-    enabled: bool
-    roles: list[str]
-
-
-@dataclass
 class ThemeConfig:
     default_theme: Literal["dark", "light"] = "dark"
 
@@ -32,7 +18,6 @@ class ThemeConfig:
 @dataclass
 class AppSettings:
     theme: ThemeConfig = field(default_factory=ThemeConfig)
-    modules: list[ModuleConfig] = field(default_factory=list)
 
 
 def read_settings() -> AppSettings:
@@ -40,11 +25,22 @@ def read_settings() -> AppSettings:
         return AppSettings()
     try:
         raw = json.loads(SETTINGS_PATH.read_text())
-        theme = ThemeConfig(**raw.get("theme", {}))
-        modules = [ModuleConfig(**m) for m in raw.get("modules", [])]
-        return AppSettings(theme=theme, modules=modules)
+        theme_raw = raw.get("theme", {})
+        theme = ThemeConfig(**{k: v for k, v in theme_raw.items() if k in ("default_theme",)})
+        return AppSettings(theme=theme)
     except Exception:
         return AppSettings()
+
+
+def read_legacy_modules() -> list[dict]:
+    """Read modules from settings.json for one-time migration to PostgreSQL."""
+    if not SETTINGS_PATH.exists():
+        return []
+    try:
+        raw = json.loads(SETTINGS_PATH.read_text())
+        return [m for m in raw.get("modules", []) if isinstance(m, dict)]
+    except Exception:
+        return []
 
 
 def write_settings(s: AppSettings) -> None:
@@ -55,5 +51,3 @@ def write_settings(s: AppSettings) -> None:
     tmp.replace(SETTINGS_PATH)
 
 
-def new_module_id() -> str:
-    return str(uuid.uuid4())

@@ -1,16 +1,14 @@
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
 from app.database import get_pg
-from app.deps import require_token
-from app.state import get_settings
+from app.deps import token_dep
 
 router = APIRouter(prefix="/api/module-data", tags=["module-data"])
 
 
 def _check_module(module_id: str) -> None:
-    ids = {m.id for m in get_settings().modules}
-    if module_id not in ids:
+    if not get_pg().get_module(module_id):
         raise HTTPException(status_code=404, detail="Module not found")
 
 
@@ -22,13 +20,12 @@ class DocPayload(BaseModel):
 async def list_documents(
     module_id: str,
     collection: str,
-    authorization: str = Header(default=""),
+    _: str = Depends(token_dep),
     limit: int = Query(default=50, le=200),
     skip: int = Query(default=0, ge=0),
 ):
-    require_token(authorization)
     _check_module(module_id)
-    return get_pg().get_documents(module_id, collection, {}, limit=limit, skip=skip)
+    return get_pg().get_documents(module_id, collection, limit=limit, skip=skip)
 
 
 @router.post("/{module_id}/{collection}", status_code=201)
@@ -36,9 +33,8 @@ async def create_document(
     module_id: str,
     collection: str,
     payload: DocPayload,
-    authorization: str = Header(default=""),
+    _: str = Depends(token_dep),
 ):
-    require_token(authorization)
     _check_module(module_id)
     inserted_id = get_pg().insert_document(module_id, collection, payload.data)
     return {"_id": inserted_id}
@@ -50,9 +46,8 @@ async def update_document(
     collection: str,
     doc_id: str,
     payload: DocPayload,
-    authorization: str = Header(default=""),
+    _: str = Depends(token_dep),
 ):
-    require_token(authorization)
     _check_module(module_id)
     updated = get_pg().update_document(module_id, collection, doc_id, payload.data)
     if not updated:
@@ -65,9 +60,8 @@ async def delete_document(
     module_id: str,
     collection: str,
     doc_id: str,
-    authorization: str = Header(default=""),
+    _: str = Depends(token_dep),
 ):
-    require_token(authorization)
     _check_module(module_id)
     deleted = get_pg().delete_document(module_id, collection, doc_id)
     if not deleted:

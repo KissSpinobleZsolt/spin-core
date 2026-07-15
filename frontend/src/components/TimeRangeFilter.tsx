@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Btn } from './ui/Button'
 
 export interface TimeRange {
   from: string
@@ -64,10 +65,6 @@ export default function TimeRangeFilter({ value, onChange }: Props) {
     'dark:border-slate-600 text-sm text-slate-800 dark:text-white focus:outline-none ' +
     'focus:ring-1 focus:ring-blue-500 [color-scheme:light] dark:[color-scheme:dark]'
 
-  const presetCls =
-    'px-2.5 py-1 rounded-md text-xs font-medium bg-slate-100 dark:bg-slate-700 ' +
-    'hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-600 dark:text-slate-300 transition-colors'
-
   return (
     <div className="flex flex-wrap items-end gap-2">
       <div>
@@ -88,13 +85,11 @@ export default function TimeRangeFilter({ value, onChange }: Props) {
           className={inputCls}
         />
       </div>
-      <button onClick={apply} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
-        Apply
-      </button>
+      <Btn onClick={apply}>Apply</Btn>
       <div className="flex items-center gap-1 ml-1">
-        <button onClick={setToday} className={presetCls}>Today</button>
-        <button onClick={setLast7} className={presetCls}>7 days</button>
-        <button onClick={setThisMonth} className={presetCls}>This month</button>
+        <Btn variant="secondary" className="px-2.5 py-1 rounded-md text-xs" onClick={setToday}>Today</Btn>
+        <Btn variant="secondary" className="px-2.5 py-1 rounded-md text-xs" onClick={setLast7}>7 days</Btn>
+        <Btn variant="secondary" className="px-2.5 py-1 rounded-md text-xs" onClick={setThisMonth}>This month</Btn>
       </div>
     </div>
   )

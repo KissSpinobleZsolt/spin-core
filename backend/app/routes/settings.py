@@ -1,15 +1,15 @@
 import asyncio
 import os
-from dataclasses import asdict
 from typing import Literal, Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Response
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
-from app.database import get_ch
-from app.deps import require_admin
-from app.settings import ModuleConfig, new_module_id, write_settings
+from app.database import get_ch, get_pg
+from app.deps import admin_dep
+from app.schemas import ModuleInput
+from app.settings import write_settings
 from app.state import get_settings
 
 router = APIRouter(prefix="/api/settings", tags=["settings"])
@@ -17,17 +17,6 @@ router = APIRouter(prefix="/api/settings", tags=["settings"])
 
 class ThemePayload(BaseModel):
     theme: Literal["dark", "light"]
-
-
-class ModuleInput(BaseModel):
-    name: str
-    remote_url: str
-    scope: str
-    component: str
-    route: str
-    icon: str = "🧩"
-    enabled: bool = True
-    roles: list[str] = ["user", "admin"]
 
 
 class DiscoveredModule(BaseModel):
@@ -45,14 +34,13 @@ class DiscoveredModule(BaseModel):
 
 
 @router.get("")
-async def get_settings_route(authorization: str = Header(default="")):
-    require_admin(authorization)
-    return asdict(get_settings())
+async def get_settings_route(_: str = Depends(admin_dep)):
+    s = get_settings()
+    return {"theme": {"default_theme": s.theme.default_theme}}
 
 
 @router.patch("/theme", status_code=204)
-async def update_theme(payload: ThemePayload, authorization: str = Header(default="")):
-    require_admin(authorization)
+async def update_theme(payload: ThemePayload, _: str = Depends(admin_dep)):
     s = get_settings()
     s.theme.default_theme = payload.theme
     write_settings(s)
@@ -60,56 +48,41 @@ async def update_theme(payload: ThemePayload, authorization: str = Header(defaul
 
 
 @router.get("/modules")
-async def list_modules(authorization: str = Header(default="")):
-    require_admin(authorization)
-    return [asdict(m) for m in get_settings().modules]
+async def list_modules(_: str = Depends(admin_dep)):
+    return get_pg().get_modules()
 
 
 @router.post("/modules", status_code=201)
-async def create_module(payload: ModuleInput, authorization: str = Header(default="")):
-    require_admin(authorization)
-    s = get_settings()
-    module = ModuleConfig(id=new_module_id(), **payload.model_dump())
-    s.modules.append(module)
-    write_settings(s)
+async def create_module(payload: ModuleInput, _: str = Depends(admin_dep)):
+    module = get_pg().create_module(payload.model_dump())
     ch = get_ch()
-    ch.ensure_module_table(module.scope)
-    ch.ensure_module_mv(module.scope)
-    return asdict(module)
+    ch.ensure_module_table(module["scope"])
+    ch.ensure_module_mv(module["scope"])
+    return module
 
 
 @router.put("/modules/{module_id}")
-async def update_module(module_id: str, payload: ModuleInput, authorization: str = Header(default="")):
-    require_admin(authorization)
-    s = get_settings()
-    for i, m in enumerate(s.modules):
-        if m.id == module_id:
-            s.modules[i] = ModuleConfig(id=module_id, **payload.model_dump())
-            write_settings(s)
-            return asdict(s.modules[i])
-    raise HTTPException(status_code=404, detail="Module not found")
+async def update_module(module_id: str, payload: ModuleInput, _: str = Depends(admin_dep)):
+    module = get_pg().update_module(module_id, payload.model_dump())
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    return module
 
 
 @router.delete("/modules/{module_id}", status_code=204)
-async def delete_module(module_id: str, authorization: str = Header(default="")):
-    require_admin(authorization)
-    s = get_settings()
-    before = len(s.modules)
-    s.modules = [m for m in s.modules if m.id != module_id]
-    if len(s.modules) == before:
+async def delete_module(module_id: str, _: str = Depends(admin_dep)):
+    if not get_pg().delete_module(module_id):
         raise HTTPException(status_code=404, detail="Module not found")
-    write_settings(s)
     return Response(status_code=204)
 
 
 @router.get("/modules/discover")
-async def discover_modules(authorization: str = Header(default="")):
-    require_admin(authorization)
+async def discover_modules(_: str = Depends(admin_dep)):
     raw = os.getenv("MODULE_REGISTRY_URLS", "").strip()
     if not raw:
         return []
     base_urls = [u.strip().rstrip("/") for u in raw.split(",") if u.strip()]
-    registered_scopes = {m.scope for m in get_settings().modules}
+    registered_scopes = {m["scope"] for m in get_pg().get_modules()}
 
     async def fetch_one(base_url: str) -> dict:
         try:
@@ -127,7 +100,7 @@ async def discover_modules(authorization: str = Header(default="")):
                 icon=m.get("icon"),
                 roles=m.get("roles"),
                 description=m.get("description"),
-                remote_url=m.get("remote_entry") or f"{base_url}/remoteEntry.js",
+                remote_url=m.get("remote_url") or m.get("remote_entry") or f"{base_url}/remoteEntry.js",
                 already_registered=bool(scope and scope in registered_scopes),
             ).model_dump()
         except Exception as exc:

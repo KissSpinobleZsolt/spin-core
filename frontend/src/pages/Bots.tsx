@@ -1,25 +1,15 @@
 import { useNavigate } from 'react-router-dom'
 import { botsService, type Bot } from '../services/botsService'
 import { useGet } from '../hooks/useApi'
-
-const BOT_TYPES = [
-  { value: 'chatbot',  label: 'Chatbot' },
-  { value: 'watchbot', label: 'Watch Bot' },
-  { value: 'tradebot', label: 'Trade Bot' },
-  { value: 'custom',   label: 'Custom' },
-]
-
-const TYPE_BADGE: Record<string, string> = {
-  chatbot:  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  watchbot: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  tradebot: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
-  custom:   'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
-}
+import { Btn } from '../components/ui/Button'
+import { Card } from '../components/ui/Card'
+import { PageTitle } from '../components/ui/PageTitle'
+import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
 
 function BotCard({ bot }: { bot: Bot }) {
   const navigate = useNavigate()
   return (
-    <div className="flex flex-col bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-5 gap-3 hover:shadow-md transition-shadow">
+    <Card className="flex flex-col gap-3 hover:shadow-md transition-shadow">
       <div className="flex items-start gap-3">
         <span className="text-3xl leading-none shrink-0">{bot.icon}</span>
         <div className="flex-1 min-w-0">
@@ -32,14 +22,8 @@ function BotCard({ bot }: { bot: Bot }) {
       {bot.description && (
         <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2">{bot.description}</p>
       )}
-      <button
-        type="button"
-        onClick={() => navigate(`/bots/${bot.id}`)}
-        className="mt-auto w-full py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
-      >
-        Launch
-      </button>
-    </div>
+      <Btn className="mt-auto w-full py-2" onClick={() => navigate(`/bots/${bot.id}`)}>Launch</Btn>
+    </Card>
   )
 }
 
@@ -51,7 +35,7 @@ export default function Bots() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-white">Bots</h1>
+      <PageTitle>Bots</PageTitle>
 
       {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {isError && <p className="text-sm text-red-500">Failed to load bots.</p>}

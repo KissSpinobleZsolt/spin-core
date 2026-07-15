@@ -14,3 +14,7 @@ Thumbs.db
 .env
 .tmp/
 *.code-workspace
+
+# Claude Code — ignore entirely
+.claude/
+CLAUDE.*

@@ -1,4 +1,5 @@
 import { apiService } from './apiService'
+import { safeJsonParse } from '../utils/safeJsonParse'
 
 export type AuthUser = {
   name: string
@@ -41,11 +42,6 @@ export const authService = {
   },
 
   getStoredUser(): AuthUser | null {
-    try {
-      const raw = localStorage.getItem(USER_KEY)
-      return raw ? (JSON.parse(raw) as AuthUser) : null
-    } catch {
-      return null
-    }
+    return safeJsonParse<AuthUser | null>(localStorage.getItem(USER_KEY), null)
   },
 }

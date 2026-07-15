@@ -4,24 +4,10 @@ import { useSettings } from '../../context/SettingsContext'
 import { useGet } from '../../hooks/useApi'
 import { apiService } from '../../services/apiService'
 import { botsService, type Bot } from '../../services/botsService'
-
-type InstalledModel = {
-  name: string
-  family: string | null
-  parameter_size: string | null
-  size_bytes: number | null
-}
-
-type InstalledModelsData = {
-  ollama: 'ok' | 'unreachable'
-  models: InstalledModel[]
-}
-
-function fmtBytes(bytes: number): string {
-  if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`
-  if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`
-  return `${bytes} B`
-}
+import { PageTitle } from '../../components/ui/PageTitle'
+import { Spinner } from '../../components/ui/Spinner'
+import { fmtBytes } from '../../utils/formatters'
+import { type InstalledModelsData } from '../../services/modelStatusService'
 
 function SectionCard({
   title,
@@ -123,7 +109,7 @@ function InstalledLLMsSection() {
 
   return (
     <SectionCard title="Installed LLMs" navigateTo="/admin/llms">
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <Spinner size="sm" />}
       {data?.ollama === 'unreachable' && (
         <p className="text-sm text-amber-600 dark:text-amber-400">Ollama unreachable</p>
       )}
@@ -186,7 +172,7 @@ function ActiveBotsSection() {
 
   return (
     <SectionCard title="Active Bots" navigateTo="/bots-admin">
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
+      {isLoading && <Spinner size="sm" />}
       {!isLoading && activeBots.length === 0 && (
         <p className="text-sm text-slate-500">No active bots.</p>
       )}
@@ -212,7 +198,7 @@ function ActiveBotsSection() {
 export default function Status() {
   return (
     <div className="max-w-3xl space-y-6">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-white">Status</h1>
+      <PageTitle>Status</PageTitle>
       <AppHealthSection />
       <DbStatusSection />
       <InstalledLLMsSection />

@@ -7,6 +7,10 @@ import {
   type LogEntry,
   type SummaryEntry,
 } from '../services/logsService'
+import { Btn } from '../components/ui/Button'
+import { Spinner } from '../components/ui/Spinner'
+import { PageTitle } from '../components/ui/PageTitle'
+import { formatEventTime } from '../utils/formatters'
 
 const PAGE_SIZE = 50
 
@@ -136,7 +140,6 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
 
   return (
     <div className="space-y-4">
-      {/* Filter bar */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3 items-end">
         <div>
           <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">User email</label>
@@ -144,22 +147,15 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
             onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setEmailFilter(draftEmail) } }}
             placeholder="user@example.com" className={`${inputCls} w-52`} />
         </div>
-        <button onClick={() => { setPage(1); setEmailFilter(draftEmail) }}
-          className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
-          Filter
-        </button>
-        <button onClick={() => { setDraftEmail(''); setPage(1); setEmailFilter('') }}
-          className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium transition-colors">
-          Clear
-        </button>
+        <Btn onClick={() => { setPage(1); setEmailFilter(draftEmail) }}>Filter</Btn>
+        <Btn variant="secondary" onClick={() => { setDraftEmail(''); setPage(1); setEmailFilter('') }}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} conversations</span>
       </div>
 
-      {/* Table */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-slate-400">
-            <div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />Loading…
+          <div className="flex items-center justify-center h-32 text-slate-400 gap-2">
+            <Spinner size="sm" />Loading…
           </div>
         ) : error ? (
           <div className="p-6 text-red-500 text-sm">{error}</div>
@@ -178,7 +174,7 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
                   >
                     <div className="flex items-center gap-4 text-xs">
                       <span className="font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                        {String(entry.event_time).replace('T', ' ').slice(0, 19)}
+                        {formatEventTime(entry.event_time)}
                       </span>
                       <span className="text-slate-600 dark:text-slate-300 truncate max-w-[12rem]">
                         {entry.user_email || '—'}
@@ -231,7 +227,7 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
   )
 }
 
-// ── HTTP logs tab (existing) ─────────────────────────────────────────────────
+// ── HTTP logs tab ─────────────────────────────────────────────────────────────
 
 function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
   const [logs, setLogs] = useState<LogEntry[]>([])
@@ -295,14 +291,14 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
           <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">User email</label>
           <input value={draftEmail} onChange={e => setDraftEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="user@example.com" className={`${inputCls} w-44`} />
         </div>
-        <button onClick={applyFilters} className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">Filter</button>
-        <button onClick={clearFilters} className="px-3 py-1.5 rounded-lg bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 text-sm font-medium transition-colors">Clear</button>
+        <Btn onClick={applyFilters}>Filter</Btn>
+        <Btn variant="secondary" onClick={clearFilters}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} rows · {PAGE_SIZE} per page</span>
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         {loading ? (
-          <div className="flex items-center justify-center h-32 text-slate-400"><div className="w-5 h-5 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-2" />Loading…</div>
+          <div className="flex items-center justify-center h-32 text-slate-400 gap-2"><Spinner size="sm" />Loading…</div>
         ) : error ? (
           <div className="p-6 text-red-500 text-sm">{error}</div>
         ) : logs.length === 0 ? (
@@ -325,7 +321,7 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
                 {logs.map((log, i) => (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
-                    <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{String(log.event_time).replace('T', ' ').slice(0, 19)}</td>
+                    <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatEventTime(log.event_time)}</td>
                     <td className="px-4 py-2"><span className={`font-semibold ${log.level === 'ERROR' ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>{log.level}</span></td>
                     <td className="px-4 py-2 font-mono text-slate-700 dark:text-slate-300">{log.event_type}</td>
                     <td className="px-4 py-2 text-slate-500 dark:text-slate-400 truncate max-w-[10rem]">{log.user_email || '—'}</td>
@@ -362,14 +358,12 @@ export default function Logs() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-white">Logs</h1>
+      <PageTitle>Logs</PageTitle>
 
-      {/* Time range — shared across tabs */}
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
         <TimeRangeFilter value={timeRange} onChange={range => setTimeRange(range)} />
       </div>
 
-      {/* Tab switcher */}
       <div className="flex gap-2">
         <button className={tabCls('http')} onClick={() => setTab('http')}>HTTP Logs</button>
         <button className={tabCls('chat')} onClick={() => setTab('chat')}>💬 Chat Logs</button>

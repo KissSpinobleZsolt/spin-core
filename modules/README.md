@@ -35,11 +35,13 @@ Modules are registered in **Admin → Modules** (`/admin/modules`). Two ways:
 | Field | Example | Description |
 |-------|---------|-------------|
 | Name | `Hello World` | Display name in sidebar |
+| Description | `Counter widget` | Short description shown in the discovery panel |
 | Remote URL | `http://localhost:3001/remoteEntry.js` | Browser-accessible URL of `remoteEntry.js` |
 | Scope | `helloWorld` | Webpack container scope (must match `webpack.config.js`) |
 | Component | `./App` | Exposed component name |
-| Route | `hello-world` | URL path under `/modules/` |
+| Root slug | `hello-world` | URL path under `/modules/` |
 | Icon | `👋` | Emoji shown in sidebar |
+| Presets | `{ "i18n": {}, "layout": {}, "settings": {} }` | JSON blobs injected as `presets` prop into the remote component |
 
 ## manifest.json
 
@@ -53,12 +55,16 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
   "route": "my-module",
   "icon": "🔧",
   "roles": ["user", "admin"],
-  "description": "Short description for the discovery panel.",
+  "description": "Short description shown in the discovery panel.",
   "remote_entry": "http://localhost:3001/remoteEntry.js"
 }
 ```
 
-`remote_entry` is the **browser-accessible** URL. The backend reads it for display only — the stored `remote_url` in settings is the authoritative URL used by the browser.
+`remote_entry` is the **browser-accessible** URL. The backend reads it for display only — the stored `remote_url` in PostgreSQL is the authoritative URL used by the browser.
+
+`description` is shown in the discovery panel and the admin module list. Kept short (one sentence).
+
+`presets` are **not** part of `manifest.json` — they are set by admins in the platform UI and stored in PostgreSQL, then injected as `props.presets` into the remote component at load time. The remote does not need to declare them in the manifest.
 
 ## React singleton contract
 
@@ -85,6 +91,6 @@ The host sets `window.React` and `window.ReactDOM` before injecting each remote 
    - Keep the `externals` block unchanged.
 3. Update `public/manifest.json` with your module's metadata.
 4. Run standalone: `npm install && npm start` (port configurable in `webpack.config.js`).
-5. Register via Settings → Modules → Scan, or manually.
+5. Register via Admin → Modules → Scan, or manually.
 
 See [hello-world/README.md](hello-world/README.md) for a detailed walkthrough.

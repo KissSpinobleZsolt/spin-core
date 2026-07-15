@@ -8,7 +8,7 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 |-------|-----------|
 | Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, React Query, React Router v7, i18next |
 | Backend | FastAPI, Python 3.12, uvicorn |
-| Primary DB | PostgreSQL 16 — users, auth, app settings, i18n translations, module data |
+| Primary DB | PostgreSQL 16 — users, auth, modules, i18n translations, module data |
 | Log DB | ClickHouse 24 — append-only event log, 30-day TTL |
 | AI | Ollama (`qwen2.5:7b`) — local LLM, no external API keys |
 | Containers | Docker Compose (dev/prod) · Kubernetes / minikube |
@@ -89,9 +89,11 @@ To start fresh: `docker compose down -v`
 | — | [GUIDE.md](GUIDE.md) | Step-by-step: WSL2, Docker, GPU, Ollama, VS Code Continue |
 | `backend/` | [backend/README.md](backend/README.md) | API routes, env vars, architecture, local dev |
 | `frontend/` | [frontend/README.md](frontend/README.md) | Pages, context providers, module federation loader, build |
+| `data/` | [data/README.md](data/README.md) | seed.json format, fields, first-run customisation |
 | `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract |
 | `modules/hello-world/` | [modules/hello-world/README.md](modules/hello-world/README.md) | Reference remote — how to build and register |
 | `k8s/` | [k8s/README.md](k8s/README.md) | Kubernetes deploy guide, secrets, day-to-day ops |
+| `scripts/` | [scripts/README.md](scripts/README.md) | restart.sh, k8s-deploy.sh usage |
 
 ## Architecture overview
 
@@ -103,10 +105,10 @@ Browser
        ├─ /bots-admin — admin CRUD for bots (name, type, model, system prompt, roles)
        ├─ /admin/llms     — pull / list / delete Ollama models
        ├─ /admin/users    — user listing (stub)
-       ├─ /admin/modules  — module CRUD (register, edit, scan)
+       ├─ /admin/modules  — module CRUD (register, edit, scan, inline log drawer)
        ├─ /admin/status   — live system overview with clickable navigation
        ├─ /api/*  ──►  Backend (FastAPI)
-       │                  ├─ PostgreSQL  — users, pages, settings, bots
+       │                  ├─ PostgreSQL  — users, pages, bots, modules, i18n, module data
        │                  ├─ ClickHouse  — HTTP request log (app_logs)
        │                  │               per-module log tables (module_{scope}_logs)
        │                  │               chat completion log (module_chatbot_logs)
@@ -169,10 +171,10 @@ curl -s "http://localhost:8000/api/logs/summary?from=$(date -u +%Y-%m-01T00:00:0
 spin-core/
 ├── backend/          # FastAPI app — see backend/README.md
 ├── frontend/         # React SPA — see frontend/README.md
+├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
 │   └── hello-world/  # Reference MF remote — see modules/hello-world/README.md
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
-├── scripts/
-│   └── k8s-deploy.sh
+├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml
 ```

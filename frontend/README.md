@@ -22,9 +22,8 @@ React 19 SPA for the spin-core platform.
 | `/bots/:botId` | Bot chat | Yes | Full-page streaming chat with a specific bot |
 | `/admin/llms` | LLMs | Admin | Ollama model management — pull, list, delete |
 | `/admin/users` | Users | Admin | User listing (stub) |
-| `/admin/modules` | Modules | Admin | Module CRUD — register, edit, delete, toggle, scan for new modules |
+| `/admin/modules` | Modules | Admin | Module CRUD — register (with description + JSON presets), edit, delete, toggle, scan for new modules, view per-module log drawer |
 | `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
-| `/settings` | Settings | Admin | Appearance + DB health badges + installed Ollama models |
 | `/logs` | Logs | Admin | ClickHouse event log viewer |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
@@ -49,7 +48,7 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 The health payload includes a `translations` map (`lang → ISO timestamp`) alongside the DB liveness flags. `useI18nSync` watches this map and reloads the active language's bundle only when its timestamp changes — no polling, no unnecessary fetches.
 
 - **Header**: shows a red "API offline" or "DB degraded" pill when any service is down; invisible when everything is healthy.
-- **Settings → Databases**: each row shows a live badge — grey pulsing "checking…" before the first result, green "online", or red pulsing "unreachable" — plus a "Last checked" timestamp.
+- **Admin → Status**: live system overview with per-service health badges and a "Last checked" timestamp.
 
 ## i18n
 
@@ -127,6 +126,16 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default "AI Assistant" bot is seeded on first backend startup.
 
+### Module presets
+
+Each registered module stores a `presets` JSON blob (`{ i18n, layout, settings }`) in PostgreSQL. When a federated module is loaded, `FederatedPage` passes the presets as a prop:
+
+```tsx
+<RemoteComponent presets={mod.presets} />
+```
+
+Remote components can read `props.presets` to receive platform configuration without any additional API calls. Admins set preset values in the **Admin → Modules** form via three collapsible JSON editors (one per preset type).
+
 ### Module discovery
 
 `src/services/settingsService.ts` exposes `discoverModules()` which calls `GET /api/settings/modules/discover`. The backend concurrently fetches `manifest.json` from every URL in `MODULE_REGISTRY_URLS` and returns a `DiscoveredModule[]` with an `already_registered` flag per entry.
@@ -136,6 +145,41 @@ The platform ships with a built-in bot system — no Module Federation required.
 - New modules show an **Add** button that opens the module form pre-filled from the manifest — the admin adjusts the `remote_url` if needed (e.g. NodePort URL in K8s) and clicks Save.
 
 The scan is on-demand (no background polling) and requires admin auth.
+
+## Shared UI components
+
+All reusable primitives live in `src/components/ui/`. Always import from there — do not re-declare these inline.
+
+| Component | File | Props |
+|-----------|------|-------|
+| `Btn` | `Button.tsx` | `variant?: 'primary' \| 'secondary' \| 'danger'`, all `<button>` attrs |
+| `Input` | `Input.tsx` | `label?: string`, all `<input>` attrs |
+| `Label` | `Label.tsx` | all `<label>` attrs |
+| `Modal` | `Modal.tsx` | `title`, `onClose?`, `maxWidth?`, `children` |
+| `Card` | `Card.tsx` | `className?`, `children` |
+| `Spinner` | `Spinner.tsx` | `size?: 'sm' \| 'md' \| 'lg'` |
+| `Toggle` | `Toggle.tsx` | `checked`, `onChange`, `disabled?` |
+| `ErrorBanner` | `ErrorBanner.tsx` | `message: string` |
+| `PageTitle` | `PageTitle.tsx` | `children` |
+
+## Utilities, hooks, and constants
+
+| File | Exports |
+|------|---------|
+| `src/utils/formatters.ts` | `fmtBytes(n)`, `formatEventTime(ts)` |
+| `src/utils/safeJsonParse.ts` | `safeJsonParse<T>(raw, fallback)` |
+| `src/constants/botConstants.ts` | `BOT_TYPES`, `TYPE_BADGE` |
+| `src/services/modelStatusService.ts` | `InstalledModel`, `InstalledModelsData` types |
+| `src/hooks/useChatStream.ts` | `useChatStream(botId, model)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
+| `src/hooks/useModelStatus.ts` | `useModelStatus()` → `{ status, dismissed, dismiss }` |
+
+## First-visit modals
+
+Two modals fire automatically — no configuration needed.
+
+**`CookieConsentModal`** (`src/components/CookieConsentModal.tsx`) — fixed bottom banner shown to every visitor before login. Offers "Essential only" and "Accept all". Choice stored in `localStorage` under `spin_cookie_consent`. Disappears permanently once accepted.
+
+**`WorkspaceTermsModal`** (`src/components/WorkspaceTermsModal.tsx`) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click "Continue to spin-core". Acceptance stored in `localStorage` under `spin_workspace_accepted_v1` keyed by username. Cannot be dismissed without accepting.
 
 ## Local development (without Docker)
 

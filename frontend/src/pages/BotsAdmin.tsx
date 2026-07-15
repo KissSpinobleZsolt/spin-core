@@ -1,24 +1,20 @@
-import { type InputHTMLAttributes, type ReactNode, useState } from 'react'
+import { type ReactNode, useState } from 'react'
 import { botsService, type Bot, type BotPayload } from '../services/botsService'
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
+import { Btn } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { Label } from '../components/ui/Label'
+import { Modal } from '../components/ui/Modal'
+import { Toggle } from '../components/ui/Toggle'
+import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { PageTitle } from '../components/ui/PageTitle'
+import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
+import { type InstalledModelsData } from '../services/modelStatusService'
 
 // ---------------------------------------------------------------------------
-// Shared UI
+// Select helper (local, not shared)
 // ---------------------------------------------------------------------------
-
-function Label({ children }: { children: ReactNode }) {
-  return <label className="block text-sm font-medium text-slate-600 dark:text-slate-300 mb-1">{children}</label>
-}
-
-function Input(props: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      {...props}
-      className={`w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 ${props.className ?? ''}`}
-    />
-  )
-}
 
 function Select({ value, onChange, children }: { value: string; onChange: (v: string) => void; children: ReactNode }) {
   return (
@@ -30,57 +26,6 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
       {children}
     </select>
   )
-}
-
-function Btn({
-  children,
-  variant = 'primary',
-  disabled,
-  onClick,
-}: {
-  children: ReactNode
-  variant?: 'primary' | 'secondary' | 'danger'
-  disabled?: boolean
-  onClick?: () => void
-}) {
-  const base = 'px-3 py-1.5 rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed'
-  const variants = {
-    primary: 'bg-blue-600 hover:bg-blue-700 text-white',
-    secondary: 'bg-slate-200 dark:bg-slate-700 hover:bg-slate-300 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-600',
-    danger: 'bg-red-600 hover:bg-red-700 text-white',
-  }
-  return (
-    <button type="button" className={`${base} ${variants[variant]}`} disabled={disabled} onClick={onClick}>
-      {children}
-    </button>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Bot types
-// ---------------------------------------------------------------------------
-
-const BOT_TYPES = [
-  { value: 'chatbot',  label: 'Chatbot' },
-  { value: 'watchbot', label: 'Watch Bot' },
-  { value: 'tradebot', label: 'Trade Bot' },
-  { value: 'custom',   label: 'Custom' },
-]
-
-const TYPE_BADGE: Record<string, string> = {
-  chatbot:  'bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300',
-  watchbot: 'bg-amber-100 dark:bg-amber-900/40 text-amber-700 dark:text-amber-300',
-  tradebot: 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300',
-  custom:   'bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300',
-}
-
-// ---------------------------------------------------------------------------
-// Installed models
-// ---------------------------------------------------------------------------
-
-type InstalledModelsData = {
-  ollama: 'ok' | 'unreachable'
-  models: { name: string }[]
 }
 
 // ---------------------------------------------------------------------------
@@ -131,96 +76,90 @@ function BotModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
-      <div className="w-full max-w-lg bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-        <h3 className="font-semibold text-slate-800 dark:text-white">{initial ? 'Edit bot' : 'New bot'}</h3>
+    <Modal title={initial ? 'Edit bot' : 'New bot'} onClose={onClose}>
+      {error && <ErrorBanner message={error} />}
 
-        {error && (
-          <div className="p-2 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm">{error}</div>
-        )}
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Name *</Label>
-            <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="My Bot" />
-          </div>
-          <div>
-            <Label>Icon</Label>
-            <Input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="🤖" />
-          </div>
-        </div>
-
+      <div className="grid grid-cols-2 gap-3">
         <div>
-          <Label>Description</Label>
-          <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this bot do?" />
+          <Label>Name *</Label>
+          <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="My Bot" />
         </div>
-
-        <div className="grid grid-cols-2 gap-3">
-          <div>
-            <Label>Type</Label>
-            <Select value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))}>
-              {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
-            </Select>
-          </div>
-          <div>
-            <Label>Model</Label>
-            <input
-              list="ollama-models"
-              value={form.model}
-              onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-              placeholder="Default (env var)"
-              className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-            />
-            <datalist id="ollama-models">
-              {models.map(m => <option key={m} value={m} />)}
-            </datalist>
-          </div>
-        </div>
-
         <div>
-          <Label>System prompt</Label>
-          <textarea
-            value={form.system_prompt}
-            onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))}
-            placeholder="You are a helpful assistant that..."
-            rows={4}
-            className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-y text-sm"
-          />
-        </div>
-
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-2">
-            <input
-              id="bot-enabled"
-              type="checkbox"
-              checked={form.enabled}
-              onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
-              className="rounded border-slate-400"
-            />
-            <label htmlFor="bot-enabled" className="text-sm text-slate-600 dark:text-slate-300">Enabled</label>
-          </div>
-          <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600 dark:text-slate-300">Roles:</span>
-            {['user', 'admin'].map(role => (
-              <label key={role} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={form.roles.includes(role)}
-                  onChange={() => toggleRole(role)}
-                  className="rounded border-slate-400"
-                />
-                {role}
-              </label>
-            ))}
-          </div>
-        </div>
-
-        <div className="flex justify-end gap-2 pt-2">
-          <Btn variant="secondary" onClick={onClose} disabled={saving}>Cancel</Btn>
-          <Btn onClick={handleSave} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : 'Save'}</Btn>
+          <Label>Icon</Label>
+          <Input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="🤖" />
         </div>
       </div>
-    </div>
+
+      <div>
+        <Label>Description</Label>
+        <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this bot do?" />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <Label>Type</Label>
+          <Select value={form.type} onChange={v => setForm(f => ({ ...f, type: v }))}>
+            {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+          </Select>
+        </div>
+        <div>
+          <Label>Model</Label>
+          <input
+            list="ollama-models"
+            value={form.model}
+            onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
+            placeholder="Default (env var)"
+            className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+          />
+          <datalist id="ollama-models">
+            {models.map(m => <option key={m} value={m} />)}
+          </datalist>
+        </div>
+      </div>
+
+      <div>
+        <Label>System prompt</Label>
+        <textarea
+          value={form.system_prompt}
+          onChange={e => setForm(f => ({ ...f, system_prompt: e.target.value }))}
+          placeholder="You are a helpful assistant that..."
+          rows={4}
+          className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 resize-y text-sm"
+        />
+      </div>
+
+      <div className="flex items-center gap-6">
+        <div className="flex items-center gap-2">
+          <input
+            id="bot-enabled"
+            type="checkbox"
+            checked={form.enabled}
+            onChange={e => setForm(f => ({ ...f, enabled: e.target.checked }))}
+            className="rounded border-slate-400"
+          />
+          <label htmlFor="bot-enabled" className="text-sm text-slate-600 dark:text-slate-300">Enabled</label>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-slate-600 dark:text-slate-300">Roles:</span>
+          {['user', 'admin'].map(role => (
+            <label key={role} className="flex items-center gap-1.5 text-sm text-slate-600 dark:text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={form.roles.includes(role)}
+                onChange={() => toggleRole(role)}
+                className="rounded border-slate-400"
+              />
+              {role}
+            </label>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex justify-end gap-2 pt-2">
+        <Btn variant="secondary" onClick={onClose} disabled={saving}>Cancel</Btn>
+        <Btn onClick={handleSave} disabled={!form.name.trim() || saving}>{saving ? 'Saving…' : 'Save'}</Btn>
+      </div>
+    </Modal>
   )
 }
 
@@ -268,13 +207,11 @@ export default function BotsAdmin() {
 
   return (
     <div className="max-w-5xl space-y-6">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-white">Bots</h1>
+      <PageTitle>Bots</PageTitle>
 
       {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
       {isError && <p className="text-sm text-red-500">Failed to load bots.</p>}
-      {error && (
-        <div className="p-2 rounded bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm">{error}</div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       {!isLoading && !isError && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
@@ -317,13 +254,7 @@ export default function BotsAdmin() {
                         {bot.roles.join(', ') || 'all'}
                       </td>
                       <td className="py-2 pr-4">
-                        <button
-                          type="button"
-                          onClick={() => handleToggle(bot)}
-                          className={`w-10 h-5 rounded-full transition-colors ${bot.enabled ? 'bg-blue-500' : 'bg-slate-400'}`}
-                        >
-                          <div className={`w-4 h-4 rounded-full bg-white shadow transition-transform mx-0.5 ${bot.enabled ? 'translate-x-5' : 'translate-x-0'}`} />
-                        </button>
+                        <Toggle checked={bot.enabled} onChange={() => handleToggle(bot)} />
                       </td>
                       <td className="py-2">
                         <div className="flex gap-2">

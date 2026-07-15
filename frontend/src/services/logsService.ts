@@ -92,6 +92,38 @@ export interface ChatLogsParams {
   offset?: number
 }
 
+export interface ModuleLogEntry {
+  event_time: string
+  user_email: string
+  event_type: string
+  details: string
+}
+
+export interface ModuleLogsPage {
+  items: ModuleLogEntry[]
+  total: number
+}
+
+export interface ModuleLogSummaryEntry {
+  bucket: string
+  event_type: string
+  event_count: number
+  unique_users: number
+}
+
+export interface ModuleLogSummaryPage {
+  items: ModuleLogSummaryEntry[]
+  total: number
+}
+
+export interface ModuleLogsParams {
+  from?: string
+  to?: string
+  event_type?: string
+  limit?: number
+  offset?: number
+}
+
 function buildQs(params: Record<string, string | number | undefined>): string {
   const q = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -140,5 +172,21 @@ export const logsService = {
   async getChatSummary(params: { from?: string; to?: string } = {}): Promise<ChatSummaryPage> {
     const qs = buildQs({ from: params.from, to: params.to })
     return apiService.get(`/chat/logs/summary${qs}`)
+  },
+
+  async getModuleLogs(moduleId: string, params: ModuleLogsParams = {}): Promise<ModuleLogsPage> {
+    const qs = buildQs({
+      from: params.from,
+      to: params.to,
+      event_type: params.event_type,
+      limit: params.limit,
+      offset: params.offset,
+    })
+    return apiService.get(`/module-logs/${moduleId}${qs}`)
+  },
+
+  async getModuleLogsSummary(moduleId: string, params: { from?: string; to?: string } = {}): Promise<ModuleLogSummaryPage> {
+    const qs = buildQs({ from: params.from, to: params.to })
+    return apiService.get(`/module-logs/${moduleId}/summary${qs}`)
   },
 }

@@ -18,6 +18,19 @@
     "theme": {
       "default_theme": "dark"
     },
-    "modules": []
+    "modules": [
+      {
+        "name": "Hello World",
+        "description": "Example federated micro-frontend module.",
+        "scope": "helloWorld",
+        "component": "./App",
+        "route": "hello-world",
+        "icon": "👋",
+        "enabled": true,
+        "roles": ["user", "admin"],
+        "remote_url": "http://hello-world/remoteEntry.js",
+        "presets": { "i18n": {}, "layout": {}, "settings": {} }
+      }
+    ]
   }
 }

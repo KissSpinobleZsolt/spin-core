@@ -1,8 +1,11 @@
+import { Card } from '../../components/ui/Card'
+import { PageTitle } from '../../components/ui/PageTitle'
+
 export default function Users() {
   return (
     <div className="max-w-4xl space-y-6">
-      <h1 className="text-xl font-bold text-slate-800 dark:text-white">Users</h1>
-      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6">
+      <PageTitle>Users</PageTitle>
+      <Card>
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -22,7 +25,7 @@ export default function Users() {
             </tbody>
           </table>
         </div>
-      </div>
+      </Card>
     </div>
   )
 }
