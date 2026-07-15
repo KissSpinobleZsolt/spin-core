@@ -56,7 +56,6 @@ export interface DiscoveredModule {
   remote_url?: string
   /** True when this module scope already exists in the database. */
   already_registered: boolean
-  error?: string
 }
 
 /** CRUD operations for platform settings, module registry, and theme preference. */

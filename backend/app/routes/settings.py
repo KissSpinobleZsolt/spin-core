@@ -110,7 +110,7 @@ async def discover_modules(_: str = Depends(admin_dep)):
     base_urls = [u.strip().rstrip("/") for u in raw.split(",") if u.strip()]
     registered_scopes = {m["scope"] for m in get_pg().get_modules()}
 
-    async def fetch_one(base_url: str) -> dict:
+    async def fetch_one(base_url: str) -> dict | None:
         try:
             async with httpx.AsyncClient(timeout=5.0) as client:
                 resp = await client.get(f"{base_url}/manifest.json")
@@ -129,7 +129,8 @@ async def discover_modules(_: str = Depends(admin_dep)):
                 remote_url=m.get("remote_url") or m.get("remote_entry") or f"{base_url}/remoteEntry.js",
                 already_registered=bool(scope and scope in registered_scopes),
             ).model_dump()
-        except Exception as exc:
-            return DiscoveredModule(source_url=base_url, error=str(exc)).model_dump()
+        except Exception:
+            return None
 
-    return await asyncio.gather(*[fetch_one(u) for u in base_urls])
+    results = await asyncio.gather(*[fetch_one(u) for u in base_urls])
+    return [r for r in results if r is not None]

@@ -486,48 +486,39 @@ export default function Modules() {
                   key={d.source_url}
                   className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700"
                 >
-                  {d.error ? (
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium text-slate-800 dark:text-white truncate">{d.source_url}</p>
-                      <p className="text-xs text-red-500 mt-0.5">{d.error}</p>
-                    </div>
+                  <span className="text-2xl shrink-0">{d.icon ?? '🧩'}</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-slate-800 dark:text-white">{d.name}</p>
+                    {d.description && (
+                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{d.description}</p>
+                    )}
+                    <p className="text-xs font-mono text-slate-400 truncate mt-0.5">{d.remote_url}</p>
+                  </div>
+                  {d.already_registered ? (
+                    <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
+                      Registered
+                    </span>
                   ) : (
-                    <>
-                      <span className="text-2xl shrink-0">{d.icon ?? '🧩'}</span>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-slate-800 dark:text-white">{d.name}</p>
-                        {d.description && (
-                          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{d.description}</p>
-                        )}
-                        <p className="text-xs font-mono text-slate-400 truncate mt-0.5">{d.remote_url}</p>
-                      </div>
-                      {d.already_registered ? (
-                        <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
-                          Registered
-                        </span>
-                      ) : (
-                        <Btn
-                          onClick={() =>
-                            setModal({
-                              prefill: {
-                                name: d.name ?? '',
-                                description: d.description ?? '',
-                                remote_url: d.remote_url ?? '',
-                                scope: d.scope ?? '',
-                                component: d.component ?? './App',
-                                route: d.route ?? '',
-                                icon: d.icon ?? '🧩',
-                                enabled: true,
-                                roles: d.roles ?? ['user', 'admin'],
-                                presets: { i18n: {}, layout: {}, settings: {} },
-                              },
-                            })
-                          }
-                        >
-                          Add
-                        </Btn>
-                      )}
-                    </>
+                    <Btn
+                      onClick={() =>
+                        setModal({
+                          prefill: {
+                            name: d.name ?? '',
+                            description: d.description ?? '',
+                            remote_url: d.remote_url ?? '',
+                            scope: d.scope ?? '',
+                            component: d.component ?? './App',
+                            route: d.route ?? '',
+                            icon: d.icon ?? '🧩',
+                            enabled: true,
+                            roles: d.roles ?? ['user', 'admin'],
+                            presets: { i18n: {}, layout: {}, settings: {} },
+                          },
+                        })
+                      }
+                    >
+                      Add
+                    </Btn>
                   )}
                 </div>
               ))
