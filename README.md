@@ -46,6 +46,16 @@ New to running Docker with an NVIDIA GPU on Windows? See **[GUIDE.md](GUIDE.md)*
 
 ## Quick start
 
+### Clone (with submodules)
+
+```bash
+git clone --recurse-submodules https://github.com/KissSpinobleZsolt/spin-core.git
+# or, if you already cloned without --recurse-submodules:
+bash scripts/setup-workspace.sh
+```
+
+See [`workspace.yml`](workspace.yml) for the full multi-repo layout.
+
 ### Development (hot reload)
 
 ```bash
@@ -94,8 +104,9 @@ To start fresh: `docker compose down -v`
 | `backend/` | [backend/README.md](backend/README.md) | API routes, env vars, architecture, local dev |
 | `frontend/` | [frontend/README.md](frontend/README.md) | Pages, context providers, module federation loader, build |
 | `data/` | [data/README.md](data/README.md) | seed.json format, fields, first-run customisation |
-| `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract |
+| `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract, submodule workflow |
 | `modules/hello-world/` | [modules/hello-world/README.md](modules/hello-world/README.md) | Reference remote — how to build and register |
+| `workspace.yml` | — | Multi-repo workspace manifest (shell + module repos, ports) |
 | `k8s/` | [k8s/README.md](k8s/README.md) | Kubernetes deploy guide, secrets, day-to-day ops |
 | `scripts/` | [scripts/README.md](scripts/README.md) | restart.sh, k8s-deploy.sh usage |
 

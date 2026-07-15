@@ -1,0 +1,20 @@
+shell:
+  repo: https://github.com/KissSpinobleZsolt/spin-core.git
+
+modules:
+  - name: hello-world
+    repo: https://github.com/KissSpinobleZsolt/spi-module-hello-world.git
+    path: modules/hello-world
+    port: 3001
+
+  - name: data-ingestion
+    repo: https://github.com/KissSpinobleZsolt/spi-module-data-ingestion.git
+    path: modules/data-ingestion
+    port: 3002
+    backend_port: 8002
+
+  - name: vision-watch
+    repo: https://github.com/KissSpinobleZsolt/spi-module-vision-watch.git
+    path: modules/vision-watch
+    port: 3003
+    backend_port: 8003

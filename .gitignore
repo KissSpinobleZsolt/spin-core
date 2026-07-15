@@ -19,7 +19,7 @@ Thumbs.db
 .claude/
 CLAUDE.*
 
-# Modules — exclude everything except README and tracked modules
-modules/*
-!modules/README.md
-!modules/hello-world/
+# Module build artefacts — submodule contents tracked via .gitmodules
+modules/*/node_modules/
+modules/*/dist/
+modules/*/build/

@@ -4,11 +4,37 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 
 ## Available modules
 
-| Module | Frontend port | Backend port | Scope | Description |
-|--------|--------------|--------------|-------|-------------|
-| [hello-world](hello-world/README.md) | 3001 | — | `helloWorld` | Reference remote — counter widget (frontend only) |
-| [data-ingestion](data-ingestion/README.md) | 3002 | 8002 | `dataIngestion` | Data source upload, processing, and management |
-| vision-watch | 3003 | 8003 | `visionWatch` | YOLO object detection and model fine-tuning |
+Each module lives in its own GitHub repository and is wired into spin-core as a git submodule (see `workspace.yml`).
+
+| Module | Repo | Frontend port | Backend port | Scope | Description |
+|--------|------|--------------|--------------|-------|-------------|
+| [hello-world](hello-world/README.md) | [spi-module-hello-world](https://github.com/KissSpinobleZsolt/spi-module-hello-world) | 3001 | — | `helloWorld` | Reference remote — counter widget (frontend only) |
+| [data-ingestion](data-ingestion/README.md) | [spi-module-data-ingestion](https://github.com/KissSpinobleZsolt/spi-module-data-ingestion) | 3002 | 8002 | `dataIngestion` | Data source upload, processing, and management |
+| vision-watch | [spi-module-vision-watch](https://github.com/KissSpinobleZsolt/spi-module-vision-watch) | 3003 | 8003 | `visionWatch` | YOLO object detection and model fine-tuning |
+
+### Submodule workflow
+
+**First-time setup after cloning spin-core without `--recurse-submodules`:**
+```bash
+bash scripts/setup-workspace.sh
+```
+
+**Working on a module:**
+```bash
+cd modules/hello-world        # full git repo — push/PR against spi-module-hello-world
+git checkout -b feat/my-thing
+# ... make changes, then:
+git push origin feat/my-thing
+```
+
+**Bumping a module version in spin-core (after a module PR is merged):**
+```bash
+cd modules/hello-world
+git pull origin main
+cd ../..
+git add modules/hello-world
+git commit -m "chore: bump hello-world submodule to <sha>"
+```
 
 > The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
 

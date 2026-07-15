@@ -35,12 +35,37 @@ kubectl apply -f k8s/
 
 Modules are Webpack 5 Module Federation remotes. They are deployed independently — the host app does not need to be rebuilt when a module changes.
 
-### 1. Copy the template
+### 1. Create a new module repo
+
+Modules live in their own GitHub repositories and are wired into spin-core as git submodules. Start by creating a repo under the organisation:
+
+```bash
+gh repo create KissSpinobleZsolt/spi-module-your-name \
+  --public --description "spin-core your-name MF remote"
+```
+
+Then initialise the module directory from the `hello-world` template and push it:
 
 ```bash
 cp -r modules/hello-world modules/your-module-name
 cd modules/your-module-name
+git init -b main
+git add .
+git commit -m "chore: initial commit — new module from hello-world template"
+git remote add origin https://github.com/KissSpinobleZsolt/spi-module-your-name.git
+git push -u origin main
+cd ../..
 ```
+
+Wire it as a submodule in spin-core so it is pinned to an exact commit:
+
+```bash
+git submodule add https://github.com/KissSpinobleZsolt/spi-module-your-name.git modules/your-module-name
+git add .gitmodules modules/your-module-name workspace.yml
+git commit -m "chore: add your-module-name submodule"
+```
+
+Update `workspace.yml` with the new module's repo URL and ports.
 
 ### 2. Edit `webpack.config.js`
 

@@ -61,3 +61,13 @@ You can also generate frontend docs alone via:
 ```bash
 cd frontend && npm run docs
 ```
+
+## `setup-workspace.sh`
+
+Initialises all git submodules after a bare clone of spin-core. Run this once when you first check out the repo without `--recurse-submodules`:
+
+```bash
+bash scripts/setup-workspace.sh
+```
+
+Equivalent to `git submodule update --init --recursive`, but prints a human-readable status table afterwards.
