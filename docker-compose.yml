@@ -91,7 +91,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  data-ingestion:
+  cloud-insight-ai:
     build: ./modules/data-ingestion
     ports:
       - "3002:80"
@@ -102,7 +102,7 @@ services:
       retries: 10
     restart: unless-stopped
 
-  vision-watch:
+  anomascan:
     build: ./modules/vision-watch
     ports:
       - "3003:80"
@@ -118,7 +118,7 @@ services:
   # FastAPI service here.  The core backend proxies /api/plugin/{scope}/...
   # to the module's backend_url using the registered DB record.
 
-  data-ingestion-backend:
+  cloud-insight-ai-backend:
     build: ./modules/data-ingestion/backend
     ports:
       - "8002:8000"
@@ -136,7 +136,7 @@ services:
         condition: service_healthy
     restart: unless-stopped
 
-  vision-watch-backend:
+  anomascan-backend:
     build: ./modules/vision-watch/backend
     ports:
       - "8003:8000"
@@ -171,7 +171,7 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80,http://vision-watch:80
+      MODULE_REGISTRY_URLS: http://cloud-insight-ai:80,http://hello-world:80,http://anomascan:80
       # Cloud LLM providers — leave blank to disable; bots using that provider will
       # return an error chunk instead of streaming tokens.
       # Anthropic Claude: get your key at https://console.anthropic.com/settings/keys

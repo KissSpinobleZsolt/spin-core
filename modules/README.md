@@ -9,8 +9,8 @@ Each module lives in its own GitHub repository and is wired into spin-core as a 
 | Module | Repo | Frontend port | Backend port | Scope | Description |
 |--------|------|--------------|--------------|-------|-------------|
 | [hello-world](hello-world/README.md) | [spi-module-hello-world](https://github.com/KissSpinobleZsolt/spi-module-hello-world) | 3001 | — | `helloWorld` | Reference remote — counter widget (frontend only) |
-| [data-ingestion](data-ingestion/README.md) | [spi-module-data-ingestion](https://github.com/KissSpinobleZsolt/spi-module-data-ingestion) | 3002 | 8002 | `dataIngestion` | Data source upload, processing, and management |
-| vision-watch | [spi-module-vision-watch](https://github.com/KissSpinobleZsolt/spi-module-vision-watch) | 3003 | 8003 | `visionWatch` | YOLO object detection and model fine-tuning |
+| [CloudInsight AI](data-ingestion/README.md) | [spi-module-data-ingestion](https://github.com/KissSpinobleZsolt/spi-module-data-ingestion) | 3002 | 8002 | `cloudInsightAI` | Data source upload, processing, and management |
+| AnomaScan | [spi-module-vision-watch](https://github.com/KissSpinobleZsolt/spi-module-vision-watch) | 3003 | 8003 | `anomaScan` | YOLO object detection and model fine-tuning |
 
 ### Submodule workflow
 

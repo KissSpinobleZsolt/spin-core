@@ -7,13 +7,13 @@ modules:
     path: modules/hello-world
     port: 3001
 
-  - name: data-ingestion
+  - name: cloud-insight-ai
     repo: https://github.com/KissSpinobleZsolt/spi-module-data-ingestion.git
     path: modules/data-ingestion
     port: 3002
     backend_port: 8002
 
-  - name: vision-watch
+  - name: anomascan
     repo: https://github.com/KissSpinobleZsolt/spi-module-vision-watch.git
     path: modules/vision-watch
     port: 3003
