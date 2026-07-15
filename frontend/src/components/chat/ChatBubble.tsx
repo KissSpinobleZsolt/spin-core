@@ -2,11 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useModelStatusContext } from '../../context/ModelStatusContext'
 import { botsService, type Bot } from '../../services/botsService'
 import { apiService } from '../../services/apiService'
-
-interface Message {
-  role: 'user' | 'assistant'
-  content: string
-}
+import { useChatStream, type Message } from '../../hooks/useChatStream'
+import { type InstalledModelsData } from '../../services/modelStatusService'
 
 const STORAGE_KEY = 'spin_core_chat_history'
 const STORAGE_BOT_KEY = 'spin_core_selected_bot'
@@ -26,12 +23,6 @@ function saveHistory(messages: Message[]) {
   } catch {}
 }
 
-
-type InstalledModelsData = {
-  ollama: 'ok' | 'unreachable'
-  models: { name: string }[]
-}
-
 export function ChatBubble() {
   const { status } = useModelStatusContext()
   const [open, setOpen] = useState(false)
@@ -42,9 +33,10 @@ export function ChatBubble() {
   const [installedModels, setInstalledModels] = useState<string[]>([])
   const [selectedModel, setSelectedModel] = useState<string>(() => localStorage.getItem(STORAGE_MODEL_KEY) ?? '')
 
-  const [messages, setMessages] = useState<Message[]>(loadHistory)
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
+  const { messages, setMessages, input, setInput, loading, sendMessage } = useChatStream(
+    selectedBotId || undefined,
+    selectedModel,
+  )
   const bottomRef = useRef<HTMLDivElement>(null)
 
   const selectedBot = bots.find(b => b.id === selectedBotId) ?? null
@@ -57,7 +49,6 @@ export function ChatBubble() {
         setBots(list)
         const savedId = localStorage.getItem(STORAGE_BOT_KEY) ?? ''
         if (savedId && !list.find(b => b.id === savedId)) {
-          // Saved bot no longer available — fall back to first
           const first = list[0]
           if (first) {
             setSelectedBotId(first.id)
@@ -67,7 +58,6 @@ export function ChatBubble() {
             localStorage.removeItem(STORAGE_BOT_KEY)
           }
         } else if (!savedId && list.length > 0) {
-          // No preference saved — auto-select first bot
           setSelectedBotId(list[0].id)
           localStorage.setItem(STORAGE_BOT_KEY, list[0].id)
         }
@@ -81,11 +71,17 @@ export function ChatBubble() {
       .catch(() => {})
   }, [open])
 
+  // Initialize messages from localStorage on mount
+  useEffect(() => {
+    setMessages(loadHistory())
+  }, [])
+
   // Clear history when bot changes
   useEffect(() => {
     setMessages([])
   }, [selectedBot?.id])
 
+  // Save history on every message change
   useEffect(() => {
     saveHistory(messages)
   }, [messages])
@@ -120,74 +116,6 @@ export function ChatBubble() {
     saveHistory([])
   }
 
-  async function sendMessage() {
-    if (!input.trim() || loading) return
-    const userMsg: Message = { role: 'user', content: input.trim() }
-    const history = [...messages, userMsg]
-    setMessages([...history, { role: 'assistant', content: '' }])
-    setInput('')
-    setLoading(true)
-
-    const token = localStorage.getItem('token') ?? ''
-    const body: Record<string, unknown> = {
-      messages: history,
-    }
-    if (selectedBotId) {
-      body.bot_id = selectedBotId
-    } else if (selectedModel) {
-      body.model = selectedModel
-    }
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      })
-
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const lines = buf.split('\n')
-        buf = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const chunk = JSON.parse(line)
-            if (chunk.error) {
-              setMessages(prev => {
-                const c = [...prev]
-                c[c.length - 1] = { role: 'assistant', content: `Error: ${chunk.error}` }
-                return c
-              })
-              return
-            }
-            if (chunk.message?.content) {
-              setMessages(prev => {
-                const c = [...prev]
-                c[c.length - 1] = { role: 'assistant', content: c[c.length - 1].content + chunk.message.content }
-                return c
-              })
-            }
-          } catch {}
-        }
-      }
-    } catch {
-      setMessages(prev => {
-        const c = [...prev]
-        c[c.length - 1] = { role: 'assistant', content: 'Could not reach the chat service.' }
-        return c
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
-
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
   }
@@ -196,7 +124,6 @@ export function ChatBubble() {
     <div className="fixed bottom-6 right-6 z-[9999] flex flex-col items-end gap-2">
       {open && (
         <div className="w-[380px] flex flex-col rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 overflow-hidden" style={{ height: showSettings ? 560 : 480 }}>
-          {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-blue-600 text-white shrink-0">
             <div className="flex items-center gap-2">
               <span className="text-lg">{selectedBot?.icon ?? '💬'}</span>
@@ -226,7 +153,6 @@ export function ChatBubble() {
             </div>
           </div>
 
-          {/* Settings panel */}
           {showSettings && (
             <div className="px-3 py-2.5 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 space-y-2 shrink-0">
               <div>
@@ -263,7 +189,6 @@ export function ChatBubble() {
             </div>
           )}
 
-          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2">
             {messages.map((msg, i) => (
               <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
@@ -281,7 +206,6 @@ export function ChatBubble() {
             <div ref={bottomRef} />
           </div>
 
-          {/* Input */}
           <div className="px-3 py-2 border-t border-slate-200 dark:border-slate-700 flex gap-2 items-end shrink-0">
             <textarea
               value={input}
@@ -302,7 +226,6 @@ export function ChatBubble() {
         </div>
       )}
 
-      {/* Bubble toggle */}
       <button
         onClick={() => setOpen(o => !o)}
         className="w-14 h-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white text-2xl shadow-lg flex items-center justify-center transition-all"

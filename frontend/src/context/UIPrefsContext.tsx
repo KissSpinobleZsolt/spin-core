@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
+import { safeJsonParse } from '../utils/safeJsonParse'
 
 interface UIPrefs {
   sidebarCollapsed: boolean
@@ -15,12 +16,7 @@ const DEFAULT: UIPrefs = { sidebarCollapsed: false }
 const UIPrefsContext = createContext<UIPrefsContextValue | null>(null)
 
 function load(): UIPrefs {
-  try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    return raw ? { ...DEFAULT, ...JSON.parse(raw) } : DEFAULT
-  } catch {
-    return DEFAULT
-  }
+  return { ...DEFAULT, ...safeJsonParse<Partial<UIPrefs>>(localStorage.getItem(STORAGE_KEY), {}) }
 }
 
 function save(prefs: UIPrefs) {
@@ -30,13 +26,10 @@ function save(prefs: UIPrefs) {
 export function UIPrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setPrefs] = useState<UIPrefs>(load)
 
-  // Keep in sync across browser tabs
   useEffect(() => {
     function onStorage(e: StorageEvent) {
       if (e.key === STORAGE_KEY && e.newValue) {
-        try {
-          setPrefs(prev => ({ ...prev, ...JSON.parse(e.newValue!) }))
-        } catch {}
+        setPrefs(prev => ({ ...prev, ...safeJsonParse<Partial<UIPrefs>>(e.newValue, {}) }))
       }
     }
     window.addEventListener('storage', onStorage)

@@ -8,12 +8,11 @@ from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.deps import require_admin
+from app.config import OLLAMA_URL
+from app.deps import admin_dep
 from app.model_tracker import get_model_progress, start_pull
 
 router = APIRouter(prefix="/api/model-status", tags=["model-status"])
-
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 
 
 def _required_models() -> list[str]:
@@ -100,7 +99,7 @@ class PullPayload(BaseModel):
 
 
 @router.post("/pull")
-async def pull_model(payload: PullPayload, _: str = Depends(require_admin)):
+async def pull_model(payload: PullPayload, _: str = Depends(admin_dep)):
     name = payload.name.strip()
     if not name:
         raise HTTPException(status_code=400, detail="model name is required")
@@ -109,7 +108,7 @@ async def pull_model(payload: PullPayload, _: str = Depends(require_admin)):
 
 
 @router.delete("/{model_name:path}")
-async def delete_model(model_name: str, _: str = Depends(require_admin)):
+async def delete_model(model_name: str, _: str = Depends(admin_dep)):
     try:
         async with httpx.AsyncClient(timeout=10.0) as client:
             resp = await client.request(

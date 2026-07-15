@@ -1,6 +1,7 @@
 import uuid
+from contextlib import contextmanager
 
-from sqlalchemy import create_engine, Column, Index, Integer, JSON, String, Text, Boolean, DateTime
+from sqlalchemy import create_engine, Column, Index, Integer, JSON, String, Text, Boolean, DateTime, text
 from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.sql import func
@@ -49,6 +50,21 @@ class TranslationRow(Base):
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now(), nullable=True)
 
 
+class ModuleRow(Base):
+    __tablename__ = "modules"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False)
+    description = Column(String, nullable=False, default="")
+    remote_url = Column(String, nullable=False)
+    scope = Column(String, nullable=False, unique=True)
+    component = Column(String, nullable=False)
+    route = Column(String, nullable=False)
+    icon = Column(String, nullable=False, default="🧩")
+    enabled = Column(Boolean, nullable=False, default=True)
+    roles = Column(ARRAY(String), nullable=False, default=list)
+    presets = Column(JSON, nullable=False, default=dict)
+
+
 class ModuleDocumentRow(Base):
     __tablename__ = "module_documents"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
@@ -76,6 +92,14 @@ class PostgresAdapter:
         self._engine = create_engine(db_url)
         self._Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
         Base.metadata.create_all(bind=self._engine)
+        self._run_migrations()
+
+    def _run_migrations(self) -> None:
+        with self._engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE translations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()"
+            ))
+            conn.commit()
 
     def test_connection(self) -> None:
         with self._engine.connect():
@@ -84,9 +108,16 @@ class PostgresAdapter:
     def _session(self):
         return self._Session()
 
-    def get_user_by_email(self, email: str) -> UserRecord | None:
+    @contextmanager
+    def _session_ctx(self):
         db = self._session()
         try:
+            yield db
+        finally:
+            db.close()
+
+    def get_user_by_email(self, email: str) -> UserRecord | None:
+        with self._session_ctx() as db:
             row = db.query(UserRow).filter(UserRow.email == email).first()
             if not row:
                 return None
@@ -97,8 +128,6 @@ class PostgresAdapter:
                 roles=list(row.roles),
                 default_theme=row.default_theme,
             )
-        finally:
-            db.close()
 
     def create_user(
         self,
@@ -108,8 +137,7 @@ class PostgresAdapter:
         roles: list[str],
         default_theme: str,
     ) -> UserRecord:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = UserRow(
                 email=email,
                 name=name,
@@ -120,38 +148,27 @@ class PostgresAdapter:
             db.add(row)
             db.commit()
             return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)
-        finally:
-            db.close()
 
     def update_user_theme(self, email: str, theme: str) -> None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(UserRow).filter(UserRow.email == email).first()
             if row:
                 row.default_theme = theme
                 db.commit()
-        finally:
-            db.close()
 
     def get_page(self, key: str) -> str | None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()
             return row.content if row else None
-        finally:
-            db.close()
 
     def upsert_page(self, key: str, content: str) -> None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()
             if row:
                 row.content = content
             else:
                 db.add(PageRow(page_key=key, content=content))
             db.commit()
-        finally:
-            db.close()
 
     def _bot_row_to_record(self, row: BotRow) -> BotRecord:
         return BotRecord(
@@ -167,8 +184,7 @@ class PostgresAdapter:
         )
 
     def get_bots(self, admin: bool = False, user_roles: list[str] | None = None) -> list[BotRecord]:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             q = db.query(BotRow)
             if not admin:
                 q = q.filter(BotRow.enabled == True)
@@ -182,16 +198,11 @@ class PostgresAdapter:
                 if not bot_roles or any(role in bot_roles for role in (user_roles or [])):
                     result.append(self._bot_row_to_record(r))
             return result
-        finally:
-            db.close()
 
     def get_bot_by_id(self, bot_id: str) -> BotRecord | None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             return self._bot_row_to_record(row) if row else None
-        finally:
-            db.close()
 
     def create_bot(
         self,
@@ -204,8 +215,7 @@ class PostgresAdapter:
         enabled: bool,
         roles: list[str],
     ) -> BotRecord:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = BotRow(
                 id=str(uuid.uuid4()),
                 name=name,
@@ -221,8 +231,6 @@ class PostgresAdapter:
             db.commit()
             db.refresh(row)
             return self._bot_row_to_record(row)
-        finally:
-            db.close()
 
     def update_bot(
         self,
@@ -236,8 +244,7 @@ class PostgresAdapter:
         enabled: bool,
         roles: list[str],
     ) -> BotRecord | None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             if not row:
                 return None
@@ -252,37 +259,147 @@ class PostgresAdapter:
             db.commit()
             db.refresh(row)
             return self._bot_row_to_record(row)
-        finally:
-            db.close()
 
     def delete_bot(self, bot_id: str) -> bool:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             if not row:
                 return False
             db.delete(row)
             db.commit()
             return True
-        finally:
-            db.close()
+
+    # ------------------------------------------------------------------
+    # Modules
+    # ------------------------------------------------------------------
+
+    def _module_row_to_dict(self, row: "ModuleRow") -> dict:
+        return {
+            "id": row.id,
+            "name": row.name,
+            "description": row.description or "",
+            "remote_url": row.remote_url,
+            "scope": row.scope,
+            "component": row.component,
+            "route": row.route,
+            "icon": row.icon or "",
+            "enabled": row.enabled,
+            "roles": list(row.roles or []),
+            "presets": row.presets or {"i18n": {}, "layout": {}, "settings": {}},
+        }
+
+    def get_modules(self, enabled_only: bool = False, user_roles: list[str] | None = None) -> list[dict]:
+        with self._session_ctx() as db:
+            q = db.query(ModuleRow)
+            if enabled_only:
+                q = q.filter(ModuleRow.enabled == True)
+            rows = q.all()
+            result = []
+            for r in rows:
+                if user_roles is not None:
+                    mod_roles = list(r.roles or [])
+                    if mod_roles and not any(role in mod_roles for role in user_roles):
+                        continue
+                result.append(self._module_row_to_dict(r))
+            return result
+
+    def get_module(self, module_id: str) -> dict | None:
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            return self._module_row_to_dict(row) if row else None
+
+    def upsert_module(self, data: dict) -> dict:
+        """Insert or update by scope — used for seeding and migration."""
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.scope == data["scope"]).first()
+            if row:
+                row.name = data.get("name", row.name)
+                row.description = data.get("description", row.description or "")
+                row.remote_url = data.get("remote_url", row.remote_url)
+                row.component = data.get("component", row.component)
+                row.route = data.get("route", row.route)
+                row.icon = data.get("icon", row.icon)
+                row.enabled = data.get("enabled", row.enabled)
+                row.roles = data.get("roles", list(row.roles or []))
+                row.presets = data.get("presets", row.presets)
+            else:
+                row = ModuleRow(
+                    id=data.get("id") or str(uuid.uuid4()),
+                    name=data["name"],
+                    description=data.get("description", ""),
+                    remote_url=data["remote_url"],
+                    scope=data["scope"],
+                    component=data.get("component", "./App"),
+                    route=data["route"],
+                    icon=data.get("icon", "🧩"),
+                    enabled=data.get("enabled", True),
+                    roles=data.get("roles", ["user", "admin"]),
+                    presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
+                )
+                db.add(row)
+            db.commit()
+            db.refresh(row)
+            return self._module_row_to_dict(row)
+
+    def create_module(self, data: dict) -> dict:
+        with self._session_ctx() as db:
+            row = ModuleRow(
+                id=str(uuid.uuid4()),
+                name=data["name"],
+                description=data.get("description", ""),
+                remote_url=data["remote_url"],
+                scope=data["scope"],
+                component=data.get("component", "./App"),
+                route=data["route"],
+                icon=data.get("icon", "🧩"),
+                enabled=data.get("enabled", True),
+                roles=data.get("roles", ["user", "admin"]),
+                presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
+            )
+            db.add(row)
+            db.commit()
+            db.refresh(row)
+            return self._module_row_to_dict(row)
+
+    def update_module(self, module_id: str, data: dict) -> dict | None:
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            if not row:
+                return None
+            row.name = data.get("name", row.name)
+            row.description = data.get("description", row.description or "")
+            row.remote_url = data.get("remote_url", row.remote_url)
+            row.component = data.get("component", row.component)
+            row.route = data.get("route", row.route)
+            row.icon = data.get("icon", row.icon)
+            row.enabled = data.get("enabled", row.enabled)
+            row.roles = data.get("roles", list(row.roles or []))
+            row.presets = data.get("presets", row.presets)
+            db.commit()
+            db.refresh(row)
+            return self._module_row_to_dict(row)
+
+    def delete_module(self, module_id: str) -> bool:
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            if not row:
+                return False
+            db.delete(row)
+            db.commit()
+            return True
 
     # ------------------------------------------------------------------
     # i18n
     # ------------------------------------------------------------------
 
     def get_i18n_data(self, lang: str) -> dict | None:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
             return dict(row.data) if row else None
-        finally:
-            db.close()
 
     def set_i18n_data(self, lang: str, data: dict) -> None:
         from datetime import datetime
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
             if row:
                 row.data = data
@@ -290,23 +407,18 @@ class PostgresAdapter:
             else:
                 db.add(TranslationRow(lang=lang, data=data, updated_at=datetime.utcnow()))
             db.commit()
-        finally:
-            db.close()
 
     def merge_i18n_data(self, lang: str, defaults: dict) -> None:
         existing = self.get_i18n_data(lang) or {}
         self.set_i18n_data(lang, _deep_merge(defaults, existing))
 
     def get_i18n_versions(self) -> dict[str, str]:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()
             return {
                 r.lang: r.updated_at.isoformat() if r.updated_at else ""
                 for r in rows
             }
-        finally:
-            db.close()
 
     # ------------------------------------------------------------------
     # Module documents
@@ -316,12 +428,10 @@ class PostgresAdapter:
         self,
         module_id: str,
         collection: str,
-        filter_dict: dict,
         limit: int = 50,
         skip: int = 0,
     ) -> list[dict]:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             q = (
                 db.query(ModuleDocumentRow)
                 .filter(
@@ -332,12 +442,9 @@ class PostgresAdapter:
                 .limit(limit)
             )
             return [{"id": row.id, **(row.data or {})} for row in q.all()]
-        finally:
-            db.close()
 
     def insert_document(self, module_id: str, collection: str, data: dict) -> str:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = ModuleDocumentRow(
                 id=str(uuid.uuid4()),
                 module_id=module_id,
@@ -347,12 +454,9 @@ class PostgresAdapter:
             db.add(row)
             db.commit()
             return row.id
-        finally:
-            db.close()
 
     def update_document(self, module_id: str, collection: str, doc_id: str, update: dict) -> bool:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = (
                 db.query(ModuleDocumentRow)
                 .filter(
@@ -367,12 +471,9 @@ class PostgresAdapter:
             row.data = update
             db.commit()
             return True
-        finally:
-            db.close()
 
     def delete_document(self, module_id: str, collection: str, doc_id: str) -> bool:
-        db = self._session()
-        try:
+        with self._session_ctx() as db:
             row = (
                 db.query(ModuleDocumentRow)
                 .filter(
@@ -387,5 +488,3 @@ class PostgresAdapter:
             db.delete(row)
             db.commit()
             return True
-        finally:
-            db.close()

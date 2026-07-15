@@ -72,6 +72,33 @@ class ClickHouseLogAdapter:
             [(level, event_type, user_email, path, method, status_code, duration_ms, json.dumps(details))],
         )
 
+    def _paginated_query(
+        self,
+        table: str,
+        select_cols: str,
+        from_dt,
+        to_dt,
+        extra_filters: list,
+        extra_params: dict,
+        limit: int,
+        offset: int,
+        order_col: str = "event_time",
+        time_col: str = "event_time",
+    ):
+        from_dt = from_dt or _month_start()
+        to_dt = to_dt or datetime.now(timezone.utc)
+        where_parts = [f"{time_col} >= %(from_dt)s", f"{time_col} <= %(to_dt)s"] + extra_filters
+        params = {"from_dt": from_dt, "to_dt": to_dt, **extra_params}
+        where = "WHERE " + " AND ".join(where_parts)
+        total = self._client.execute(f"SELECT count() FROM {table} {where}", params)[0][0]
+        params["limit"] = limit
+        params["offset"] = offset
+        rows = self._client.execute(
+            f"SELECT {select_cols} FROM {table} {where} ORDER BY {order_col} DESC LIMIT %(limit)s OFFSET %(offset)s",
+            params,
+        )
+        return rows, total
+
     def query_logs(
         self,
         limit: int = 100,
@@ -81,32 +108,18 @@ class ClickHouseLogAdapter:
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
-        from_dt = from_dt or _month_start()
-        to_dt = to_dt or datetime.now(timezone.utc)
-        where_parts = [
-            "event_time >= %(from_dt)s",
-            "event_time <= %(to_dt)s",
-        ]
-        params: dict = {"from_dt": from_dt, "to_dt": to_dt}
+        extra_filters: list = []
+        extra_params: dict = {}
         if event_type:
-            where_parts.append("event_type = %(event_type)s")
-            params["event_type"] = event_type
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
         if user_email:
-            where_parts.append("user_email = %(user_email)s")
-            params["user_email"] = user_email
-        where = "WHERE " + " AND ".join(where_parts)
-        total = self._client.execute(
-            f"SELECT count() FROM app_logs {where}", params
-        )[0][0]
-        params["limit"] = limit
-        params["offset"] = offset
-        rows = self._client.execute(
-            f"SELECT event_time, level, event_type, user_email, path, method, "
-            f"status_code, duration_ms, details "
-            f"FROM app_logs {where} "
-            f"ORDER BY event_time DESC "
-            f"LIMIT %(limit)s OFFSET %(offset)s",
-            params,
+            extra_filters.append("user_email = %(user_email)s")
+            extra_params["user_email"] = user_email
+        rows, total = self._paginated_query(
+            "app_logs",
+            "event_time, level, event_type, user_email, path, method, status_code, duration_ms, details",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
         )
         keys = ["event_time", "level", "event_type", "user_email", "path",
                 "method", "status_code", "duration_ms", "details"]
@@ -121,32 +134,19 @@ class ClickHouseLogAdapter:
         limit: int = 500,
         offset: int = 0,
     ) -> dict:
-        from_dt = from_dt or _month_start()
-        to_dt = to_dt or datetime.now(timezone.utc)
-        where_parts = [
-            "bucket >= %(from_dt)s",
-            "bucket <= %(to_dt)s",
-        ]
-        params: dict = {"from_dt": from_dt, "to_dt": to_dt}
+        extra_filters: list = []
+        extra_params: dict = {}
         if event_type:
-            where_parts.append("event_type = %(event_type)s")
-            params["event_type"] = event_type
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
         if path:
-            where_parts.append("path = %(path)s")
-            params["path"] = path
-        where = "WHERE " + " AND ".join(where_parts)
-        total = self._client.execute(
-            f"SELECT count() FROM app_logs_mv {where}", params
-        )[0][0]
-        params["limit"] = limit
-        params["offset"] = offset
-        rows = self._client.execute(
-            f"SELECT bucket, event_type, path, status_code, "
-            f"request_count, avg_duration_ms, max_duration_ms, error_count "
-            f"FROM app_logs_mv {where} "
-            f"ORDER BY bucket DESC "
-            f"LIMIT %(limit)s OFFSET %(offset)s",
-            params,
+            extra_filters.append("path = %(path)s")
+            extra_params["path"] = path
+        rows, total = self._paginated_query(
+            "app_logs_mv",
+            "bucket, event_type, path, status_code, request_count, avg_duration_ms, max_duration_ms, error_count",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+            order_col="bucket", time_col="bucket",
         )
         keys = ["bucket", "event_type", "path", "status_code",
                 "request_count", "avg_duration_ms", "max_duration_ms", "error_count"]
@@ -218,28 +218,15 @@ class ClickHouseLogAdapter:
         to_dt: datetime | None = None,
     ) -> dict:
         table = self._module_table(scope)
-        from_dt = from_dt or _month_start()
-        to_dt = to_dt or datetime.now(timezone.utc)
-        where_parts = [
-            "event_time >= %(from_dt)s",
-            "event_time <= %(to_dt)s",
-        ]
-        params: dict = {"from_dt": from_dt, "to_dt": to_dt}
+        extra_filters: list = []
+        extra_params: dict = {}
         if event_type:
-            where_parts.append("event_type = %(event_type)s")
-            params["event_type"] = event_type
-        where = "WHERE " + " AND ".join(where_parts)
-        total = self._client.execute(
-            f"SELECT count() FROM {table} {where}", params
-        )[0][0]
-        params["limit"] = limit
-        params["offset"] = offset
-        rows = self._client.execute(
-            f"SELECT event_time, user_email, event_type, details "
-            f"FROM {table} {where} "
-            f"ORDER BY event_time DESC "
-            f"LIMIT %(limit)s OFFSET %(offset)s",
-            params,
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        rows, total = self._paginated_query(
+            table,
+            "event_time, user_email, event_type, details",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
         )
         keys = ["event_time", "user_email", "event_type", "details"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
@@ -254,28 +241,16 @@ class ClickHouseLogAdapter:
         offset: int = 0,
     ) -> dict:
         mv = self._module_mv(scope)
-        from_dt = from_dt or _month_start()
-        to_dt = to_dt or datetime.now(timezone.utc)
-        where_parts = [
-            "bucket >= %(from_dt)s",
-            "bucket <= %(to_dt)s",
-        ]
-        params: dict = {"from_dt": from_dt, "to_dt": to_dt}
+        extra_filters: list = []
+        extra_params: dict = {}
         if event_type:
-            where_parts.append("event_type = %(event_type)s")
-            params["event_type"] = event_type
-        where = "WHERE " + " AND ".join(where_parts)
-        total = self._client.execute(
-            f"SELECT count() FROM {mv} {where}", params
-        )[0][0]
-        params["limit"] = limit
-        params["offset"] = offset
-        rows = self._client.execute(
-            f"SELECT bucket, event_type, event_count, unique_users "
-            f"FROM {mv} {where} "
-            f"ORDER BY bucket DESC "
-            f"LIMIT %(limit)s OFFSET %(offset)s",
-            params,
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        rows, total = self._paginated_query(
+            mv,
+            "bucket, event_type, event_count, unique_users",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+            order_col="bucket", time_col="bucket",
         )
         keys = ["bucket", "event_type", "event_count", "unique_users"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}

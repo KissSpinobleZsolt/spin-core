@@ -4,6 +4,7 @@ import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { ChatBubble } from '../chat/ChatBubble';
 import { ModelStatusBanner } from './ModelStatusBanner';
+import { WorkspaceTermsModal } from '../WorkspaceTermsModal';
 
 export default function Layout() {
   return (
@@ -18,6 +19,7 @@ export default function Layout() {
         <Footer />
       </div>
       <ChatBubble />
+      <WorkspaceTermsModal />
     </div>
   );
 }

@@ -8,7 +8,6 @@ import { useHealth } from '../../context/HealthContext'
 const ROUTE_KEYS: Record<string, string> = {
   '/': 'nav.dashboard',
   '/bots': 'nav.bots',
-  '/settings': 'nav.settings',
   '/logs': 'nav.logs',
   '/translations': 'nav.translations',
   '/bots-admin': 'nav.botsAdmin',

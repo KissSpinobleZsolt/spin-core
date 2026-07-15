@@ -5,16 +5,16 @@ from datetime import datetime
 from typing import List, Optional
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from app.config import OLLAMA_URL
 from app.database import get_ch, get_pg
-from app.deps import require_admin, require_token
+from app.deps import token_dep, admin_dep
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434")
 OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 _CHATBOT_SCOPE = "chatbot"
 
@@ -31,8 +31,7 @@ class ChatRequest(BaseModel):
 
 
 @router.post("")
-async def chat(payload: ChatRequest, authorization: str = Header(default="")):
-    user_email = require_token(authorization)
+async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
 
     # Resolve bot config if bot_id provided
     bot_name: Optional[str] = None
@@ -114,14 +113,13 @@ async def chat(payload: ChatRequest, authorization: str = Header(default="")):
 
 @router.get("/logs")
 async def get_chat_logs(
-    authorization: str = Header(default=""),
+    _: str = Depends(admin_dep),
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
     user_email: Optional[str] = Query(default=None),
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
 ):
-    require_admin(authorization)
     result = get_ch().query_module_logs(
         _CHATBOT_SCOPE,
         limit=limit,
@@ -136,13 +134,12 @@ async def get_chat_logs(
 
 @router.get("/logs/summary")
 async def get_chat_logs_summary(
-    authorization: str = Header(default=""),
+    _: str = Depends(admin_dep),
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
     limit: int = Query(default=500, le=2000),
     offset: int = Query(default=0, ge=0),
 ):
-    require_admin(authorization)
     return get_ch().query_module_logs_mv(
         _CHATBOT_SCOPE,
         from_dt=from_dt,

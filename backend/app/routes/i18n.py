@@ -1,7 +1,7 @@
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_pg
-from app.deps import require_admin
+from app.deps import admin_dep
 
 router = APIRouter(prefix="/api/i18n", tags=["i18n"])
 
@@ -18,8 +18,7 @@ async def get_translations(lang: str):
 async def update_translations(
     lang: str,
     data: dict,
-    authorization: str = Header(default=""),
+    _: str = Depends(admin_dep),
 ):
-    require_admin(authorization)
     get_pg().set_i18n_data(lang, data)
     return {"ok": True}

@@ -2,6 +2,7 @@ import { Component, type ReactNode, Suspense, useEffect, useState, type Componen
 import { useParams } from 'react-router-dom'
 import { useSettings } from '../../context/SettingsContext'
 import { loadFederatedModule } from '../../utils/federationLoader'
+import { Spinner } from '../ui/Spinner'
 
 class ErrorBoundary extends Component<
   { children: ReactNode; fallback: ReactNode },
@@ -32,7 +33,7 @@ export function FederatedPage() {
   const { modules } = useSettings()
   const mod = modules.find(m => m.id === moduleId)
 
-  const [RemoteComponent, setRemoteComponent] = useState<ComponentType | null>(null)
+  const [RemoteComponent, setRemoteComponent] = useState<ComponentType<{ presets?: Record<string, unknown> }> | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -59,7 +60,7 @@ export function FederatedPage() {
   if (!RemoteComponent) {
     return (
       <div className="flex items-center justify-center h-64 gap-3 text-slate-400">
-        <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+        <Spinner size="lg" />
         <span>Loading {mod.name}…</span>
       </div>
     )
@@ -69,10 +70,10 @@ export function FederatedPage() {
     <ErrorBoundary fallback={<ModuleErrorFallback name={mod.name} />}>
       <Suspense fallback={
         <div className="flex items-center justify-center h-64 text-slate-400">
-          <div className="w-6 h-6 border-4 border-blue-500 border-t-transparent rounded-full animate-spin" />
+          <Spinner size="lg" />
         </div>
       }>
-        <RemoteComponent />
+        <RemoteComponent presets={mod.presets as unknown as Record<string, unknown>} />
       </Suspense>
     </ErrorBoundary>
   )

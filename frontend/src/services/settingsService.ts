@@ -1,11 +1,16 @@
 import { apiService } from './apiService'
-import type { ModuleInput } from './setupService'
 
-export type { Theme } from './setupService'
+export type Theme = 'dark' | 'light'
 
-export interface ModuleConfig {
-  id: string
+export interface ModulePresets {
+  i18n: Record<string, unknown>
+  layout: Record<string, unknown>
+  settings: Record<string, unknown>
+}
+
+export interface ModuleInput {
   name: string
+  description: string
   remote_url: string
   scope: string
   component: string
@@ -13,12 +18,21 @@ export interface ModuleConfig {
   icon: string
   enabled: boolean
   roles: string[]
+  presets: ModulePresets
 }
 
-export interface AppSettings {
-  setup_complete: boolean
-  theme: { default_theme: string }
-  modules: ModuleConfig[]
+export interface ModuleConfig {
+  id: string
+  name: string
+  description: string
+  remote_url: string
+  scope: string
+  component: string
+  route: string
+  icon: string
+  enabled: boolean
+  roles: string[]
+  presets: ModulePresets
 }
 
 export interface DiscoveredModule {
@@ -36,11 +50,7 @@ export interface DiscoveredModule {
 }
 
 export const settingsService = {
-  async getSettings(): Promise<AppSettings> {
-    return apiService.get('/settings')
-  },
-
-  async updateTheme(theme: 'dark' | 'light'): Promise<void> {
+  async updateTheme(theme: Theme): Promise<void> {
     await apiService.patch('/settings/theme', { theme })
   },
 

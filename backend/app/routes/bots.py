@@ -1,10 +1,10 @@
 from typing import List
 
-from fastapi import APIRouter, Header, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from app.database import get_pg
-from app.deps import require_admin, require_token
+from app.deps import token_dep, admin_dep
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])
 
@@ -33,8 +33,7 @@ class BotOut(BaseModel):
 
 
 @router.get("", response_model=List[BotOut])
-def list_bots(authorization: str = Header(default="")):
-    email = require_token(authorization)
+def list_bots(email: str = Depends(token_dep)):
     pg = get_pg()
 
     user = pg.get_user_by_email(email)
@@ -46,8 +45,7 @@ def list_bots(authorization: str = Header(default="")):
 
 
 @router.post("", response_model=BotOut, status_code=201)
-def create_bot(payload: BotPayload, authorization: str = Header(default="")):
-    require_admin(authorization)
+def create_bot(payload: BotPayload, _: str = Depends(admin_dep)):
     bot = get_pg().create_bot(
         name=payload.name,
         description=payload.description,
@@ -62,8 +60,7 @@ def create_bot(payload: BotPayload, authorization: str = Header(default="")):
 
 
 @router.get("/{bot_id}", response_model=BotOut)
-def get_bot(bot_id: str, authorization: str = Header(default="")):
-    email = require_token(authorization)
+def get_bot(bot_id: str, email: str = Depends(token_dep)):
     pg = get_pg()
     bot = pg.get_bot_by_id(bot_id)
     if not bot:
@@ -83,8 +80,7 @@ def get_bot(bot_id: str, authorization: str = Header(default="")):
 
 
 @router.put("/{bot_id}", response_model=BotOut)
-def update_bot(bot_id: str, payload: BotPayload, authorization: str = Header(default="")):
-    require_admin(authorization)
+def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
     bot = get_pg().update_bot(
         bot_id=bot_id,
         name=payload.name,
@@ -102,8 +98,7 @@ def update_bot(bot_id: str, payload: BotPayload, authorization: str = Header(def
 
 
 @router.delete("/{bot_id}", status_code=204)
-def delete_bot(bot_id: str, authorization: str = Header(default="")):
-    require_admin(authorization)
+def delete_bot(bot_id: str, _: str = Depends(admin_dep)):
     deleted = get_pg().delete_bot(bot_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Bot not found")

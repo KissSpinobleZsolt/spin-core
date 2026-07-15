@@ -5,7 +5,7 @@ FastAPI backend for the spin-core platform.
 ## Tech
 
 - **Framework**: FastAPI, Python 3.12, uvicorn
-- **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages, i18n translations, module data)
+- **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages, modules, i18n translations, module data)
 - **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log + per-module log tables + refreshable materialized views)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
 - **AI proxy**: httpx — async streaming proxy to Ollama for the `/api/chat` endpoint
@@ -16,11 +16,22 @@ FastAPI backend for the spin-core platform.
 Both databases are always initialised at startup via `init_db()`. Each has a fixed role — there is no user-selectable DB mode.
 
 ```
-get_pg()    → PostgresAdapter      — users, pages, admin ops, i18n translations, module data
+get_pg()    → PostgresAdapter      — users, pages, bots, modules, i18n translations, module data
 get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_logs_mv()
                                      ensure_module_table() / write_module_log()
                                      query_module_logs() / query_module_logs_mv()
 ```
+
+**PostgreSQL tables (SQLAlchemy ORM, auto-created by `init_db()`, incremental column additions via `_run_migrations()`):**
+
+| Table | Description |
+|-------|-------------|
+| `users` | Auth users — email, hashed password, roles, theme preference |
+| `page_responses` | Dashboard page content (editable by admins) |
+| `bots` | Bot configurations — name, model, system prompt, roles |
+| `modules` | Registered MF modules — **source of truth** (not `settings.json`) |
+| `translations` | EN + RO i18n bundles — deep-merged from `i18n_defaults.py` every startup |
+| `module_documents` | Per-module namespaced document store (scoped by `module_id` + `collection`) |
 
 Every HTTP request is automatically appended to `app_logs` by the middleware in `main.py`.
 
@@ -79,8 +90,13 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Admin user | email not in PostgreSQL | `[spin-core] Admin user created: …` |
 | Dashboard page | `page_responses` row absent | _(silent)_ |
 | Default bots | `bots` table is empty | `[spin-core] Seeded bot: …` (one line per bot) |
+| Modules (migration) | `settings.json` contains `modules` array | migrated to PostgreSQL; `settings.json` rewritten without `modules` |
+| Modules (seed) | `modules` table is empty after migration | seeded from `data/seed.json` |
+| Modules (discovery) | `MODULE_REGISTRY_URLS` is set | new scopes inserted; existing admin edits never overwritten |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
+
+**Startup order:** migration → seed → discovery → i18n merge → ClickHouse table provisioning (one table + MV per registered module).
 
 Default values for dashboard content, bots, theme, and modules come from **`./data/seed.json`** (mounted read-only at `SEED_PATH`). Edit that file before first run to customise defaults. If the file is absent or malformed, the backend falls back to built-in defaults and logs a warning.
 
@@ -131,15 +147,19 @@ Each DB field is `true` if the connection check passed, `false` otherwise. `api`
 
 ### Settings (admin)
 
+Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
+
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/settings` | Full `AppSettings` (theme + modules) |
+| `GET` | `/api/settings` | `AppSettings` (theme only) |
 | `PATCH` | `/api/settings/theme` | Update default theme |
-| `GET` | `/api/settings/modules` | List registered modules |
-| `POST` | `/api/settings/modules` | Add a module |
+| `GET` | `/api/settings/modules` | List registered modules (from PostgreSQL) |
+| `POST` | `/api/settings/modules` | Create a module (also provisions ClickHouse log tables) |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
 | `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |
+
+**Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`).
 
 ### Logs (admin)
 
@@ -251,17 +271,19 @@ The chat log `details` field is JSON with the shape:
 backend/
 ├── app/
 │   ├── main.py           # App factory, HTTP logging middleware, router registration
+│   ├── config.py         # Centralised env-var constants (OLLAMA_URL, …)
+│   ├── schemas.py        # Shared Pydantic models (ModuleInput, …)
 │   ├── settings.py       # AppSettings dataclass, read/write settings.json
 │   ├── seed_loader.py    # Loads ./data/seed.json → SeedData (dashboard, bots, theme, modules)
 │   ├── database.py       # init_db(), get_pg() / get_ch()
 │   ├── auth.py           # JWT creation/validation, password hashing
-│   ├── deps.py           # require_token / require_admin
+│   ├── deps.py           # FastAPI Depends wrappers — token_dep / admin_dep
 │   ├── state.py          # In-process AppSettings singleton
 │   ├── i18n_defaults.py  # Default EN + RO translations (deep-merged into PostgreSQL every startup)
 │   ├── model_tracker.py  # Background async pull tracker — progress dict consumed by the SSE stream
 │   ├── db/
-│   │   ├── interface.py  # AppAdapter protocol + UserRecord + BotRecord dataclasses
-│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots, i18n, module data via SQLAlchemy
+│   │   ├── interface.py  # UserRecord + BotRecord dataclasses
+│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots, modules, i18n, module data via SQLAlchemy
 │   │   └── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
 │   └── routes/
 │       ├── auth.py           # /api/auth/login

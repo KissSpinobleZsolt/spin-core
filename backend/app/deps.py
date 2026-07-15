@@ -1,4 +1,4 @@
-from fastapi import HTTPException
+from fastapi import Header, HTTPException
 
 from app.auth import decode_token
 from app.database import get_pg
@@ -16,3 +16,11 @@ def require_admin(authorization: str) -> str:
     if not user or "admin" not in user.roles:
         raise HTTPException(status_code=403, detail="Admin role required")
     return email
+
+
+def token_dep(authorization: str = Header(default="")) -> str:
+    return require_token(authorization)
+
+
+def admin_dep(authorization: str = Header(default="")) -> str:
+    return require_admin(authorization)

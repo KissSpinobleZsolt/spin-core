@@ -6,7 +6,6 @@ import { RoleGuard } from './components/guards/RoleGuard'
 import { FederatedPage } from './components/modules/FederatedPage'
 import Dashboard from './pages/Dashboard'
 import Login from './pages/Login'
-import Settings from './pages/Settings'
 import Logs from './pages/Logs'
 import Translations from './pages/Translations'
 import Bots from './pages/Bots'
@@ -17,6 +16,8 @@ import Users from './pages/admin/Users'
 import Modules from './pages/admin/Modules'
 import Status from './pages/admin/Status'
 import { useI18nSync } from './i18n/useI18nSync'
+import { CookieConsentModal } from './components/CookieConsentModal'
+import { Spinner } from './components/ui/Spinner'
 
 const router = createBrowserRouter([
   {
@@ -31,14 +32,6 @@ const router = createBrowserRouter([
         element: <Layout />,
         children: [
           { index: true, element: <Dashboard /> },
-          {
-            path: 'settings',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <Settings />
-              </RoleGuard>
-            ),
-          },
           {
             path: 'logs',
             element: (
@@ -109,11 +102,16 @@ function App() {
   if (!i18nReady) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <span className="w-8 h-8 rounded-full border-4 border-blue-500 border-t-transparent animate-spin" />
+        <Spinner size="lg" />
       </div>
     )
   }
-  return <RouterProvider router={router} />
+  return (
+    <>
+      <RouterProvider router={router} />
+      <CookieConsentModal />
+    </>
+  )
 }
 
 export default App

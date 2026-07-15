@@ -1,99 +1,26 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { botsService, type Bot } from '../services/botsService'
-
-interface Message {
-  role: 'user' | 'assistant' | 'system'
-  content: string
-}
+import { useGet } from '../hooks/useApi'
+import { useChatStream } from '../hooks/useChatStream'
+import { Btn } from '../components/ui/Button'
 
 export default function Chat() {
   const { botId } = useParams<{ botId: string }>()
   const navigate = useNavigate()
 
-  const [bot, setBot] = useState<Bot | null>(null)
-  const [botError, setBotError] = useState(false)
-  const [messages, setMessages] = useState<Message[]>([])
-  const [input, setInput] = useState('')
-  const [loading, setLoading] = useState(false)
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const { data: bot, isError: botError } = useGet<Bot>(
+    ['bot', botId ?? ''],
+    () => botsService.getBot(botId!),
+    { enabled: !!botId },
+  )
 
-  useEffect(() => {
-    if (!botId) return
-    botsService.getBot(botId)
-      .then(b => {
-        setBot(b)
-      })
-      .catch(() => setBotError(true))
-  }, [botId])
+  const { messages, setMessages, input, setInput, loading, sendMessage } = useChatStream(botId, '')
+  const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages])
-
-  async function sendMessage() {
-    if (!input.trim() || loading) return
-    const userMsg: Message = { role: 'user', content: input.trim() }
-    const history = [...messages, userMsg]
-    setMessages([...history, { role: 'assistant', content: '' }])
-    setInput('')
-    setLoading(true)
-
-    const token = localStorage.getItem('token') ?? ''
-    const body: Record<string, unknown> = {
-      messages: history.filter(m => m.role !== 'system'),
-    }
-    if (botId) body.bot_id = botId
-
-    try {
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify(body),
-      })
-
-      const reader = res.body!.getReader()
-      const decoder = new TextDecoder()
-      let buf = ''
-
-      while (true) {
-        const { done, value } = await reader.read()
-        if (done) break
-        buf += decoder.decode(value, { stream: true })
-        const lines = buf.split('\n')
-        buf = lines.pop() ?? ''
-        for (const line of lines) {
-          if (!line.trim()) continue
-          try {
-            const chunk = JSON.parse(line)
-            if (chunk.error) {
-              setMessages(prev => {
-                const c = [...prev]
-                c[c.length - 1] = { role: 'assistant', content: `Error: ${chunk.error}` }
-                return c
-              })
-              return
-            }
-            if (chunk.message?.content) {
-              setMessages(prev => {
-                const c = [...prev]
-                c[c.length - 1] = { role: 'assistant', content: c[c.length - 1].content + chunk.message.content }
-                return c
-              })
-            }
-          } catch {}
-        }
-      }
-    } catch {
-      setMessages(prev => {
-        const c = [...prev]
-        c[c.length - 1] = { role: 'assistant', content: 'Could not reach the chat service.' }
-        return c
-      })
-    } finally {
-      setLoading(false)
-    }
-  }
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() }
@@ -107,20 +34,13 @@ export default function Chat() {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-4 text-slate-500 dark:text-slate-400">
         <p className="text-lg">Bot not found or unavailable.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/bots')}
-          className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors"
-        >
-          Back to Bots
-        </button>
+        <Btn onClick={() => navigate('/bots')} className="px-4 py-2">Back to Bots</Btn>
       </div>
     )
   }
 
   return (
     <div className="flex flex-col h-full max-w-3xl mx-auto">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 rounded-t-xl">
         <div className="flex items-center gap-3">
           <button
@@ -148,9 +68,8 @@ export default function Chat() {
         </button>
       </div>
 
-      {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3 bg-slate-50 dark:bg-slate-900">
-        {messages.filter(m => m.role !== 'system').map((msg, i) => (
+        {messages.map((msg, i) => (
           <div key={i} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div
               className={`max-w-[75%] px-4 py-2.5 rounded-2xl text-sm leading-relaxed whitespace-pre-wrap break-words ${
@@ -166,7 +85,6 @@ export default function Chat() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input */}
       <div className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 rounded-b-xl flex gap-2 items-end">
         <textarea
           value={input}
