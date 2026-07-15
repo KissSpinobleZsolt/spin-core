@@ -1,27 +1,50 @@
+"""
+Chat streaming route.
+
+Accepts a POST request with a conversation history and optional ``bot_id``,
+resolves the bot's provider and model, delegates streaming to the matching
+`LLMProvider` adapter, normalises each chunk to Ollama-compatible NDJSON, and
+logs the completed exchange to ClickHouse.
+
+The frontend parses ``{"message": {"content": "…"}}`` NDJSON lines — every
+provider adapter outputs `NormalizedChunk` objects that this route serialises to
+that exact shape, so the frontend requires no changes when a new provider is added.
+"""
+
 import json
 import os
 import time
 from datetime import datetime
 from typing import List, Optional
 
-import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
-from app.config import OLLAMA_URL
 from app.database import get_ch, get_pg
 from app.deps import token_dep, admin_dep
+from app.providers import get_provider
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+# Fallback Ollama model used when neither the bot record nor the request body
+# specifies a model.  Cloud-provider bots always carry an explicit model string.
+_OLLAMA_DEFAULT_MODEL = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
+
+# ClickHouse scope key used for all chatbot log entries.
 _CHATBOT_SCOPE = "chatbot"
 
+# ---------------------------------------------------------------------------
+# Platform-context navigation tables
+# ---------------------------------------------------------------------------
+
+# Public pages visible to all authenticated users.
 _NAV_PUBLIC = [
     ("/",               "Dashboard",    "admin-editable welcome page"),
     ("/bots",           "Bots",         "browse and launch AI bots"),
 ]
+
+# Admin-only pages appended when the requesting user has the ``admin`` role.
 _NAV_ADMIN = [
     ("/logs",           "Logs",         "HTTP and chat log viewer"),
     ("/translations",   "Translations", "live i18n string editor"),
@@ -34,9 +57,26 @@ _NAV_ADMIN = [
 
 
 def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = None) -> str:
-    """Compose the full system prompt for a bot by prepending bot-type context, platform navigation, and optional module info."""
+    """Compose the full system prompt for a bot.
+
+    Concatenates (in order): the bot-type preprompt, a platform-context block
+    describing available pages / modules / bots, and the bot's own system prompt.
+    Empty sections are omitted so the final string has no stray blank lines.
+
+    Args:
+        pg: Active `PostgresAdapter` instance used to query modules and bots.
+        bot: `BotRecord` whose type preprompt and system prompt are used.
+        user_roles: Roles of the requesting user; determines which nav links
+            and bots are surfaced in the context block.
+        module: Optional module dict injected when the chat originates from a
+            specific micro-frontend module.
+
+    Returns:
+        A single string suitable for use as the ``system`` role message.
+    """
     is_admin = "admin" in user_roles
 
+    # Look up the preprompt text defined on the bot's type.
     preprompt = ""
     for bt in pg.get_bot_types():
         if bt["name"] == bot.type:
@@ -47,6 +87,9 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
     bots = pg.get_bots(admin=False, user_roles=user_roles)
 
     nav = _NAV_PUBLIC + (_NAV_ADMIN if is_admin else [])
+
+    # Optional current-module context block appended when the request originates
+    # from a specific module page.
     module_lines = []
     if module:
         module_lines = [
@@ -55,6 +98,7 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
             f"You are embedded in the '{module['name']}' module: {module['description']}",
             f"Module route: /modules/{module['route']}",
         ]
+
     ctx_lines = [
         "## PLATFORM CONTEXT (injected) ##",
         "",
@@ -79,31 +123,66 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
         "## END PLATFORM CONTEXT ##",
     ]
 
+    # Join non-empty sections with a blank line between them.
     parts = [p for p in [preprompt, "\n".join(ctx_lines), bot.system_prompt] if p]
     return "\n\n".join(parts)
 
 
+# ---------------------------------------------------------------------------
+# Request / response schemas
+# ---------------------------------------------------------------------------
+
 class Message(BaseModel):
-    """A single chat message with a role (user, assistant, or system) and text content."""
+    """A single chat message with a role (``user``, ``assistant``, or ``system``) and text content."""
 
     role: str
     content: str
 
 
 class ChatRequest(BaseModel):
-    """Request body schema for a streaming chat completion."""
+    """Request body for a streaming chat completion.
+
+    Attributes:
+        messages: Ordered conversation history; the route prepends a system message
+            when ``bot_id`` is supplied.
+        model: Explicit model override used only in free mode (no ``bot_id``).
+            Ignored when a bot is selected — the bot's stored model takes precedence.
+        bot_id: Optional UUID of the bot to use.  When supplied the bot's
+            ``provider``, ``model``, and system prompt are loaded from Postgres.
+        module_id: Optional UUID of the module the chat originated from; used to
+            inject module-specific context into the system prompt.
+    """
 
     messages: List[Message]
-    model: str = OLLAMA_MODEL
+    model: str = _OLLAMA_DEFAULT_MODEL
     bot_id: Optional[str] = None
     module_id: Optional[str] = None
 
 
+# ---------------------------------------------------------------------------
+# Streaming endpoint
+# ---------------------------------------------------------------------------
+
 @router.post("")
 async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
-    """Stream a chat completion from Ollama, applying bot configuration and logging the exchange to ClickHouse."""
-    # Resolve bot config if bot_id provided
+    """Stream a chat completion, dispatching to the bot's configured LLM provider.
+
+    Loads the bot record (when ``bot_id`` is set) to determine the provider and
+    model, injects the platform-context system prompt, and delegates streaming to
+    the matching `LLMProvider` adapter.  Each `NormalizedChunk` is serialised to
+    the Ollama NDJSON shape ``{"message": {"content": "…"}}`` so the frontend
+    requires no changes.  On stream completion a ClickHouse log entry is written.
+
+    Args:
+        payload: Chat request body (messages, optional bot_id / module_id).
+        user_email: JWT-verified email of the requesting user.
+
+    Returns:
+        A ``StreamingResponse`` with ``Content-Type: application/x-ndjson``.
+    """
+    # Resolve bot configuration from Postgres when a bot_id is provided.
     bot_name: Optional[str] = None
+    effective_provider = "ollama"
     effective_model = payload.model
     messages_to_send = list(payload.messages)
 
@@ -112,62 +191,73 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
         bot = pg.get_bot_by_id(payload.bot_id)
         if not bot or not bot.active:
             raise HTTPException(status_code=404, detail="Bot not found")
+
         user = pg.get_user_by_email(user_email)
         user_roles = user.roles if user else []
+
+        # Non-admins cannot access inactive or admin-restricted bots.
         if "admin" not in user_roles:
             if not bot.active:
                 raise HTTPException(status_code=404, detail="Bot not found")
             if bot.restricted == "admin":
                 raise HTTPException(status_code=403, detail="Access denied")
+
         bot_name = bot.name
+        # The bot's stored provider beats the default; its model beats the request model.
+        effective_provider = bot.provider or "ollama"
         if bot.model:
             effective_model = bot.model
+
         module = pg.get_module(payload.module_id) if payload.module_id else None
         system_content = _build_system_message(pg, bot, user_roles, module=module)
+        # Prepend the assembled system message so the provider always receives it first.
         messages_to_send = [Message(role="system", content=system_content)] + messages_to_send
 
     async def stream():
-        """Yield NDJSON chunks from Ollama and write a completion log entry when the stream finishes."""
+        """Yield NDJSON lines from the selected provider and log the exchange on completion."""
         start = time.time()
         response_parts: list[str] = []
         prompt_tokens = 0
         eval_tokens = 0
 
-        try:
-            async with httpx.AsyncClient(timeout=120.0) as client:
-                async with client.stream(
-                    "POST",
-                    f"{OLLAMA_URL}/api/chat",
-                    json={
-                        "model": effective_model,
-                        "messages": [m.model_dump() for m in messages_to_send],
-                        "stream": True,
-                    },
-                ) as resp:
-                    if resp.status_code != 200:
-                        yield f'{{"error": "Ollama returned {resp.status_code}"}}\n'
-                        return
-                    async for chunk in resp.aiter_text():
-                        yield chunk
-                        try:
-                            data = json.loads(chunk.strip())
-                            content = data.get("message", {}).get("content", "")
-                            if content:
-                                response_parts.append(content)
-                            if data.get("done"):
-                                prompt_tokens = data.get("prompt_eval_count", 0)
-                                eval_tokens = data.get("eval_count", 0)
-                        except Exception:
-                            pass
-        except httpx.ConnectError:
-            yield '{"error": "Ollama service unreachable"}\n'
-            return
-        except Exception as e:
-            yield f'{{"error": "{str(e)}"}}\n'
-            return
+        provider = get_provider(effective_provider)
 
         try:
+            async for chunk in provider.stream(
+                model=effective_model,
+                messages=[m.model_dump() for m in messages_to_send],
+            ):
+                # Accumulate text for the ClickHouse log written after the stream ends.
+                if chunk.content:
+                    response_parts.append(chunk.content)
+
+                # Capture token counts from the final sentinel chunk.
+                if chunk.done:
+                    prompt_tokens = chunk.prompt_tokens
+                    eval_tokens = chunk.completion_tokens
+
+                # Serialise to the Ollama NDJSON shape the frontend already parses.
+                # Cloud providers emit empty content on the terminal chunk; the frontend
+                # uses the ``done`` flag to stop the streaming cursor.
+                yield json.dumps({
+                    "message": {"role": "assistant", "content": chunk.content},
+                    "done": chunk.done,
+                }) + "\n"
+
+        except RuntimeError as exc:
+            # Surface provider-level errors (missing key, unreachable service) as a
+            # JSON error chunk so the frontend can display a human-readable message.
+            yield json.dumps({"error": str(exc)}) + "\n"
+            return
+        except Exception as exc:
+            yield json.dumps({"error": f"Unexpected error: {exc}"}) + "\n"
+            return
+
+        # Write the completion log to ClickHouse after the stream is fully consumed.
+        # Failures here are silent so a logging outage never breaks the chat.
+        try:
             log_details = {
+                "provider": effective_provider,
                 "model": effective_model,
                 "messages": [m.model_dump() for m in payload.messages],
                 "response": "".join(response_parts),
@@ -187,10 +277,15 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
                 details=log_details,
             )
         except Exception:
+            # ClickHouse logging must never surface errors to the chat stream.
             pass
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
+
+# ---------------------------------------------------------------------------
+# Log query endpoints
+# ---------------------------------------------------------------------------
 
 @router.get("/logs")
 async def get_chat_logs(
@@ -201,7 +296,20 @@ async def get_chat_logs(
     limit: int = Query(default=50, le=200),
     offset: int = Query(default=0, ge=0),
 ):
-    """Return paginated chatbot completion logs from ClickHouse, optionally filtered by time range and user email."""
+    """Return paginated chatbot completion logs from ClickHouse.
+
+    Optionally filters by time range and user email.  Admin-only endpoint.
+
+    Args:
+        from_dt: Inclusive start of the time window (UTC).
+        to_dt: Inclusive end of the time window (UTC).
+        user_email: When supplied, only entries for this email are returned.
+        limit: Maximum number of rows to return (capped at 200).
+        offset: Row offset for pagination.
+
+    Returns:
+        Dict with ``items`` list and ``total`` count from ClickHouse.
+    """
     result = get_ch().query_module_logs(
         _CHATBOT_SCOPE,
         limit=limit,
@@ -222,7 +330,20 @@ async def get_chat_logs_summary(
     limit: int = Query(default=500, le=2000),
     offset: int = Query(default=0, ge=0),
 ):
-    """Return hourly aggregated chatbot log summaries from the materialized view for the given time window."""
+    """Return hourly aggregated chatbot log summaries from the materialized view.
+
+    Uses the pre-computed ``module_chatbot_logs_mv`` ClickHouse view refreshed every
+    10 minutes.  Admin-only endpoint.
+
+    Args:
+        from_dt: Inclusive start of the aggregation window (UTC).
+        to_dt: Inclusive end of the aggregation window (UTC).
+        limit: Maximum number of hourly buckets to return (capped at 2000).
+        offset: Bucket offset for pagination.
+
+    Returns:
+        Dict with ``items`` list and ``total`` count from the materialized view.
+    """
     return get_ch().query_module_logs_mv(
         _CHATBOT_SCOPE,
         from_dt=from_dt,

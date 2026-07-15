@@ -11,11 +11,21 @@ router = APIRouter(prefix="/api/bots", tags=["bots"])
 
 
 class BotPayload(BaseModel):
-    """Request body schema for creating or updating a bot."""
+    """Request body schema for creating or updating a bot.
+
+    Attributes:
+        provider: LLM backend to use — ``"ollama"`` (default), ``"anthropic"``,
+            or ``"openai"``.  Determines which provider adapter the chat route
+            selects at inference time.
+        model: Provider-specific model identifier (e.g. ``"qwen2.5:7b"`` for Ollama,
+            ``"claude-sonnet-5"`` for Anthropic).  Empty string uses the adapter
+            default, which is the ``OLLAMA_MODEL`` / ``ANTHROPIC_DEFAULT_MODEL`` env var.
+    """
 
     name: str
     description: str = ""
     type: str = "communicator"
+    provider: str = "ollama"
     model: str = ""
     system_prompt: str = ""
     icon: str = "🤖"
@@ -25,12 +35,18 @@ class BotPayload(BaseModel):
 
 
 class BotOut(BaseModel):
-    """Response schema representing a single bot with its full configuration and metadata."""
+    """Response schema representing a single bot with its full configuration and metadata.
+
+    Attributes:
+        provider: LLM backend identifier stored on the bot — one of ``"ollama"``,
+            ``"anthropic"``, or ``"openai"``.
+    """
 
     id: str
     name: str
     description: str
     type: str
+    provider: str
     model: str
     system_prompt: str
     icon: str
@@ -68,6 +84,7 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         name=payload.name,
         description=payload.description,
         type=payload.type,
+        provider=payload.provider,
         model=payload.model,
         system_prompt=payload.system_prompt,
         icon=payload.icon,
@@ -108,6 +125,7 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
         name=payload.name,
         description=payload.description,
         type=payload.type,
+        provider=payload.provider,
         model=payload.model,
         system_prompt=payload.system_prompt,
         icon=payload.icon,
