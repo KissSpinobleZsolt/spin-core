@@ -91,7 +91,18 @@ export function ChatBubble() {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [messages, open])
 
-  if (!status?.all_ready) return null
+  // Hide the bubble only when Ollama is not ready AND there are no cloud-provider
+  // bots available.  Cloud bots (anthropic / openai) never depend on the Ollama
+  // readiness status, so we check the selected bot's provider before gating.
+  const selectedBotIsCloudProvider =
+    selectedBot !== null && selectedBot.provider !== 'ollama' && selectedBot.provider !== undefined
+
+  const ollamaNotReady = !status?.all_ready
+
+  if (ollamaNotReady && !selectedBotIsCloudProvider && bots.length === 0) return null
+  // When Ollama isn't ready but a cloud bot is selected (or available), keep the
+  // bubble visible so users can still chat via the cloud provider.
+  if (ollamaNotReady && !selectedBotIsCloudProvider && bots.every(b => b.provider === 'ollama')) return null
 
   function selectBot(botId: string) {
     setSelectedBotId(botId)

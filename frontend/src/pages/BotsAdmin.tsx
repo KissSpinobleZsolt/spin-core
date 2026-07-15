@@ -1,5 +1,5 @@
 import { type ReactNode, useState, useEffect } from 'react'
-import { botsService, type Bot, type BotPayload, type BotType } from '../services/botsService'
+import { botsService, type Bot, type BotPayload, type BotType, type LLMProvider, PROVIDER_LABELS, PROVIDER_MODEL_HINTS } from '../services/botsService'
 import { settingsService, type ModuleConfig } from '../services/settingsService'
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
@@ -34,7 +34,7 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
 // ---------------------------------------------------------------------------
 
 const BLANK: BotPayload = {
-  name: '', description: '', type: 'communicator', model: '',
+  name: '', description: '', type: 'communicator', provider: 'ollama', model: '',
   system_prompt: '', icon: '💬', active: false, restricted: 'user', modules: [],
 }
 
@@ -56,6 +56,7 @@ function BotModal({
     name: initial.name,
     description: initial.description,
     type: initial.type,
+    provider: initial.provider ?? 'ollama',
     model: initial.model,
     system_prompt: initial.system_prompt,
     icon: initial.icon,
@@ -150,17 +151,52 @@ function BotModal({
         <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this bot do?" />
       </div>
 
+      {/* Provider selector — determines which LLM backend the chat route calls */}
+      <div>
+        <Label>Provider</Label>
+        <Select
+          value={form.provider}
+          onChange={v => setForm(f => ({
+            ...f,
+            provider: v as LLMProvider,
+            // Clear the model when switching providers so stale identifiers
+            // (e.g. an Ollama tag) are not accidentally sent to a cloud API.
+            model: '',
+          }))}
+        >
+          {(Object.entries(PROVIDER_LABELS) as [LLMProvider, string][]).map(([id, label]) => (
+            <option key={id} value={id}>{label}</option>
+          ))}
+        </Select>
+        {form.provider !== 'ollama' && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            Requires the corresponding API key set in docker-compose.yml / k8s secrets.
+          </p>
+        )}
+      </div>
+
+      {/* Model field — hints are provider-aware; Ollama shows installed models */}
       <div>
         <Label>Model</Label>
         <input
-          list="ollama-models"
+          list="bot-model-hints"
           value={form.model}
           onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-          placeholder={currentBotType?.default_model || 'Default (env var)'}
+          placeholder={
+            form.provider === 'ollama'
+              ? (currentBotType?.default_model || 'Default (OLLAMA_MODEL env var)')
+              : form.provider === 'anthropic'
+              ? 'e.g. claude-sonnet-5'
+              : 'e.g. gpt-4o'
+          }
           className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
-        <datalist id="ollama-models">
-          {models.map(m => <option key={m} value={m} />)}
+        {/* Datalist merges Ollama installed-model names with static cloud hints */}
+        <datalist id="bot-model-hints">
+          {form.provider === 'ollama'
+            ? models.map(m => <option key={m} value={m} />)
+            : PROVIDER_MODEL_HINTS[form.provider as LLMProvider].map(m => <option key={m} value={m} />)
+          }
         </datalist>
       </div>
 
@@ -280,6 +316,7 @@ export default function BotsAdmin() {
 
   async function handleToggle(bot: Bot) {
     try {
+      // Spread the full bot into BotPayload; created_by and created_at are server-only.
       const { id, created_by, created_at, ...payload } = bot
       await botsService.updateBot(id, { ...payload, active: !bot.active })
       await refetch()
@@ -307,6 +344,7 @@ export default function BotsAdmin() {
                   <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                     <th className="pb-2 pr-4">Bot</th>
                     <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2 pr-4">Provider</th>
                     <th className="pb-2 pr-4">Model</th>
                     <th className="pb-2 pr-4">Created by</th>
                     <th className="pb-2 pr-4">Active</th>
@@ -328,6 +366,18 @@ export default function BotsAdmin() {
                       <td className="py-2 pr-4">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_BADGE[bot.type] ?? TYPE_BADGE.custom}`}>
                           {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 text-xs">
+                        {/* Provider badge — colour-coded by backend type */}
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${
+                          bot.provider === 'anthropic'
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                            : bot.provider === 'openai'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        }`}>
+                          {bot.provider ?? 'ollama'}
                         </span>
                       </td>
                       <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400 text-xs">

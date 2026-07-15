@@ -16,12 +16,51 @@ export interface BotType {
   context_strategy: string
 }
 
+/**
+ * LLM provider identifier stored on a bot record.
+ *
+ * - `"ollama"` — self-hosted Ollama instance; no API key required.
+ * - `"anthropic"` — Anthropic Claude API; requires `ANTHROPIC_API_KEY` on the backend.
+ * - `"openai"` — OpenAI or any OpenAI-compatible endpoint; requires `OPENAI_API_KEY`.
+ */
+export type LLMProvider = 'ollama' | 'anthropic' | 'openai'
+
+/** Human-readable label shown in the provider selector drop-down. */
+export const PROVIDER_LABELS: Record<LLMProvider, string> = {
+  ollama: 'Ollama (self-hosted)',
+  anthropic: 'Anthropic (Claude)',
+  openai: 'OpenAI / compatible',
+}
+
+/**
+ * Suggested model identifiers shown as autocomplete hints per provider.
+ * Users can type any valid model string; these are just starting points.
+ */
+export const PROVIDER_MODEL_HINTS: Record<LLMProvider, string[]> = {
+  ollama: [],  // populated at runtime from /api/model-status/installed
+  anthropic: [
+    'claude-sonnet-5',
+    'claude-opus-4-8',
+    'claude-haiku-4-5-20251001',
+  ],
+  openai: [
+    'gpt-4o',
+    'gpt-4o-mini',
+    'gpt-4-turbo',
+    // Groq — set OPENAI_BASE_URL=https://api.groq.com/openai/v1
+    'llama-3.3-70b-versatile',
+    'mixtral-8x7b-32768',
+  ],
+}
+
 /** Persisted bot configuration record including model, system prompt, and RBAC settings. */
 export interface Bot {
   id: string
   name: string
   description: string
   type: string
+  /** LLM backend this bot uses; defaults to `"ollama"` for existing bots. */
+  provider: LLMProvider
   model: string
   system_prompt: string
   icon: string
