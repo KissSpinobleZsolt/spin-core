@@ -80,7 +80,7 @@ docker compose up backend postgres clickhouse
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
 | `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
-| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` by `GET /api/settings/modules/discover` |
+| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` on startup (auto-discovery) and by `GET /api/settings/modules/discover` |
 
 ## Admin bootstrap
 
@@ -95,6 +95,8 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Modules (migration) | `settings.json` contains `modules` array | migrated to PostgreSQL; `settings.json` rewritten without `modules` |
 | Modules (seed) | `modules` table is empty after migration | seeded from `data/seed.json` |
 | Modules (discovery) | `MODULE_REGISTRY_URLS` is set | new scopes inserted; existing admin edits never overwritten |
+| Module bots (discovery) | new scope registered via discovery and manifest contains `bots` | `[spin-core] Provisioned bot '…' for module …` (idempotent — name+module_id guard) |
+| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning; best-effort (failure does not fail the create response) |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
 
@@ -156,7 +158,7 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 | `GET` | `/api/settings` | `AppSettings` (theme only) |
 | `PATCH` | `/api/settings/theme` | Update default theme |
 | `GET` | `/api/settings/modules` | List registered modules (from PostgreSQL) |
-| `POST` | `/api/settings/modules` | Create a module (also provisions ClickHouse log tables) |
+| `POST` | `/api/settings/modules` | Create a module (also provisions ClickHouse log tables and fetches manifest to auto-create module bots) |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
 | `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |

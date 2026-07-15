@@ -253,6 +253,34 @@ class PostgresAdapter:
                 result.append(self._bot_row_to_record(r))
             return result
 
+    def seed_bots_for_module(self, module_id: str, bots_data: list[dict], created_by: str = "") -> None:
+        for bot in bots_data:
+            name = bot.get("name", "").strip()
+            if not name:
+                continue
+            with self._session_ctx() as db:
+                exists = (
+                    db.query(BotRow)
+                    .filter(BotRow.name == name, BotRow.modules.contains([module_id]))
+                    .first()
+                )
+            if exists:
+                continue
+            self.create_bot(
+                name=name,
+                description=bot.get("description", ""),
+                type=bot.get("type", "communicator"),
+                model=bot.get("model", ""),
+                system_prompt=bot.get("system_prompt", ""),
+                icon=bot.get("icon", "🤖"),
+                active=bot.get("active", True),
+                restricted=bot.get("restricted", "user"),
+                modules=[module_id],
+                created_by=created_by,
+            )
+            import sys
+            print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)
+
     def get_bot_types(self) -> list[dict]:
         with self._session_ctx() as db:
             rows = db.query(BotTypeRow).order_by(BotTypeRow.name).all()
@@ -401,6 +429,11 @@ class PostgresAdapter:
     def get_module(self, module_id: str) -> dict | None:
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            return self._module_row_to_dict(row) if row else None
+
+    def get_module_by_scope(self, scope: str) -> dict | None:
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.scope == scope).first()
             return self._module_row_to_dict(row) if row else None
 
     def upsert_module(self, data: dict) -> dict:

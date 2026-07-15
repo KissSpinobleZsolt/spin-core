@@ -19,13 +19,15 @@ Mounted read-only into the backend container at `SEED_PATH` (`/app/seed-data/see
 }
 ```
 
-### `settings.modules` — module entries
+### `settings.modules` — module entries (optional)
 
-Each entry is inserted into the PostgreSQL `modules` table on first startup (skipped if the table is already populated). Fields:
+Each entry is inserted into the PostgreSQL `modules` table on first startup (skipped if the table is already populated). Module-specific configuration (including companion bots) should live in the module's own `manifest.json` rather than here — see "Module-carried bots" below.
+
+Fields:
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `id` | UUID string | No | Stable primary key. Set explicitly to pin a known UUID (required when seed bots must reference the module by ID). If omitted, a random UUID is generated on first creation. |
+| `id` | UUID string | No | Stable primary key. If omitted, a random UUID is generated. |
 | `name` | string | Yes | Display name shown in the sidebar |
 | `description` | string | No | Short description shown in the discovery panel and admin list |
 | `scope` | string | Yes | Webpack container scope — must match `name` in `webpack.config.js` |
@@ -37,26 +39,37 @@ Each entry is inserted into the PostgreSQL `modules` table on first startup (ski
 | `remote_url` | string | Yes | Browser-accessible URL of `remoteEntry.js` |
 | `presets` | object | No | `{ "i18n": {}, "layout": {}, "settings": {} }` — JSON blobs injected as props into the remote component |
 
-### Default hello-world entry
+### `bots` — global bot entries
+
+Each entry is inserted into the PostgreSQL `bots` table when the table is empty. Only add bots here that are not tied to a specific module (e.g. the "AI Assistant" with `"modules": ["core"]`). Module-specific bots belong in the module's `manifest.json` — they are created automatically when the module is registered.
+
+Fields: `name`, `description`, `type`, `model`, `system_prompt`, `icon`, `active`, `restricted`, `modules`.
+
+### Module-carried bots
+
+A module's `manifest.json` can declare its own bots in a top-level `bots` array:
 
 ```json
 {
-  "name": "Hello World",
-  "description": "Example federated micro-frontend module.",
-  "scope": "helloWorld",
-  "component": "./App",
-  "route": "hello-world",
-  "icon": "👋",
-  "enabled": true,
-  "roles": ["user", "admin"],
-  "remote_url": "http://hello-world/remoteEntry.js",
-  "presets": { "i18n": {}, "layout": {}, "settings": {} }
+  "scope": "myModule",
+  "bots": [
+    {
+      "name": "My Bot",
+      "type": "communicator",
+      "description": "…",
+      "model": "",
+      "system_prompt": "…",
+      "icon": "🤖",
+      "active": true,
+      "restricted": "user"
+    }
+  ]
 }
 ```
 
-### `bots` — bot entries
-
-Each entry is inserted into the PostgreSQL `bots` table when the table is empty. Fields: `name`, `description`, `type` (`chatbot` | `watchbot` | `tradebot` | `custom`), `model`, `system_prompt`, `icon`, `enabled`, `roles`.
+The backend provisions these bots automatically (idempotently, keyed on `name + module_id`) when:
+- The module is registered via `MODULE_REGISTRY_URLS` auto-discovery on startup.
+- The module is manually created via **Admin → Modules** (the backend fetches the manifest from `remote_url` after saving).
 
 ### `dashboard.content`
 

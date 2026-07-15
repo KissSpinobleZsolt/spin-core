@@ -112,6 +112,7 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
+      MODULE_REGISTRY_URLS: http://data-ingestion:80,http://hello-world:80
     volumes:
       - app_data:/app/data
       - ./data:/app/seed-data:ro

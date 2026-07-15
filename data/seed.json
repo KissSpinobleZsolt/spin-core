@@ -22,48 +22,12 @@
       "active": true,
       "restricted": "user",
       "modules": ["core"]
-    },
-    {
-      "name": "Ingestion Q&A",
-      "description": "Answers questions about data loaded into the Data Ingestion module.",
-      "type": "communicator",
-      "model": "",
-      "system_prompt": "You are a data assistant. Help users understand the data they have ingested: schema, quality issues, record counts, and field values. Be specific and concise.",
-      "icon": "🔍",
-      "active": true,
-      "restricted": "user",
-      "modules": ["d474a100-da7a-4000-8000-000000000001"]
-    },
-    {
-      "name": "Ingestion Monitor",
-      "description": "Monitors ingestion jobs and reports anomalies or failures.",
-      "type": "watcher",
-      "model": "",
-      "system_prompt": "You are a data pipeline monitor. Analyze ingestion run summaries and report anomalies, failures, or data quality issues in structured form.",
-      "icon": "👁️",
-      "active": true,
-      "restricted": "user",
-      "modules": ["d474a100-da7a-4000-8000-000000000001"]
     }
   ],
   "settings": {
     "theme": {
       "default_theme": "dark"
     },
-    "modules": [
-      {
-        "id": "d474a100-da7a-4000-8000-000000000001",
-        "name": "Data Ingestion",
-        "description": "Upload, process, and manage structured data sources for your workspace.",
-        "scope": "dataIngestion",
-        "component": "./App",
-        "route": "data-ingestion",
-        "icon": "📥",
-        "enabled": true,
-        "roles": ["user", "admin"],
-        "remote_url": "http://localhost:3002/remoteEntry.js",
-        "presets": { "i18n": {}, "layout": {}, "settings": {} }
-      }
-    ]
+    "modules": []
   }
 }

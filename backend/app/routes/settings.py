@@ -53,11 +53,23 @@ async def list_modules(_: str = Depends(admin_dep)):
 
 
 @router.post("/modules", status_code=201)
-async def create_module(payload: ModuleInput, _: str = Depends(admin_dep)):
-    module = get_pg().create_module(payload.model_dump())
+async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
+    pg = get_pg()
+    module = pg.create_module(payload.model_dump())
     ch = get_ch()
     ch.ensure_module_table(module["scope"])
     ch.ensure_module_mv(module["scope"])
+    try:
+        manifest_url = payload.remote_url.rsplit("/remoteEntry.js", 1)[0] + "/manifest.json"
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            resp = await client.get(manifest_url)
+            resp.raise_for_status()
+            manifest = resp.json()
+        bots_data = manifest.get("bots") or []
+        if bots_data:
+            pg.seed_bots_for_module(module["id"], bots_data, created_by=email)
+    except Exception:
+        pass
     return module
 
 

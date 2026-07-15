@@ -123,6 +123,11 @@ async def lifespan(app: FastAPI):
                         })
                         registered_scopes.add(scope)
                         print(f"[spin-core] Auto-discovered module: {scope}", file=sys.stderr)
+                        bots_from_manifest = m.get("bots") or []
+                        if bots_from_manifest:
+                            mod = pg.get_module_by_scope(scope)
+                            if mod:
+                                pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
                 except Exception as exc:
                     print(f"[spin-core] Discovery failed for {base_url}: {exc}", file=sys.stderr)
 
