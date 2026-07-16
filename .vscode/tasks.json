@@ -16,19 +16,27 @@
       "type": "pickString",
       "description": "Restart mode",
       "options": [
-        { "label": "clean restart all", "value": "--rebuild" },
-        { "label": "restart all", "value": "" },
-        { "label": "restart backend", "value": "backend" },
-        { "label": "restart frontend-dev", "value": "frontend-dev" },
-        { "label": "rebuild backend", "value": "--rebuild backend" },
-        { "label": "rebuild frontend-dev", "value": "--rebuild frontend-dev" }
+        { "label": "clean restart all",      "value": "--rebuild" },
+        { "label": "restart all",            "value": "" },
+        { "label": "restart backend",        "value": "backend" },
+        { "label": "restart frontend-dev",   "value": "frontend-dev" },
+        { "label": "rebuild backend",        "value": "--rebuild backend" },
+        { "label": "rebuild frontend-dev",   "value": "--rebuild frontend-dev" }
       ],
       "default": "clean restart all"
     }
   ],
   "tasks": [
 
-    // ── Core platform ────────────────────────────────────────────────────────────
+    // ── Infra + core ─────────────────────────────────────────────────────────────
+    //
+    // "BE"  — starts PostgreSQL, ClickHouse, Ollama, and the core FastAPI backend.
+    //         All their logs stream together in the Backend terminal.
+    // "FE"  — starts the Vite dev server (hot-reload, mounts frontend/src/).
+    //         Waits for the backend health check before starting.
+    //
+    // Run "DEV" to open both terminals at once, or "DEV + <Module>" to also
+    // open the module's webpack dev server in a third dedicated terminal.
 
     {
       "label": "Down",
@@ -44,36 +52,47 @@
       "presentation": { "reveal": "always", "panel": "shared", "close": false },
       "problemMatcher": []
     },
+
+    // Backend: infra (postgres, clickhouse, ollama) + core FastAPI — terminal 1
     {
       "label": "BE",
       "type": "shell",
       "command": "docker compose up --build backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "shared", "group": "dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "backend", "close": false },
       "problemMatcher": []
     },
+
+    // Waits silently until the backend health endpoint responds — used as a
+    // dependency so the FE task doesn't start before the API is ready.
     {
       "label": "Wait-BE",
       "type": "shell",
       "command": "until curl -sf http://localhost:8000/api/health > /dev/null; do sleep 1; done",
-      "presentation": { "reveal": "silent", "panel": "shared", "group": "dev", "close": true },
+      "presentation": { "reveal": "silent", "panel": "dedicated", "group": "backend", "close": true },
       "problemMatcher": []
     },
+
+    // Frontend dev: Vite hot-reload inside Docker (mounts frontend/src/) — terminal 2
     {
       "label": "FE",
       "type": "shell",
       "command": "docker compose up --build frontend-dev",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "shared", "group": "dev", "close": false },
       "dependsOn": ["Wait-BE"],
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "frontend", "close": false },
       "problemMatcher": []
     },
+
+    // Convenience: open BE + FE together (no module)
     {
       "label": "DEV",
+      "detail": "Start backend + frontend dev server (no module)",
       "dependsOn": ["BE", "FE"],
       "dependsOrder": "parallel",
       "problemMatcher": []
     },
+
     {
       "label": "deploy to kubectl",
       "type": "shell",
@@ -82,16 +101,20 @@
       "problemMatcher": []
     },
 
-    // ── Module: Hello World ──────────────────────────────────────────────────────
+    // ── Module: Hello World ───────────────────────────────────────────────────────
+    //
+    // Dev:  runs webpack-dev-server with hot reload on port 3001.
+    //       No plugin backend — frontend only.
+    // Prod: builds a Docker image from the local folder and serves it via nginx.
 
     {
       "label": "Hello World — dev",
-      "detail": "webpack serve (hot reload) from local folder — port 3001",
+      "detail": "webpack serve (hot reload) — port 3001",
       "type": "shell",
       "command": "npm install --prefer-offline && npm start",
       "options": { "cwd": "${workspaceFolder}/modules/hello-world" },
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
       "problemMatcher": []
     },
     {
@@ -100,7 +123,7 @@
       "type": "shell",
       "command": "docker compose up --build hello-world",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
       "problemMatcher": []
     },
     {
@@ -109,20 +132,24 @@
       "type": "shell",
       "command": "git -C modules/hello-world pull origin main && docker compose up --build hello-world",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
       "problemMatcher": []
     },
 
-    // ── Module: CloudInsight AI ──────────────────────────────────────────────────
+    // ── Module: CloudInsight AI ───────────────────────────────────────────────────
+    //
+    // Dev frontend:  webpack-dev-server on port 3002 (hot reload, no Docker build).
+    // Dev backend:   plugin FastAPI via docker compose on port 8002.
+    // Prod:          Docker images for both frontend and backend.
 
     {
       "label": "CloudInsight AI — dev",
-      "detail": "webpack serve (hot reload) from local folder — port 3002",
+      "detail": "webpack serve (hot reload) — port 3002",
       "type": "shell",
       "command": "npm install --prefer-offline && npm start",
-      "options": { "cwd": "${workspaceFolder}/modules/data-ingestion" },
+      "options": { "cwd": "${workspaceFolder}/modules/cloud-insight-ai" },
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-cloud-insight-ai", "close": false },
       "problemMatcher": []
     },
     {
@@ -131,38 +158,42 @@
       "type": "shell",
       "command": "docker compose up --build cloud-insight-ai-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-cloud-insight-ai", "close": false },
       "problemMatcher": []
     },
     {
       "label": "CloudInsight AI — prod (local)",
-      "detail": "Build Docker image from local folder and run on port 3002",
+      "detail": "Build Docker images from local folder — ports 3002 + 8002",
       "type": "shell",
       "command": "docker compose up --build cloud-insight-ai cloud-insight-ai-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-cloud-insight-ai", "close": false },
       "problemMatcher": []
     },
     {
       "label": "CloudInsight AI — prod (GitHub)",
-      "detail": "Pull latest from GitHub, build Docker images, run frontend + backend",
+      "detail": "Pull latest from GitHub, build Docker images — ports 3002 + 8002",
       "type": "shell",
-      "command": "git -C modules/data-ingestion pull origin main && docker compose up --build cloud-insight-ai cloud-insight-ai-backend",
+      "command": "git -C modules/cloud-insight-ai pull origin main && docker compose up --build cloud-insight-ai cloud-insight-ai-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-cloud-insight-ai", "close": false },
       "problemMatcher": []
     },
 
-    // ── Module: AnomaScan ────────────────────────────────────────────────────────
+    // ── Module: AnomaScan ─────────────────────────────────────────────────────────
+    //
+    // Dev frontend:  webpack-dev-server on port 3003 (hot reload, no Docker build).
+    // Dev backend:   plugin FastAPI via docker compose on port 8003 (YOLO inference).
+    // Prod:          Docker images for both frontend and backend.
 
     {
       "label": "AnomaScan — dev",
-      "detail": "webpack serve (hot reload) from local folder — port 3003",
+      "detail": "webpack serve (hot reload) — port 3003",
       "type": "shell",
       "command": "npm install --prefer-offline && npm start",
-      "options": { "cwd": "${workspaceFolder}/modules/vision-watch" },
+      "options": { "cwd": "${workspaceFolder}/modules/AnomaScan" },
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-anomascan", "close": false },
       "problemMatcher": []
     },
     {
@@ -171,29 +202,63 @@
       "type": "shell",
       "command": "docker compose up --build anomascan-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-dev", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-anomascan", "close": false },
       "problemMatcher": []
     },
     {
       "label": "AnomaScan — prod (local)",
-      "detail": "Build Docker images from local folder and run on ports 3003 + 8003",
+      "detail": "Build Docker images from local folder — ports 3003 + 8003",
       "type": "shell",
       "command": "docker compose up --build anomascan anomascan-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-anomascan", "close": false },
       "problemMatcher": []
     },
     {
       "label": "AnomaScan — prod (GitHub)",
-      "detail": "Pull latest from GitHub, build Docker images, run frontend + backend",
+      "detail": "Pull latest from GitHub, build Docker images — ports 3003 + 8003",
       "type": "shell",
-      "command": "git -C modules/vision-watch pull origin main && docker compose up --build anomascan anomascan-backend",
+      "command": "git -C modules/AnomaScan pull origin main && docker compose up --build anomascan anomascan-backend",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "modules-prod-gh", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-anomascan", "close": false },
       "problemMatcher": []
     },
 
-    // ── Compound: all modules ────────────────────────────────────────────────────
+    // ── Compound: DEV + one module ────────────────────────────────────────────────
+    //
+    // These are the main entry points for day-to-day module development.
+    // Each opens exactly 3 terminals:
+    //   1. Backend    — docker compose: postgres + clickhouse + ollama + core FastAPI
+    //   2. Frontend   — docker compose: Vite dev server (http://localhost:3000)
+    //   3. Module     — webpack-dev-server for the selected module + its plugin backend
+    //
+    // The platform auto-discovers the module from MODULE_REGISTRY_URLS on startup.
+    // Make sure the module's remote_entry in the DB points to the dev port
+    // (e.g. http://host.docker.internal:3002/remoteEntry.js for CloudInsight AI).
+
+    {
+      "label": "DEV + Hello World",
+      "detail": "Backend + Frontend + Hello World webpack dev server",
+      "dependsOn": ["BE", "FE", "Hello World — dev"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "DEV + CloudInsight AI",
+      "detail": "Backend + Frontend + CloudInsight AI webpack dev server + plugin backend",
+      "dependsOn": ["BE", "FE", "CloudInsight AI — dev", "CloudInsight AI — backend dev"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+    {
+      "label": "DEV + AnomaScan",
+      "detail": "Backend + Frontend + AnomaScan webpack dev server + plugin backend",
+      "dependsOn": ["BE", "FE", "AnomaScan — dev", "AnomaScan — backend dev"],
+      "dependsOrder": "parallel",
+      "problemMatcher": []
+    },
+
+    // ── All modules (batch) ───────────────────────────────────────────────────────
 
     {
       "label": "Modules: all — dev",
