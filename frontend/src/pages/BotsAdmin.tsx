@@ -10,7 +10,7 @@ import { Modal } from '../components/ui/Modal'
 import { Toggle } from '../components/ui/Toggle'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { PageTitle } from '../components/ui/PageTitle'
-import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
+import { BOT_TYPES, CUSTOM_ICONS, TYPE_BADGE } from '../constants/botConstants'
 import { type InstalledModelsData } from '../services/modelStatusService'
 
 // ---------------------------------------------------------------------------
@@ -76,16 +76,13 @@ function BotModal({
   function handleTypeChange(newType: string) {
     const bt = botTypes.find(t => t.name === newType)
     const clearCore = newType !== 'communicator'
-    if (!bt) {
-      setForm(f => ({ ...f, type: newType, modules: clearCore ? f.modules.filter(m => m !== 'core') : f.modules }))
-      return
-    }
     setForm(f => ({
       ...f,
       type: newType,
-      icon: bt.icon,
+      // For communicator, adopt its icon; for custom, keep current icon (user picks via picker)
+      ...(newType !== 'custom' && bt ? { icon: bt.icon } : {}),
       modules: clearCore ? f.modules.filter(m => m !== 'core') : f.modules,
-      ...(isNew ? {
+      ...(isNew && bt ? {
         system_prompt: f.system_prompt || bt.preprompt,
         model: f.model || bt.default_model,
       } : {}),
@@ -93,11 +90,9 @@ function BotModal({
   }
 
   useEffect(() => {
-    if (isNew && botTypes.length > 0) {
+    if (isNew && botTypes.length > 0 && form.type !== 'custom') {
       const bt = botTypes.find(t => t.name === form.type)
-      if (bt) {
-        setForm(f => ({ ...f, icon: bt.icon }))
-      }
+      if (bt) setForm(f => ({ ...f, icon: bt.icon }))
     }
   }, [botTypes])
 
@@ -136,13 +131,34 @@ function BotModal({
         <div>
           <Label>Type</Label>
           <div className="flex items-center gap-2">
-            <span className="text-xl leading-none">{currentBotType?.icon ?? form.icon}</span>
+            <span className="text-xl leading-none">{form.type === 'custom' ? form.icon : (currentBotType?.icon ?? form.icon)}</span>
             <div className="flex-1">
               <Select value={form.type} onChange={handleTypeChange}>
                 {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </Select>
             </div>
           </div>
+          {form.type === 'custom' && (
+            <div className="mt-2">
+              <Label>Icon</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {CUSTOM_ICONS.map(ic => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, icon: ic }))}
+                    className={`text-xl px-2 py-1 rounded-lg border transition-colors ${
+                      form.icon === ic
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
+                        : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-100 dark:bg-slate-700'
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
