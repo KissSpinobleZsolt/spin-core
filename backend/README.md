@@ -6,7 +6,7 @@ FastAPI backend for the spin-core platform.
 
 - **Framework**: FastAPI, Python 3.12, uvicorn
 - **Primary DB**: PostgreSQL 16 via SQLAlchemy + psycopg2 (users, pages, modules, i18n translations, module data)
-- **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event log + per-module log tables + refreshable materialized views)
+- **Log DB**: ClickHouse 24 via clickhouse-driver (append-only event logs — six fixed tables, no materialized views)
 - **Auth**: JWT via python-jose, password hashing via bcrypt
 - **LLM providers**: Ollama (self-hosted, default), Anthropic, and any OpenAI-compatible endpoint (Groq, Mistral, Azure, vLLM) — selected per-bot via the `provider` field; streamed via httpx
 - **Config**: `/app/data/settings.json` on a Docker / Kubernetes volume
@@ -17,9 +17,12 @@ Both databases are always initialised at startup via `init_db()`. Each has a fix
 
 ```
 get_pg()    → PostgresAdapter      — users, pages, bots, modules, i18n translations, module data
-get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_logs_mv()
-                                     ensure_module_table() / write_module_log()
-                                     query_module_logs() / query_module_logs_mv()
+get_ch()    → ClickHouseLogAdapter — write_api_log() / write_app_log() / write_user_log()
+                                     write_module_log() / write_bot_log() / write_notification()
+                                     query_api_logs() / query_api_logs_summary()
+                                     query_user_logs() / query_module_logs() / query_module_logs_summary()
+                                     query_bot_logs() / query_bot_logs_summary()
+                                     ensure_module_logs_table() / ensure_bot_logs_table()
 ```
 
 **PostgreSQL tables (SQLAlchemy ORM, auto-created by `init_db()`, incremental column additions via `_run_migrations()`):**
@@ -28,6 +31,7 @@ get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_
 |-------|-------------|
 | `users` | Auth users — email, hashed password, roles, theme preference |
 | `page_responses` | Dashboard page content (editable by admins) |
+| `page_registry` | Server-driven page config — route, title, roles, skeleton, enabled |
 | `bot_types` | Built-in bot type definitions — name, icon, description, preprompt, skills, tools, output_format, default_model, context_strategy |
 | `bots` | Bot configurations — name, type, model, system_prompt, icon, active, restricted, roles, modules, created_by |
 | `modules` | Registered MF modules — **source of truth** (not `settings.json`) |
@@ -36,20 +40,18 @@ get_ch()    → ClickHouseLogAdapter — write_log() / query_logs() / query_app_
 
 Every HTTP request is automatically appended to `app_logs` by the middleware in `main.py`.
 
-**ClickHouse tables created at startup:**
+**ClickHouse tables created at startup (six fixed tables, no materialized views):**
 
-| Table | Description |
-|-------|-------------|
-| `app_logs` | Every HTTP request — method, path, status, duration, user |
-| `app_logs_mv` | Refreshable MV — hourly aggregates of `app_logs` (request count, avg/max duration, error count). Rebuilt every 10 minutes. |
-| `module_{scope}_logs` | Per-module event log — created automatically when a module is registered |
-| `module_{scope}_logs_mv` | Refreshable MV — hourly aggregates per module (event count, unique users). Rebuilt every 10 minutes. |
-| `bot_{name}_logs` | Per-bot event log — created automatically when a bot is provisioned from a module manifest |
-| `bot_{name}_logs_mv` | Refreshable MV — hourly aggregates per bot (event count, unique users). Rebuilt every 10 minutes. |
-| `module_chatbot_logs` | Chat completions — provider, model, messages, response, token counts, duration |
-| `module_chatbot_logs_mv` | Refreshable MV — hourly chat aggregates (completion count, avg/total tokens, avg duration). Rebuilt every 10 minutes. |
+| Table | TTL | Description |
+|-------|-----|-------------|
+| `api_logs` | 30 days | Every HTTP request — method, path, status, duration, user |
+| `app_logs` | 30 days | Platform/system events — startup, config changes, background task results |
+| `user_logs` | 30 days | User lifecycle events — login, create, update, delete |
+| `module_logs` | 30 days | All module events in one table; `scope` column identifies the module. Table is ensured on module registration. |
+| `bot_logs` | 30 days | All bot events in one table; `bot_name` column identifies the bot. Chat completions are written here. Table is ensured on bot provisioning. |
+| `notifications` | 30 days | Platform notifications delivered via WebSocket (`/api/notifications/ws`) |
 
-All raw tables have a 30-day TTL. All `from`/`to` query params default to the start of the current month → now.
+All `from`/`to` query params default to the start of the current month → now.
 
 ## Running locally
 
@@ -83,7 +85,8 @@ docker compose up backend postgres clickhouse
 | `POSTGRES_URL` | `postgresql://core-postgres:core-postgres@db:5432/core-postgres` | Primary DB |
 | `CLICKHOUSE_URL` | `clickhouse://core-ch:core-ch@clickhouse:9000/core` | Event log DB |
 | `OLLAMA_URL` | `http://localhost:11434` | Ollama API base URL (K8s: injected from ConfigMap) |
-| `OLLAMA_MODEL` | `qwen2.5:7b` | Default model for `POST /api/chat` when no bot is selected or the bot has no model set |
+| `OLLAMA_MODEL` | `qwen2.5:7b` | Default model used by model-status checks; `POST /api/chat` falls back to this when no bot is selected |
+| `OLLAMA_EMBED_MODEL` | `nomic-embed-text:latest` | Embedding model checked by `GET /api/model-status` alongside `OLLAMA_MODEL` |
 | `ANTHROPIC_API_KEY` | _(empty)_ | Anthropic Claude API key — required for bots with `provider = "anthropic"`. Obtain at console.anthropic.com |
 | `OPENAI_API_KEY` | _(empty)_ | OpenAI API key — also used for Groq, Mistral, Azure OpenAI, and any other OpenAI-compatible endpoint |
 | `OPENAI_BASE_URL` | _(empty)_ | Override the OpenAI-compatible base URL (e.g. `https://api.groq.com/openai/v1`). Leave blank for `api.openai.com` |
@@ -105,12 +108,12 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Module i18n (discovery / manual create) | manifest contains `i18n` key | stored in `module.presets.i18n` snapshot; merged into `translations` table immediately |
 | Module bots (discovery) | new scope registered via discovery and manifest contains `bots` | `[spin-core] Provisioned bot '…' for module …` (idempotent — name+module_id guard) |
 | Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning + i18n merge; best-effort (failure does not fail the create response) |
-| Bot ClickHouse tables | bot provisioned from manifest (discovery or manual create) | `bot_{name}_logs` table + `bot_{name}_logs_mv` created; also ensured for all existing bots at every startup |
+| Bot ClickHouse tables | bot provisioned from manifest (discovery or manual create) | `bot_logs` table ensured (shared table; `bot_name` column scopes rows per bot); also ensured for all existing bots at every startup |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
 | Daily log purge (background task) | always started; first run after 24 h | `[spin-core] Daily log purge: N table(s) optimized` |
 
-**Startup order:** migration → seed → discovery → i18n merge → ClickHouse table provisioning (one table + MV per registered module) → background tasks (model tracker + daily log purge).
+**Startup order:** migration → seed → discovery → i18n merge → ClickHouse table provisioning (module_logs + bot_logs ensured for all registered modules/bots) → background tasks (model tracker + daily log purge).
 
 Default values for dashboard content, bots, theme, and modules come from **`./data/seed.json`** (mounted read-only at `SEED_PATH`). Edit that file before first run to customise defaults. If the file is absent or malformed, the backend falls back to built-in defaults and logs a warning.
 
@@ -238,7 +241,7 @@ CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
 
 ### Chat (AI assistant)
 
-Streams responses from the bot's configured LLM provider. Every completed conversation is persisted to `module_chatbot_logs` in ClickHouse.
+Streams responses from the bot's configured LLM provider. Every completed conversation is persisted to `bot_logs` in ClickHouse.
 
 **Supported providers** (set per-bot in the `provider` field):
 
@@ -252,7 +255,7 @@ Streams responses from the bot's configured LLM provider. Every completed conver
 |--------|------|------|-------------|
 | `POST` | `/api/chat` | Bearer | Send a message list, receive a streaming NDJSON response |
 | `GET` | `/api/chat/logs` | Admin | Paginated chat completion history. Params: `from`, `to`, `user_email`, `limit`, `offset`. Returns `{items, total}`. |
-| `GET` | `/api/chat/logs/summary` | Admin | Hourly aggregates from `module_chatbot_logs_mv`. Params: `from`, `to`. Returns `{items, total}`. |
+| `GET` | `/api/chat/logs/summary` | Admin | Hourly aggregates from `bot_logs`. Params: `from`, `to`. Returns `{items, total}`. |
 
 Request body for `POST /api/chat`:
 ```json
@@ -295,6 +298,28 @@ Forwards REST requests to a module's own backend service. The module must have `
 
 The `Authorization` header is forwarded verbatim — module backends validate the same `JWT_SECRET_KEY`. WebSocket connections (e.g. for progress notifications) connect directly from the module frontend to the module backend URL passed via `presets.settings.backend_url`.
 
+### Bot logs (admin)
+
+Per-bot event log stored in the `bot_logs` ClickHouse table (single table; `bot_name` column identifies the bot).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/bot-logs/{bot_id}` | Admin | Raw bot log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
+| `GET` | `/api/bot-logs/{bot_id}/summary` | Admin | Hourly aggregates. Params: `from`, `to`, `event_type`, `limit`, `offset`. Returns `{items, total}`. |
+
+### Pages (server-driven config)
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/pages/config?route=…` | Bearer | Return the `page_registry` entry for the given route (title, roles, skeleton, enabled). |
+| `PATCH` | `/api/pages/config?route=…` | Admin | Update title, roles, skeleton, or enabled flag for the given route. |
+
+### Notifications
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `WS` | `/api/notifications/ws?token=…` | Bearer (query param) | WebSocket stream — polls ClickHouse every 5 s and pushes new notifications as a JSON array. |
+
 ## Project structure
 
 ```
@@ -326,8 +351,11 @@ backend/
 │       ├── health.py         # /api/health — DB liveness checks
 │       ├── plugin_proxy.py   # /api/plugin/{scope}/{path} — forwards to module backend_url
 │       ├── bots.py           # /api/bots — bot CRUD (stored in PostgreSQL)
+│       ├── bot_logs.py       # /api/bot-logs/{bot_id} — per-bot ClickHouse log read
 │       ├── model_status.py   # /api/model-status — Ollama readiness, installed models, pull/delete, SSE stream
-│       └── chat.py           # /api/chat — streaming LLM proxy, bot system prompt injection
+│       ├── chat.py           # /api/chat — streaming LLM proxy, bot system prompt injection
+│       ├── pages.py          # /api/pages/config — server-driven page registry CRUD
+│       └── notifications.py  # /api/notifications/ws — WebSocket notification stream
 ├── requirements.txt
 └── Dockerfile         # single pip install layer — core deps only (no ML libraries)
 ```
