@@ -100,6 +100,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    depends_on:
+      cloud-insight-ai-backend:
+        condition: service_started
     restart: unless-stopped
 
   anomascan:
@@ -111,6 +114,9 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    depends_on:
+      anomascan-backend:
+        condition: service_started
     restart: unless-stopped
 
   # ── Module backend services (plugin backends — each module owns its deps) ────
@@ -129,11 +135,6 @@ services:
       CLICKHOUSE_USER: core-ch
       CLICKHOUSE_PASSWORD: core-ch
       CLICKHOUSE_DB: core
-    depends_on:
-      postgres:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
     restart: unless-stopped
 
   anomascan-backend:
@@ -150,11 +151,6 @@ services:
       YOLO_MODELS_DIR: /app/vision-models
     volumes:
       - vision_model_weights:/app/vision-models
-    depends_on:
-      postgres:
-        condition: service_healthy
-      clickhouse:
-        condition: service_healthy
     restart: unless-stopped
 
   # ── Core platform ─────────────────────────────────────────────────────────────
