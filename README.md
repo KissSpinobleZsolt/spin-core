@@ -44,57 +44,163 @@ New to running Docker with an NVIDIA GPU on Windows? See **[GUIDE.md](GUIDE.md)*
 
 > If you already have Docker + GPU working, skip straight to Quick start below.
 
-## Quick start
+## First-time setup
 
-### Clone (with submodules)
+### Prerequisites
+
+You do not need every tool listed below — install only what matches your chosen run mode.
+
+| Tool | Min version | Install | Required for |
+|------|------------|---------|--------------|
+| **Git** | 2.x | [git-scm.com](https://git-scm.com) | All modes |
+| **Docker + Compose** | 24 + v2 plugin | [docs.docker.com](https://docs.docker.com/get-docker/) | Docker · Prod |
+| **nvm** | — | [github.com/nvm-sh/nvm](https://github.com/nvm-sh/nvm) | Dev (frontend) |
+| **Node.js** | 20 LTS | via nvm: `nvm install 20` | Dev (frontend) |
+| **pnpm** | 9 | `npm i -g pnpm` | Dev (frontend) |
+| **Python** | 3.12 | [python.org](https://www.python.org/downloads/) | Dev (backend) |
+| **kubectl** | 1.28 | [kubernetes.io/docs/tasks/tools](https://kubernetes.io/docs/tasks/tools/) | Prod (k8s) |
+| **minikube** | 1.32 | [minikube.sigs.k8s.io](https://minikube.sigs.k8s.io/docs/start/) | Prod (local cluster) |
+
+> **GPU (optional):** Ollama runs on CPU but is significantly faster with an NVIDIA GPU. See [GUIDE.md](GUIDE.md) for WSL2 + NVIDIA Container Toolkit setup.
+
+---
+
+### Step 1 — Clone
 
 ```bash
 git clone --recurse-submodules https://github.com/KissSpinobleZsolt/spin-core.git
-# or, if you already cloned without --recurse-submodules:
+cd spin-core
+```
+
+If you already cloned without `--recurse-submodules`:
+
+```bash
 bash scripts/setup-workspace.sh
 ```
 
-See [`workspace.yml`](workspace.yml) for the full multi-repo layout.
+---
 
-### Development (hot reload)
+### Step 2 — Configure
 
-```bash
-docker compose up --build frontend-dev
+Open `docker-compose.yml` and set these values before the first run:
+
+```yaml
+ADMIN_EMAIL:    admin@spin.local   # login email
+ADMIN_PASSWORD: change-me          # login password — change before deploying
+JWT_SECRET_KEY: change-me-in-production
 ```
 
-Starts everything in dependency order. Open [http://localhost:3000](http://localhost:3000).
+> Default credentials are intentionally weak. Change them before exposing the app on any network.
 
-### Production
+To customise the seeded bots, dashboard content, or default theme, edit [`data/seed.json`](data/seed.json) before running. Changes only apply on first start (or after `docker compose down -v`).
+
+---
+
+### Step 3 — Run
+
+Pick **one** of the three modes below. You do not need to run all three.
+
+---
+
+#### 🐳 Docker (recommended — one command, no local installs needed)
+
+Builds and starts every service. Best for trying the full platform or running all modules.
 
 ```bash
 docker compose up --build
 ```
 
-### Kubernetes (minikube)
+> On first run Ollama downloads `qwen2.5:7b` (~4.7 GB). This takes 15–60 min depending on your connection. Subsequent starts are instant — the model is cached in the `ollama_data` Docker volume.
+
+All services start in dependency order. Open **http://localhost:3000** and log in.
+
+To run a single module alongside the core (without rebuilding everything):
 
 ```bash
-cp k8s/.env.example k8s/.env   # fill in credentials
+# Terminal 1 — core backend + infra
+docker compose up --build backend
+
+# Terminal 2 — frontend dev server
+docker compose up --build frontend-dev
+
+# Terminal 3 — one module (example: CloudInsight AI)
+cd modules/cloud-insight-ai && npm install && npm start
+```
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the full 3-terminal module dev workflow and the VSCode task shortcuts.
+
+---
+
+#### 💻 Dev — native Python + pnpm (fastest iteration, no Docker for core)
+
+Run each service directly on the host. Best for active backend or frontend development with instant restarts.
+
+You still need Docker for the databases and Ollama:
+
+```bash
+# Start only the infrastructure services
+docker compose up postgres clickhouse ollama
+```
+
+**Backend:**
+
+```bash
+cd backend
+python -m venv .venv && source .venv/bin/activate
+pip install -r requirements.txt
+uvicorn app.main:app --reload --port 8000
+```
+
+**Frontend** (in a second terminal):
+
+```bash
+cd frontend
+pnpm install
+pnpm dev        # Vite dev server on http://localhost:3000
+```
+
+The backend reads `POSTGRES_URL`, `CLICKHOUSE_HOST`, and `OLLAMA_BASE_URL` from the environment. When running natively they default to `localhost` — no extra config needed if you used the docker compose infra step above.
+
+---
+
+#### ☸️ Prod — Kubernetes / minikube
+
+Deploy to a local cluster. Best for testing the production manifest before a real deployment.
+
+```bash
+# Start minikube
 minikube start --driver=docker
+
+# Copy and fill in credentials
+cp k8s/.env.example k8s/.env
+
+# Deploy
 bash scripts/k8s-deploy.sh
 ```
 
-See [k8s/README.md](k8s/README.md) for the full deploy guide, day-to-day ops, and model downloading.
+See [k8s/README.md](k8s/README.md) for the full deploy guide, secrets management, day-to-day ops, and pulling Ollama models inside the cluster.
 
-## First-time login
+---
 
-There is no setup wizard. The backend seeds an admin user on first startup from env vars:
+### First-time login
 
-| Variable | Docker default | Description |
-|----------|---------------|-------------|
-| `ADMIN_EMAIL` | `admin@spin.local` | Login email — **change before deploying** |
-| `ADMIN_PASSWORD` | `change-me` | Password — **change before deploying** |
-| `ADMIN_NAME` | `Admin` | Display name |
+There is no setup wizard — the admin user is seeded automatically on first backend startup.
 
-Go to `/login` and sign in. The seed is idempotent — subsequent restarts skip it if the email already exists.
+Default credentials (set in `docker-compose.yml`):
 
-To customise first-run defaults (bots, dashboard content, theme), edit **`./data/seed.json`** before running `docker compose up`.
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ADMIN_EMAIL` | `admin@spin.local` | Login email |
+| `ADMIN_PASSWORD` | `change-me` | Login password |
 
-To start fresh: `docker compose down -v`
+Go to **http://localhost:3000/login** and sign in with the above credentials.
+
+To start completely fresh (wipe all data and re-seed):
+
+```bash
+docker compose down -v
+docker compose up --build
+```
 
 ## Package documentation
 
