@@ -14,15 +14,72 @@ This project is open to everyone — students, interns, researchers, and develop
 
 ## Running the project
 
-**Development (Docker Compose):**
+### Full stack (all modules, production images)
 
 ```bash
-docker compose up
+docker compose up --build
 ```
 
-Frontend is served at `http://localhost:3000`, backend at `http://localhost:8000`.
+Starts every service defined in `docker-compose.yml`. Frontend at `http://localhost:3000`, backend at `http://localhost:8000`. Use this to verify the full platform before submitting a PR.
 
-**Cluster (minikube / Kubernetes):**
+### Module development — 3-terminal workflow
+
+When working on a single module you only need three terminals. The fastest way is through the built-in **VSCode tasks** (`Terminal → Run Task` or `Ctrl+Shift+P → Tasks: Run Task`):
+
+| Task | What it opens |
+|------|---------------|
+| `DEV + Hello World` | Backend · Frontend · Hello World webpack dev |
+| `DEV + CloudInsight AI` | Backend · Frontend · CloudInsight AI webpack dev + plugin backend |
+| `DEV + AnomaScan` | Backend · Frontend · AnomaScan webpack dev + plugin backend |
+
+Each compound task opens **3 dedicated terminal panels** simultaneously:
+
+```
+Terminal 1 — Backend
+  docker compose up backend
+  → PostgreSQL, ClickHouse, Ollama, core FastAPI (http://localhost:8000)
+
+Terminal 2 — Frontend
+  docker compose up frontend-dev
+  → Vite dev server with hot reload (http://localhost:3000)
+
+Terminal 3 — Module
+  npm start          (in modules/<your-module>/)
+  → webpack-dev-server with hot reload (http://localhost:300X)
+  docker compose up <module>-backend   [if the module has a plugin backend]
+  → plugin FastAPI (http://localhost:800X)
+```
+
+The `BE` task waits for the backend health check before starting the frontend, so you can safely run everything in parallel.
+
+**Connecting the dev module to the platform**
+
+The backend auto-discovers modules from Docker service names (`MODULE_REGISTRY_URLS`). When running the module's webpack dev server on the host instead, you need to point the platform at the host's port. In **Admin → Modules**, edit the module and set its Remote URL to:
+
+```
+http://host.docker.internal:<port>/remoteEntry.js
+```
+
+e.g. `http://host.docker.internal:3002/remoteEntry.js` for CloudInsight AI. This lets the backend (inside Docker) reach the webpack dev server running on the host.
+
+**Manual terminal alternative**
+
+If you prefer plain terminals over VSCode tasks:
+
+```bash
+# Terminal 1 — backend + infra
+docker compose up --build backend
+
+# Terminal 2 — frontend dev (after backend is healthy)
+docker compose up --build frontend-dev
+
+# Terminal 3 — module (example: CloudInsight AI)
+cd modules/cloud-insight-ai && npm install && npm start
+# if it has a plugin backend, in a 4th terminal:
+docker compose up --build cloud-insight-ai-backend
+```
+
+### Cluster (minikube / Kubernetes)
 
 ```bash
 minikube start
