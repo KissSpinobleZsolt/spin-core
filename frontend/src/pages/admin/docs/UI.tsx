@@ -1,5 +1,6 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
+import { DocPageShell } from '../../../components/layout/DocPageShell'
 import { Input } from '../../../components/ui/Input'
 
 interface Prop {
@@ -181,6 +182,38 @@ const DOCS: ComponentDoc[] = [
   },
 ]
 
+const IDS = DOCS.map(d => d.name.toLowerCase())
+
+function useActiveSection(ids: string[]): string {
+  const [active, setActive] = useState(ids[0] ?? '')
+
+  useEffect(() => {
+    // root = <main> because that element carries overflow-y:auto; default viewport root would miss scroll events
+    const root = document.querySelector('main')
+    const visible = new Set<string>()
+
+    const observers = ids.map(id => {
+      const el = document.getElementById(id)
+      if (!el) return null
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) visible.add(id)
+          else visible.delete(id)
+          const first = ids.find(i => visible.has(i))
+          if (first) setActive(first)
+        },
+        { root, rootMargin: '0px 0px -60% 0px', threshold: 0 },
+      )
+      obs.observe(el)
+      return obs
+    })
+
+    return () => observers.forEach(o => o?.disconnect())
+  }, [ids])
+
+  return active
+}
+
 function PropTable({ props }: { props: Prop[] }) {
   return (
     <div className="overflow-x-auto">
@@ -248,8 +281,10 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
 
 export default function DocsUI() {
   const [query, setQuery] = useState('')
+  const active = useActiveSection(IDS)
 
-  const filtered = query.trim()
+  const searching = query.trim() !== ''
+  const filtered = searching
     ? DOCS.filter(d =>
         d.name.toLowerCase().includes(query.toLowerCase()) ||
         d.description.toLowerCase().includes(query.toLowerCase()),
@@ -257,7 +292,7 @@ export default function DocsUI() {
     : DOCS
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <DocPageShell maxWidth="max-w-5xl">
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <PageTitle>UI Components</PageTitle>
@@ -270,27 +305,41 @@ export default function DocsUI() {
         </div>
       </div>
 
-      {!query && (
-        <div className="flex flex-wrap gap-2">
-          {DOCS.map(d => (
-            <a
-              key={d.name}
-              href={`#${d.name.toLowerCase()}`}
-              className="text-xs px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:bg-blue-100 dark:hover:bg-blue-900/30 hover:text-blue-700 dark:hover:text-blue-400 transition-colors"
-            >
-              {d.name}
-            </a>
-          ))}
-        </div>
-      )}
+      <div className="flex gap-8 items-start">
+        {!searching && (
+          <nav className="w-40 shrink-0 sticky top-0 self-start">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Components</p>
+            <ul className="space-y-0.5">
+              {DOCS.map(d => {
+                const id = d.name.toLowerCase()
+                const isActive = active === id
+                return (
+                  <li key={id}>
+                    <a
+                      href={`#${id}`}
+                      className={`flex items-center gap-2 px-2 py-1.5 rounded-md text-sm transition-colors ${
+                        isActive
+                          ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium'
+                          : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800'
+                      }`}
+                    >
+                      <span className={`w-1.5 h-1.5 rounded-full shrink-0 transition-colors ${isActive ? 'bg-blue-500' : 'bg-slate-200 dark:bg-slate-700'}`} />
+                      {d.name}
+                    </a>
+                  </li>
+                )
+              })}
+            </ul>
+          </nav>
+        )}
 
-      {filtered.length === 0 ? (
-        <p className="text-sm text-slate-500 text-center py-12">No components match "{query}"</p>
-      ) : (
-        <div className="space-y-5">
-          {filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />)}
+        <div className="flex-1 min-w-0 space-y-5">
+          {filtered.length === 0
+            ? <p className="text-sm text-slate-500 text-center py-12">No components match "{query}"</p>
+            : filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />)
+          }
         </div>
-      )}
-    </div>
+      </div>
+    </DocPageShell>
   )
 }

@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import { PageTitle } from '../../components/ui/PageTitle'
+import { AdminPageShell } from '../../components/layout/AdminPageShell'
+import { DocPageShell } from '../../components/layout/DocPageShell'
 import { Tabs } from '../../components/ui/Tabs'
 import { Card } from '../../components/ui/Card'
 import { Btn } from '../../components/ui/Button'
@@ -218,26 +220,66 @@ function CloudInsightAILayout() {
   )
 }
 
+// ─── Shell demos ──────────────────────────────────────────────────────────────
+
+function AdminShellDemo() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">
+        <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">AdminPageShell</code>
+        {' '}constrains width and stacks children with <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">space-y-6</code>.
+        Pass <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">maxWidth</code> to override (default <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">max-w-4xl</code>).
+      </p>
+      <AdminPageShell maxWidth="max-w-2xl">
+        <Card><p className="text-sm text-slate-600 dark:text-slate-300">First card — <code className="font-mono text-xs">max-w-2xl</code></p></Card>
+        <Card><p className="text-sm text-slate-600 dark:text-slate-300">Second card — same gap as every admin page</p></Card>
+        <Card><p className="text-sm text-slate-600 dark:text-slate-300">Third card — no extra wrapper needed</p></Card>
+      </AdminPageShell>
+    </div>
+  )
+}
+
+function DocShellDemo() {
+  return (
+    <div className="space-y-4">
+      <p className="text-sm text-slate-500">
+        <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">DocPageShell</code>
+        {' '}adds <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">p-6</code> and centres the column.
+        Props: <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">maxWidth</code> (default <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">max-w-4xl</code>),
+        {' '}<code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">gap</code> (default <code className="font-mono text-xs bg-slate-100 dark:bg-slate-800 px-1.5 py-0.5 rounded">space-y-6</code>).
+      </p>
+      <DocPageShell maxWidth="max-w-2xl">
+        <Card><p className="text-sm text-slate-600 dark:text-slate-300">Padded + centred — like every docs page</p></Card>
+        <Card><p className="text-sm text-slate-600 dark:text-slate-300">Same shell used by Api, UI, Deployment, Components</p></Card>
+      </DocPageShell>
+    </div>
+  )
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 const LAYOUT_TABS = [
-  { key: 'vision',   label: '👁️ Anoma Scan' },
-  { key: 'ingestion',label: '📥 Cloud Insight AI' },
+  { key: 'vision',    label: '👁️ Anoma Scan' },
+  { key: 'ingestion', label: '📥 Cloud Insight AI' },
+  { key: 'admin',     label: '🗂️ AdminPageShell' },
+  { key: 'doc',       label: '📄 DocPageShell' },
 ]
 
 export default function Layouts() {
   const [active, setActive] = useState('vision')
 
   return (
-    <div className="p-6 max-w-5xl mx-auto space-y-6">
+    <DocPageShell maxWidth="max-w-5xl">
       <PageTitle>Layouts</PageTitle>
 
       <Tabs tabs={LAYOUT_TABS} active={active} onChange={setActive} />
 
       <div className="pt-2">
-        {active === 'vision'   && <AnomaScanLayout />}
+        {active === 'vision'    && <AnomaScanLayout />}
         {active === 'ingestion' && <CloudInsightAILayout />}
+        {active === 'admin'     && <AdminShellDemo />}
+        {active === 'doc'       && <DocShellDemo />}
       </div>
-    </div>
+    </DocPageShell>
   )
 }

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PageTitle } from '../../components/ui/PageTitle'
+import { DocPageShell } from '../../components/layout/DocPageShell'
 import { Btn } from '../../components/ui/Button'
 import { Card } from '../../components/ui/Card'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
@@ -37,7 +38,7 @@ export default function Components() {
   const [droppedFile, setDroppedFile] = useState<File | null>(null)
 
   return (
-    <div className="p-6 max-w-3xl mx-auto space-y-8">
+    <DocPageShell maxWidth="max-w-3xl" gap="space-y-8">
       <PageTitle>UI Components</PageTitle>
 
       <Section title="Button">
@@ -189,6 +190,6 @@ export default function Components() {
           )}
         </div>
       </Section>
-    </div>
+    </DocPageShell>
   )
 }

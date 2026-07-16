@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
+import { DocPageShell } from '../../../components/layout/DocPageShell'
 import { Input } from '../../../components/ui/Input'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -218,7 +219,7 @@ export default function DocsApi() {
     : GROUPS
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <DocPageShell>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <PageTitle>API Reference</PageTitle>
@@ -268,6 +269,6 @@ export default function DocsApi() {
           {filtered.map(g => <GroupCard key={g.id} group={g} />)}
         </div>
       )}
-    </div>
+    </DocPageShell>
   )
 }

@@ -15,6 +15,7 @@ import { StatCard } from '../../components/ui/StatCard'
 import { Spinner } from '../../components/ui/Spinner'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { PageTitle } from '../../components/ui/PageTitle'
+import { AdminPageShell } from '../../components/layout/AdminPageShell'
 
 function Textarea({
   value,
@@ -454,7 +455,7 @@ export default function Modules() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <AdminPageShell>
       <PageTitle>Modules</PageTitle>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
@@ -586,6 +587,6 @@ export default function Modules() {
       {logsModule && (
         <ModuleLogsDrawer module={logsModule} onClose={() => setLogsModule(null)} />
       )}
-    </div>
+    </AdminPageShell>
   )
 }

@@ -7,6 +7,7 @@ import { ChatBubble } from '../chat/ChatBubble';
 import { ModelStatusBanner } from './ModelStatusBanner';
 import { WorkspaceTermsModal } from '../WorkspaceTermsModal';
 import { Spinner } from '../ui/Spinner';
+import { PageLoaderProvider } from '../../context/PageLoaderContext';
 
 export default function Layout() {
   return (
@@ -17,7 +18,9 @@ export default function Layout() {
         <ModelStatusBanner />
         <main className="flex-1 overflow-y-auto p-6">
           <Suspense fallback={<div className="flex items-center justify-center py-20"><Spinner /></div>}>
-            <Outlet />
+            <PageLoaderProvider>
+              <Outlet />
+            </PageLoaderProvider>
           </Suspense>
         </main>
         <Footer />

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
+import { DocPageShell } from '../../../components/layout/DocPageShell'
 import { Tabs } from '../../../components/ui/Tabs'
 import { Card } from '../../../components/ui/Card'
 
@@ -294,7 +295,7 @@ export default function DocsDeployment() {
   const [tab, setTab] = useState('docker')
 
   return (
-    <div className="p-6 max-w-4xl mx-auto space-y-6">
+    <DocPageShell>
       <div>
         <PageTitle>Deployment</PageTitle>
         <p className="text-sm text-slate-500 mt-1">
@@ -308,6 +309,6 @@ export default function DocsDeployment() {
         {tab === 'docker' && <DockerTab />}
         {tab === 'k8s'    && <KubernetesTab />}
       </div>
-    </div>
+    </DocPageShell>
   )
 }

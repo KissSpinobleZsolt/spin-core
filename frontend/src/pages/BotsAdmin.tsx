@@ -1,4 +1,5 @@
 import { type ReactNode, useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   botsService, type Bot, type BotPayload, type BotType, type LLMProvider,
   PROVIDER_LABELS, PROVIDER_MODEL_HINTS,
@@ -19,6 +20,7 @@ import { StatCard } from '../components/ui/StatCard'
 import { Spinner } from '../components/ui/Spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { PageTitle } from '../components/ui/PageTitle'
+import { Table, type TableColumn } from '../components/ui/Table'
 import { BOT_TYPES, CUSTOM_ICONS } from '../constants/botConstants'
 
 // ---------------------------------------------------------------------------
@@ -430,8 +432,7 @@ function BotLogsDrawer({ bot, onClose }: { bot: Bot; onClose: () => void }) {
 // ---------------------------------------------------------------------------
 
 export default function BotsAdmin() {
-  const [modal, setModal] = useState<'add' | Bot | null>(null)
-  const [logsBot, setLogsBot] = useState<Bot | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
   const [error, setError] = useState<string | null>(null)
 
   const { data: bots = [], isLoading, isError, refetch } = useGet<Bot[]>(
@@ -450,14 +451,33 @@ export default function BotsAdmin() {
   )
   const installedModules = allModules.filter(m => m.enabled)
 
+  const isAdding = searchParams.has('new')
+  const editBotId = searchParams.get('edit')
+  const logsBotId = searchParams.get('logs')
+  const editBot = bots.find(b => b.id === editBotId)
+  const logsBot = bots.find(b => b.id === logsBotId)
+
+  function closeModal() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('new')
+    next.delete('edit')
+    setSearchParams(next, { replace: true })
+  }
+
+  function closeLogs() {
+    const next = new URLSearchParams(searchParams)
+    next.delete('logs')
+    setSearchParams(next, { replace: true })
+  }
+
   async function handleSave(payload: BotPayload) {
-    if (modal === 'add') {
+    if (isAdding) {
       await botsService.createBot(payload)
-    } else if (modal && typeof modal === 'object') {
-      await botsService.updateBot(modal.id, payload)
+    } else if (editBot) {
+      await botsService.updateBot(editBot.id, payload)
     }
     await refetch()
-    setModal(null)
+    closeModal()
   }
 
   async function handleDelete(bot: Bot) {
@@ -481,6 +501,76 @@ export default function BotsAdmin() {
     }
   }
 
+  const columns: TableColumn<Bot>[] = [
+    {
+      key: 'bot',
+      header: 'Bot',
+      cell: bot => (
+        <>
+          <span className="mr-2">{bot.icon}</span>
+          <span className="font-medium text-slate-800 dark:text-white">{bot.name}</span>
+          {bot.description && (
+            <span className="ml-2 text-slate-400 dark:text-slate-500 text-xs truncate max-w-[160px] inline-block align-middle">
+              {bot.description}
+            </span>
+          )}
+        </>
+      ),
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      cell: bot => (
+        <Badge variant={bot.type === 'communicator' ? 'info' : 'neutral'}>
+          {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
+        </Badge>
+      ),
+    },
+    {
+      key: 'provider',
+      header: 'Provider',
+      className: 'text-xs',
+      cell: bot => (
+        <Badge variant={bot.provider === 'anthropic' ? 'warn' : bot.provider === 'openai' ? 'success' : 'neutral'}>
+          {bot.provider ?? 'ollama'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'model',
+      header: 'Model',
+      className: 'font-mono text-slate-500 dark:text-slate-400 text-xs',
+      cell: bot => bot.model || <span className="italic">default</span>,
+    },
+    {
+      key: 'created_by',
+      header: 'Created by',
+      className: 'text-slate-500 dark:text-slate-400 text-xs',
+      cell: bot => (
+        <span className="truncate max-w-[140px] block">
+          {bot.created_by || <span className="italic">system</span>}
+        </span>
+      ),
+    },
+    {
+      key: 'active',
+      header: 'Active',
+      cell: bot => (
+        <Toggle checked={bot.active} onChange={() => handleToggle(bot)} disabled={bot.modules.length === 0} />
+      ),
+    },
+    {
+      key: 'actions',
+      cell: bot => (
+        <div className="flex gap-2">
+          <Btn variant="secondary" onClick={() => setSearchParams({ logs: bot.id })}>Logs</Btn>
+          <Btn variant="secondary" onClick={() => setSearchParams({ edit: bot.id })}>Edit</Btn>
+          <Btn variant="danger" onClick={() => handleDelete(bot)}>Delete</Btn>
+        </div>
+      ),
+    },
+  ]
+
   return (
     <div className="max-w-5xl space-y-6">
       <PageTitle>Bots</PageTitle>
@@ -491,82 +581,27 @@ export default function BotsAdmin() {
 
       {!isLoading && !isError && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
-          {bots.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">No bots configured yet.</p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                    <th className="pb-2 pr-4">Bot</th>
-                    <th className="pb-2 pr-4">Type</th>
-                    <th className="pb-2 pr-4">Provider</th>
-                    <th className="pb-2 pr-4">Model</th>
-                    <th className="pb-2 pr-4">Created by</th>
-                    <th className="pb-2 pr-4">Active</th>
-                    <th className="pb-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                  {bots.map(bot => (
-                    <tr key={bot.id}>
-                      <td className="py-2 pr-4">
-                        <span className="mr-2">{bot.icon}</span>
-                        <span className="font-medium text-slate-800 dark:text-white">{bot.name}</span>
-                        {bot.description && (
-                          <span className="ml-2 text-slate-400 dark:text-slate-500 text-xs truncate max-w-[160px] inline-block align-middle">
-                            {bot.description}
-                          </span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Badge variant={bot.type === 'communicator' ? 'info' : 'neutral'}>
-                          {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 text-xs">
-                        <Badge variant={bot.provider === 'anthropic' ? 'warn' : bot.provider === 'openai' ? 'success' : 'neutral'}>
-                          {bot.provider ?? 'ollama'}
-                        </Badge>
-                      </td>
-                      <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400 text-xs">
-                        {bot.model || <span className="italic">default</span>}
-                      </td>
-                      <td className="py-2 pr-4 text-slate-500 dark:text-slate-400 text-xs truncate max-w-[140px]">
-                        {bot.created_by || <span className="italic">system</span>}
-                      </td>
-                      <td className="py-2 pr-4">
-                        <Toggle checked={bot.active} onChange={() => handleToggle(bot)} disabled={bot.modules.length === 0} />
-                      </td>
-                      <td className="py-2">
-                        <div className="flex gap-2">
-                          <Btn variant="secondary" onClick={() => setLogsBot(bot)}>Logs</Btn>
-                          <Btn variant="secondary" onClick={() => setModal(bot)}>Edit</Btn>
-                          <Btn variant="danger" onClick={() => handleDelete(bot)}>Delete</Btn>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-
-          <Btn onClick={() => setModal('add')}>+ Add bot</Btn>
+          <Table
+            columns={columns}
+            rows={bots}
+            rowKey={bot => bot.id}
+            empty={<p className="text-sm text-slate-500 dark:text-slate-400">No bots configured yet.</p>}
+          />
+          <Btn onClick={() => setSearchParams({ new: '1' })}>+ Add bot</Btn>
         </div>
       )}
 
-      {modal !== null && (
+      {(isAdding || editBot) && (
         <BotModal
-          initial={modal === 'add' ? undefined : modal}
+          initial={editBot}
           botTypes={botTypes}
           installedModules={installedModules}
           onSave={handleSave}
-          onClose={() => setModal(null)}
+          onClose={closeModal}
         />
       )}
 
-      {logsBot && <BotLogsDrawer bot={logsBot} onClose={() => setLogsBot(null)} />}
+      {logsBot && <BotLogsDrawer bot={logsBot} onClose={closeLogs} />}
     </div>
   )
 }

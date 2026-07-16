@@ -5,6 +5,7 @@ import { Btn } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { PageTitle } from '../components/ui/PageTitle'
+import { AdminPageShell } from '../components/layout/AdminPageShell'
 import { Spinner } from '../components/ui/Spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { BOT_TYPES } from '../constants/botConstants'
@@ -53,7 +54,7 @@ export default function Bots() {
   const bots = allBots.filter(b => !b.modules.includes('core'))
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <AdminPageShell maxWidth="max-w-5xl">
       <PageTitle>Bots</PageTitle>
 
       {isLoading && <Spinner />}
@@ -68,6 +69,6 @@ export default function Bots() {
           {bots.map(bot => <BotCard key={bot.id} bot={bot} />)}
         </div>
       )}
-    </div>
+    </AdminPageShell>
   )
 }

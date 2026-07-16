@@ -5,6 +5,7 @@ import { Btn } from '../../components/ui/Button'
 import { Spinner } from '../../components/ui/Spinner'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { PageTitle } from '../../components/ui/PageTitle'
+import { AdminPageShell } from '../../components/layout/AdminPageShell'
 import { fmtBytes } from '../../utils/formatters'
 
 export default function LLMs() {
@@ -52,7 +53,7 @@ export default function LLMs() {
   }
 
   return (
-    <div className="max-w-4xl space-y-6">
+    <AdminPageShell>
       <PageTitle>LLMs</PageTitle>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-3">
@@ -142,6 +143,6 @@ export default function LLMs() {
           <Btn variant="secondary" onClick={() => refetch()} disabled={isLoading}>↻ Refresh</Btn>
         </div>
       </div>
-    </div>
+    </AdminPageShell>
   )
 }

@@ -1,12 +1,13 @@
 import { useNavigate } from 'react-router-dom'
-import { useHealth } from '../../context/HealthContext'
-import { useSettings } from '../../context/SettingsContext'
-import { useGet } from '../../hooks/useApi'
+import { useHealth } from '@context/HealthContext'
+import { useSettings } from '@context/SettingsContext'
+import { useGet } from '@hooks/useApi'
 import { apiService, botsService, type Bot, type InstalledModelsData } from '@services'
-import { Badge } from '../../components/ui/Badge'
-import { PageTitle } from '../../components/ui/PageTitle'
-import { Spinner } from '../../components/ui/Spinner'
-import { fmtBytes } from '../../utils/formatters'
+import { Badge } from '@components/ui/Badge'
+import { PageTitle } from '@components/ui/PageTitle'
+import { AdminPageShell } from '@components/layout/AdminPageShell'
+import { Spinner } from '@components/ui/Spinner'
+import { fmtBytes } from '@utils/formatters'
 
 function SectionCard({
   title,
@@ -196,13 +197,13 @@ function ActiveBotsSection() {
 
 export default function Status() {
   return (
-    <div className="max-w-3xl space-y-6">
+    <AdminPageShell maxWidth="max-w-3xl">
       <PageTitle>Status</PageTitle>
       <AppHealthSection />
       <DbStatusSection />
       <InstalledLLMsSection />
       <ModulesStatusSection />
       <ActiveBotsSection />
-    </div>
+    </AdminPageShell>
   )
 }

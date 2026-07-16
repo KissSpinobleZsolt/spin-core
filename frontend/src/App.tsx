@@ -4,16 +4,15 @@ import Layout from './components/layout/Layout'
 import { AuthGuard } from './components/guards/AuthGuard'
 import { RoleGuard } from './components/guards/RoleGuard'
 import { FederatedPage } from './components/modules/FederatedPage'
+import { PageLoader } from './components/layout/PageLoader'
 import { useI18nSync } from './i18n/useI18nSync'
 import { CookieConsentModal } from './components/CookieConsentModal'
 import { Spinner } from './components/ui/Spinner'
 
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
 const Login          = lazy(() => import('./pages/Login'))
-const Logs           = lazy(() => import('./pages/Logs'))
 const Translations   = lazy(() => import('./pages/Translations'))
 const Bots           = lazy(() => import('./pages/Bots'))
-const BotsAdmin      = lazy(() => import('./pages/BotsAdmin'))
 const Chat           = lazy(() => import('./pages/Chat'))
 const LLMs           = lazy(() => import('./pages/admin/LLMs'))
 const Users          = lazy(() => import('./pages/admin/Users'))
@@ -51,7 +50,7 @@ const router = createBrowserRouter([
             path: 'logs',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <Logs />
+                <PageLoader />
               </RoleGuard>
             ),
           },
@@ -67,7 +66,7 @@ const router = createBrowserRouter([
             path: 'bots-admin',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <BotsAdmin />
+                <PageLoader />
               </RoleGuard>
             ),
           },

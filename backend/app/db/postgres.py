@@ -110,6 +110,22 @@ class ModuleDocumentRow(Base):
     )
 
 
+class PageRegistryRow(Base):
+    """SQLAlchemy ORM model for the page_registry table."""
+    __tablename__ = "page_registry"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    route = Column(String, nullable=False, unique=True, index=True)
+    title = Column(String, nullable=False, default="")
+    type = Column(String, nullable=False, default="native")
+    component_key = Column(String, nullable=True)
+    remote_url = Column(String, nullable=True)
+    scope = Column(String, nullable=True)
+    component = Column(String, nullable=True)
+    roles = Column(ARRAY(String), nullable=False, default=list)
+    skeleton = Column(JSON, nullable=False, default=dict)
+    enabled = Column(Boolean, nullable=False, default=True)
+
+
 def _deep_merge(base: dict, override: dict) -> dict:
     """Recursively merge override into base, returning a new dict with override values preferred."""
     result = dict(base)
@@ -773,3 +789,60 @@ class PostgresAdapter:
             db.delete(row)
             db.commit()
             return True
+
+    def _page_registry_row_to_dict(self, row: "PageRegistryRow") -> dict:
+        return {
+            "id": row.id,
+            "route": row.route,
+            "title": row.title,
+            "type": row.type,
+            "component_key": row.component_key,
+            "remote_url": row.remote_url,
+            "scope": row.scope,
+            "component": row.component,
+            "roles": list(row.roles or []),
+            "skeleton": dict(row.skeleton) if row.skeleton else {},
+            "enabled": row.enabled,
+        }
+
+    def get_page_config(self, route: str) -> dict | None:
+        """Return the page registry config for the given route, or None if absent."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            return self._page_registry_row_to_dict(row) if row else None
+
+    def update_page_config(self, route: str, data: dict) -> dict | None:
+        """Update mutable page registry fields for the given route and return the updated dict."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not row:
+                return None
+            for field in ("title", "roles", "skeleton", "enabled"):
+                if field in data:
+                    setattr(row, field, data[field])
+            db.commit()
+            db.refresh(row)
+            return self._page_registry_row_to_dict(row)
+
+    def seed_page_registry(self, route: str, data: dict) -> None:
+        """Insert a page_registry entry only if the route does not already exist.
+
+        Skips existing rows to preserve any admin edits to title/roles/skeleton made after initial seed.
+        """
+        with self._session_ctx() as db:
+            existing = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not existing:
+                row = PageRegistryRow(
+                    route=route,
+                    title=data.get("title", ""),
+                    type=data.get("type", "native"),
+                    component_key=data.get("component_key"),
+                    remote_url=data.get("remote_url"),
+                    scope=data.get("scope"),
+                    component=data.get("component"),
+                    roles=data.get("roles", []),
+                    skeleton=data.get("skeleton", {}),
+                    enabled=data.get("enabled", True),
+                )
+                db.add(row)
+                db.commit()

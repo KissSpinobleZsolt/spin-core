@@ -16,7 +16,7 @@ from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
 from app.state import get_settings, set_settings
 
-from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy
+from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications
 from app.routes.model_status import _required_models
 
 
@@ -179,6 +179,7 @@ async def lifespan(app: FastAPI):
     ch.ensure_user_logs()
     ch.ensure_module_logs_table()
     ch.ensure_bot_logs_table()
+    ch.ensure_notifications_table()
     ch.write_app_log("INFO", "app.start", "system", "spin-core backend started", name="spin-core")
 
     # Runs every startup — catches bots that exist in PG but lost CH history after a wipe
@@ -271,6 +272,25 @@ async def lifespan(app: FastAPI):
     for lang, data in DEFAULT_TRANSLATIONS.items():
         pg.merge_i18n_data(lang, data)
 
+    _PAGE_REGISTRY_SEED = [
+        ("", {"title": "Dashboard", "component_key": "Dashboard", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
+        ("logs", {"title": "Logs", "component_key": "Logs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 8}}),
+        ("translations", {"title": "Translations", "component_key": "Translations", "roles": ["admin"], "skeleton": {"type": "table", "columns": 3, "rows": 6}}),
+        ("bots", {"title": "Bots", "component_key": "Bots", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
+        ("bots-admin", {"title": "Bots Admin", "component_key": "BotsAdmin", "roles": ["admin"], "skeleton": {"type": "table", "columns": 7, "rows": 5}}),
+        ("admin/llms", {"title": "LLMs", "component_key": "LLMs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 4, "rows": 4}}),
+        ("admin/users", {"title": "Users", "component_key": "Users", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 5}}),
+        ("admin/modules", {"title": "Modules", "component_key": "Modules", "roles": ["admin"], "skeleton": {"type": "table", "columns": 4, "rows": 4}}),
+        ("admin/status", {"title": "Status", "component_key": "Status", "roles": ["admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 1}}),
+        ("admin/components", {"title": "Components", "component_key": "Components", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 8}}),
+        ("admin/layouts", {"title": "Layouts", "component_key": "Layouts", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 6}}),
+        ("admin/docs/ui", {"title": "UI Docs", "component_key": "DocsUI", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
+        ("admin/docs/api", {"title": "API Docs", "component_key": "DocsApi", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
+        ("admin/docs/deployment", {"title": "Deployment Docs", "component_key": "DocsDeployment", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
+    ]
+    for route, data in _PAGE_REGISTRY_SEED:
+        pg.seed_page_registry(route, {**data, "type": "native", "enabled": True})
+
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())
     health_task = asyncio.create_task(_module_health_checker())
@@ -339,3 +359,5 @@ app.include_router(chat.router)
 app.include_router(model_status.router)
 app.include_router(bots.router)
 app.include_router(plugin_proxy.router)
+app.include_router(pages.router)
+app.include_router(notifications.router)
