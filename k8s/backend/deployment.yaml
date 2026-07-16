@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: backend
-          image: spin-core-backend:latest
-          imagePullPolicy: Never
+          image: ghcr.io/kissspinoblezsolt/spin-core-backend:latest
+          imagePullPolicy: Always  # Always, not IfNotPresent — manifest defaults to :latest, which nodes cache aggressively; deploy script overrides to SHA at apply time
           ports:
             - containerPort: 8000
           envFrom:
