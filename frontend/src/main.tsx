@@ -1,4 +1,8 @@
+import { registerSW } from 'virtual:pwa-register'
 import { StrictMode } from 'react'
+
+// Re-registers whenever the user reloads; autoUpdate in vite.config handles silent updates
+registerSW({ immediate: true })
 import { createRoot } from 'react-dom/client'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { AuthProvider } from './context/AuthContext'
@@ -7,6 +11,7 @@ import { SettingsProvider } from './context/SettingsContext'
 import { UIPrefsProvider } from './context/UIPrefsContext'
 import { HealthProvider } from './context/HealthContext'
 import { ModelStatusProvider } from './context/ModelStatusContext'
+import { NotificationProvider } from './context/NotificationContext'
 import './i18n'
 import './index.css'
 import App from './App.tsx'
@@ -29,7 +34,9 @@ createRoot(document.getElementById('root')!).render(
             <SettingsProvider>
               <HealthProvider>
                 <ModelStatusProvider>
-                  <App />
+                  <NotificationProvider>
+                    <App />
+                  </NotificationProvider>
                 </ModelStatusProvider>
               </HealthProvider>
             </SettingsProvider>
