@@ -622,11 +622,21 @@ class PostgresAdapter:
             return self._module_row_to_dict(row)
 
     def delete_module(self, module_id: str) -> bool:
-        """Delete a module by ID and return True if the row existed."""
+        """Delete a module by ID and return True if the row existed.
+
+        Also removes the module_id from every bot's modules array; bots whose
+        modules array becomes empty after removal are deleted outright.
+        """
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
             if not row:
                 return False
+            for bot in db.query(BotRow).filter(BotRow.modules.contains([module_id])).all():
+                remaining = [m for m in (bot.modules or []) if m != module_id]
+                if remaining:
+                    bot.modules = remaining
+                else:
+                    db.delete(bot)
             db.delete(row)
             db.commit()
             return True

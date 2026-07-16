@@ -11,6 +11,7 @@ _FALLBACK_BOT = {
     "name": "AI Assistant",
     "description": "General-purpose AI assistant powered by Ollama.",
     "type": "communicator",
+    "provider": "ollama",
     "model": "qwen2.5:7b",
     "system_prompt": "You are a helpful AI assistant for this platform. Use the platform context above to help users understand what they can do, which pages to visit, and which bots or modules are available. Be concise and friendly.",
     "icon": "💬",
@@ -26,6 +27,7 @@ class BotSeed:
     name: str
     description: str
     type: str
+    provider: str
     model: str
     system_prompt: str
     icon: str
@@ -65,6 +67,7 @@ def load_seed() -> SeedData:
                 name=b["name"],
                 description=b.get("description", ""),
                 type=b.get("type", "communicator"),
+                provider=b.get("provider", "ollama"),
                 model=b.get("model", "qwen2.5:7b"),
                 system_prompt=b.get("system_prompt", ""),
                 icon=b.get("icon", "🤖"),
