@@ -3,6 +3,7 @@ import os
 import sys
 import time
 from contextlib import asynccontextmanager
+from urllib.parse import urlparse
 
 import httpx
 from fastapi import FastAPI, Request
@@ -36,6 +37,46 @@ def _build_module_dict(m: dict) -> dict:
 
 
 _PURGE_INTERVAL_SECONDS = 24 * 60 * 60  # 24 hours
+_MODULE_HEALTH_INTERVAL_SECONDS = 30
+
+# Scopes disabled automatically by the health checker (not by an admin),
+# so they can be re-enabled automatically when the container comes back.
+_auto_disabled_scopes: set[str] = set()
+
+
+async def _module_health_checker() -> None:
+    # Wait one interval before the first check — modules may still be starting when the backend boots.
+    await asyncio.sleep(_MODULE_HEALTH_INTERVAL_SECONDS)
+    while True:
+        try:
+            modules = get_pg().get_modules(enabled_only=False)
+            async with httpx.AsyncClient(timeout=5.0) as client:
+                for m in modules:
+                    remote_url = m.get("remote_url", "")
+                    if not remote_url:
+                        continue
+                    scope = m["scope"]
+                    enabled = m.get("enabled", False)
+                    parsed = urlparse(remote_url)
+                    # remote_url points to remoteEntry.js; probe /manifest.json instead —
+                    # it's a lightweight JSON canary that every module dev server exposes.
+                    manifest_url = f"{parsed.scheme}://{parsed.netloc}/manifest.json"
+                    try:
+                        resp = await client.get(manifest_url)
+                        resp.raise_for_status()
+                        # Only re-enable if the checker itself disabled it; admin-disabled modules stay off.
+                        if not enabled and scope in _auto_disabled_scopes:
+                            get_pg().update_module(m["id"], {"enabled": True})
+                            _auto_disabled_scopes.discard(scope)
+                            print(f"[spin-core] Module back online, re-enabled: {scope}", file=sys.stderr)
+                    except Exception:
+                        if enabled:
+                            get_pg().update_module(m["id"], {"enabled": False})
+                            _auto_disabled_scopes.add(scope)
+                            print(f"[spin-core] Module offline, auto-disabled: {scope}", file=sys.stderr)
+        except Exception as exc:
+            print(f"[spin-core] Module health check error: {exc}", file=sys.stderr)
+        await asyncio.sleep(_MODULE_HEALTH_INTERVAL_SECONDS)
 
 
 async def _daily_log_purge() -> None:
@@ -194,19 +235,18 @@ async def lifespan(app: FastAPI):
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())
+    health_task = asyncio.create_task(_module_health_checker())
 
     yield
 
     tracker_task.cancel()
     purge_task.cancel()
-    try:
-        await tracker_task
-    except asyncio.CancelledError:
-        pass
-    try:
-        await purge_task
-    except asyncio.CancelledError:
-        pass
+    health_task.cancel()
+    for task in (tracker_task, purge_task, health_task):
+        try:
+            await task
+        except asyncio.CancelledError:
+            pass
 
 
 app = FastAPI(title="spin-core API", lifespan=lifespan)
