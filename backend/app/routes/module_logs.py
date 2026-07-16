@@ -11,7 +11,7 @@ router = APIRouter(prefix="/api/module-logs", tags=["module-logs"])
 
 
 def _get_scope(module_id: str) -> str:
-    """Resolve the ClickHouse scope name for a module, raising 404 if the module does not exist."""
+    """Resolve the scope name for a module, raising 404 if the module does not exist."""
     mod = get_pg().get_module(module_id)
     if not mod:
         raise HTTPException(status_code=404, detail="Module not found")
@@ -49,7 +49,7 @@ async def get_module_logs_summary(
 ):
     """Return hourly aggregated event summaries for a module log, filtered by time range and event type."""
     scope = _get_scope(module_id)
-    return get_ch().query_module_logs_mv(
+    return get_ch().query_module_logs_summary(
         scope,
         from_dt=from_dt,
         to_dt=to_dt,

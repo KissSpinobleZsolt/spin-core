@@ -22,7 +22,7 @@ async def login(credentials: LoginCredentials):
         raise HTTPException(status_code=401, detail="Invalid email or password")
     token = create_token(user.email)
     try:
-        get_ch().write_log("INFO", "auth.login", user.email, "/api/auth/login", "POST", 200, 0, {})
+        get_ch().write_user_log("INFO", "user.login", user.email, f"{user.email} logged in.", name=user.email)
     except Exception:
         pass
     return {
