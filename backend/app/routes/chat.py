@@ -23,6 +23,7 @@ from pydantic import BaseModel
 
 from app.database import get_ch, get_pg
 from app.deps import token_dep, admin_dep
+from app.events import BotEvent, LogLevel
 from app.providers import get_provider
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
@@ -159,6 +160,13 @@ class ChatRequest(BaseModel):
     module_id: Optional[str] = None
 
 
+class AbortPayload(BaseModel):
+    """Request body for reporting a user-initiated stream abort."""
+
+    bot_id: str
+    module_id: Optional[str] = None
+
+
 # ---------------------------------------------------------------------------
 # Streaming endpoint
 # ---------------------------------------------------------------------------
@@ -248,14 +256,35 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
             # Surface provider-level errors (missing key, unreachable service) as a
             # JSON error chunk so the frontend can display a human-readable message.
             yield json.dumps({"error": str(exc)}) + "\n"
+            if bot_name:
+                try:
+                    get_ch().write_bot_log(
+                        bot_name, user_email, BotEvent.ERROR,
+                        {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
+                        level=LogLevel.ERROR, name=bot_name,
+                        message=str(exc),
+                    )
+                except Exception:
+                    pass
             return
         except Exception as exc:
             yield json.dumps({"error": f"Unexpected error: {exc}"}) + "\n"
+            if bot_name:
+                try:
+                    get_ch().write_bot_log(
+                        bot_name, user_email, BotEvent.ERROR,
+                        {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
+                        level=LogLevel.ERROR, name=bot_name,
+                        message=f"Unexpected error: {exc}",
+                    )
+                except Exception:
+                    pass
             return
 
         # Write the completion log to ClickHouse after the stream is fully consumed.
         # Failures here are silent so a logging outage never breaks the chat.
         try:
+            duration_ms = round((time.time() - start) * 1000, 2)
             log_details = {
                 "provider": effective_provider,
                 "model": effective_model,
@@ -263,24 +292,60 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
                 "response": "".join(response_parts),
                 "prompt_tokens": prompt_tokens,
                 "eval_tokens": eval_tokens,
-                "duration_ms": round((time.time() - start) * 1000, 2),
+                "duration_ms": duration_ms,
             }
             if payload.bot_id:
                 log_details["bot_id"] = payload.bot_id
                 log_details["bot_name"] = bot_name
             if payload.module_id:
                 log_details["module_id"] = payload.module_id
-            get_ch().write_module_log(
-                scope=_CHATBOT_SCOPE,
-                user_email=user_email,
-                event_type="chat.completion",
-                details=log_details,
+            ch = get_ch()
+            ch.write_module_log(
+                _CHATBOT_SCOPE,
+                user_email,
+                "chat.completion",
+                log_details,
             )
+            if bot_name:
+                ch.write_bot_log(
+                    bot_name, user_email, BotEvent.INFO,
+                    {"bot_id": payload.bot_id, "provider": effective_provider, "model": effective_model, "prompt_tokens": prompt_tokens, "eval_tokens": eval_tokens, "duration_ms": duration_ms},
+                    level=LogLevel.INFO, name=bot_name,
+                    message=f"Chat completed. {eval_tokens} tokens, {duration_ms}ms.",
+                )
         except Exception:
             # ClickHouse logging must never surface errors to the chat stream.
             pass
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
+
+
+# ---------------------------------------------------------------------------
+# Abort endpoint
+# ---------------------------------------------------------------------------
+
+# Separate endpoint because the frontend detects the abort (AbortError); the backend cannot reliably observe stream disconnects
+@router.post("/abort", status_code=204)
+async def abort_chat(payload: AbortPayload, user_email: str = Depends(token_dep)):
+    """Record a user-initiated stream abort in bot_logs and the chatbot module log."""
+    try:
+        bot = get_pg().get_bot_by_id(payload.bot_id)
+        if not bot:
+            return
+        ch = get_ch()
+        ch.write_bot_log(
+            bot.name, user_email, BotEvent.ABORT,
+            {"bot_id": payload.bot_id, **({"module_id": payload.module_id} if payload.module_id else {})},
+            level=LogLevel.WARN, name=bot.name,
+            message=lifecycle_message(BotEvent.ABORT, bot.name),
+        )
+        ch.write_module_log(
+            _CHATBOT_SCOPE, user_email, "chat.abort",
+            {"bot_id": payload.bot_id, "bot_name": bot.name,
+             **({"module_id": payload.module_id} if payload.module_id else {})},
+        )
+    except Exception:
+        pass
 
 
 # ---------------------------------------------------------------------------
@@ -318,7 +383,7 @@ async def get_chat_logs(
         to_dt=to_dt,
     )
     if user_email:
-        result["items"] = [r for r in result["items"] if r["user_email"] == user_email]
+        result["items"] = [r for r in result["items"] if r["owner"] == user_email]
     return result
 
 
@@ -344,7 +409,7 @@ async def get_chat_logs_summary(
     Returns:
         Dict with ``items`` list and ``total`` count from the materialized view.
     """
-    return get_ch().query_module_logs_mv(
+    return get_ch().query_module_logs_summary(
         _CHATBOT_SCOPE,
         from_dt=from_dt,
         to_dt=to_dt,

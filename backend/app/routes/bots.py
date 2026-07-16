@@ -4,8 +4,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 
-from app.database import get_pg
+from app.database import get_pg, get_ch
 from app.deps import token_dep, admin_dep
+from app.events import LogLevel, BotEvent, lifecycle_message
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])
 
@@ -98,6 +99,14 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         created_by=admin_email,
         config_schema=payload.config_schema,
     )
+    ch = get_ch()
+    ch.write_bot_log(
+        bot.name, admin_email, BotEvent.INIT,
+        {"bot_id": bot.id},
+        level=LogLevel.INFO,
+        name=bot.name,
+        message=lifecycle_message(BotEvent.INIT, bot.name),
+    )
     return BotOut(**bot.__dict__)
 
 
@@ -123,9 +132,14 @@ def get_bot(bot_id: str, email: str = Depends(token_dep)):
 
 
 @router.put("/{bot_id}", response_model=BotOut)
-def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
+def update_bot(bot_id: str, payload: BotPayload, email: str = Depends(admin_dep)):
     """Replace a bot's full configuration by ID (admin only)."""
-    bot = get_pg().update_bot(
+    pg = get_pg()
+    # Read before update to detect active↔inactive transition and emit the right event (ACTIVATE/DEACTIVATE vs UPDATE)
+    old = pg.get_bot_by_id(bot_id)
+    if not old:
+        raise HTTPException(status_code=404, detail="Bot not found")
+    bot = pg.update_bot(
         bot_id=bot_id,
         name=payload.name,
         description=payload.description,
@@ -141,11 +155,34 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
     )
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
+    if payload.active and not old.active:
+        event = BotEvent.ACTIVATE
+    elif not payload.active and old.active:
+        event = BotEvent.DEACTIVATE
+    else:
+        event = BotEvent.UPDATE
+    get_ch().write_bot_log(
+        bot.name, email, event,
+        {"bot_id": bot_id},
+        level=LogLevel.INFO,
+        name=bot.name,
+        message=lifecycle_message(event, bot.name),
+    )
     return BotOut(**bot.__dict__)
 
 
 @router.delete("/{bot_id}", status_code=204)
-def delete_bot(bot_id: str, _: str = Depends(admin_dep)):
+def delete_bot(bot_id: str, email: str = Depends(admin_dep)):
     """Permanently delete a bot by ID (admin only)."""
-    if not get_pg().delete_bot(bot_id):
+    pg = get_pg()
+    # Read before delete — bot name is needed for the log entry and is unreachable after deletion
+    bot = pg.get_bot_by_id(bot_id)
+    if not bot or not pg.delete_bot(bot_id):
         raise HTTPException(status_code=404, detail="Bot not found")
+    get_ch().write_bot_log(
+        bot.name, email, BotEvent.DELETE,
+        {"bot_id": bot_id},
+        level=LogLevel.INFO,
+        name=bot.name,
+        message=lifecycle_message(BotEvent.DELETE, bot.name),
+    )

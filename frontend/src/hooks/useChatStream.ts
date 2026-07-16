@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 
 /** A single chat message with a role and text content. */
 export type Message = { role: 'user' | 'assistant'; content: string }
@@ -8,6 +8,11 @@ export function useChatStream(botId: string | undefined, selectedModel: string, 
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
+  const abortRef = useRef<AbortController | null>(null)
+
+  function stopStream() {
+    abortRef.current?.abort()
+  }
 
   async function sendMessage() {
     if (!input.trim() || loading) return
@@ -16,6 +21,9 @@ export function useChatStream(botId: string | undefined, selectedModel: string, 
     setMessages([...history, { role: 'assistant', content: '' }])
     setInput('')
     setLoading(true)
+
+    const controller = new AbortController()
+    abortRef.current = controller
 
     const token = localStorage.getItem('token') ?? ''
     const body: Record<string, unknown> = { messages: history }
@@ -31,6 +39,7 @@ export function useChatStream(botId: string | undefined, selectedModel: string, 
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify(body),
+        signal: controller.signal,
       })
 
       const reader = res.body!.getReader()
@@ -65,7 +74,18 @@ export function useChatStream(botId: string | undefined, selectedModel: string, 
           } catch {}
         }
       }
-    } catch {
+    } catch (err) {
+      // AbortError means the user stopped the stream intentionally — keep partial content as-is.
+      if (err instanceof Error && err.name === 'AbortError') {
+        if (botId) {
+          fetch('/api/chat/abort', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ bot_id: botId, ...(moduleId ? { module_id: moduleId } : {}) }),
+          }).catch(() => {}) // Fire-and-forget: stream is already dead; awaiting would block setLoading(false) and freeze the UI
+        }
+        return
+      }
       setMessages(prev => {
         const c = [...prev]
         c[c.length - 1] = { role: 'assistant', content: 'Could not reach the chat service.' }
@@ -73,8 +93,9 @@ export function useChatStream(botId: string | undefined, selectedModel: string, 
       })
     } finally {
       setLoading(false)
+      abortRef.current = null
     }
   }
 
-  return { messages, setMessages, input, setInput, loading, sendMessage }
+  return { messages, setMessages, input, setInput, loading, sendMessage, stopStream }
 }

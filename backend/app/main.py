@@ -10,6 +10,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, get_pg, get_ch
+from app.events import LogLevel, BotEvent, ModuleEvent, UserEvent, lifecycle_message
 from app.model_tracker import run_sequential_trackers
 from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
@@ -69,11 +70,21 @@ async def _module_health_checker() -> None:
                             get_pg().update_module(m["id"], {"enabled": True})
                             _auto_disabled_scopes.discard(scope)
                             print(f"[spin-core] Module back online, re-enabled: {scope}", file=sys.stderr)
+                            get_ch().write_module_log(
+                                scope, "system", ModuleEvent.ACTIVATE, {"source": "health-checker"},
+                                level=LogLevel.INFO, name=m.get("name", scope),
+                                message=lifecycle_message(ModuleEvent.ACTIVATE, m.get("name", scope)),
+                            )
                     except Exception:
                         if enabled:
                             get_pg().update_module(m["id"], {"enabled": False})
                             _auto_disabled_scopes.add(scope)
                             print(f"[spin-core] Module offline, auto-disabled: {scope}", file=sys.stderr)
+                            get_ch().write_module_log(
+                                scope, "system", ModuleEvent.DEACTIVATE, {"source": "health-checker"},
+                                level=LogLevel.WARN, name=m.get("name", scope),
+                                message=lifecycle_message(ModuleEvent.DEACTIVATE, m.get("name", scope)),
+                            )
         except Exception as exc:
             print(f"[spin-core] Module health check error: {exc}", file=sys.stderr)
         await asyncio.sleep(_MODULE_HEALTH_INTERVAL_SECONDS)
@@ -102,16 +113,20 @@ async def lifespan(app: FastAPI):
     # Seed admin from env vars on first run
     admin_email = os.getenv("ADMIN_EMAIL")
     admin_password = os.getenv("ADMIN_PASSWORD")
+    # CH is not initialized yet at this point; user.init log is written after ch = get_ch() below
+    admin_created = False
     if admin_email and admin_password:
         if not pg.get_user_by_email(admin_email):
             from app.auth import hash_password
+            admin_name = os.getenv("ADMIN_NAME", "Admin")
             pg.create_user(
                 email=admin_email,
-                name=os.getenv("ADMIN_NAME", "Admin"),
+                name=admin_name,
                 hashed_password=hash_password(admin_password),
                 roles=["user", "admin"],
                 default_theme=seed.default_theme,
             )
+            admin_created = True
             print(f"[spin-core] Admin user created: {admin_email}", file=sys.stderr)
     else:
         print("[spin-core] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin seed", file=sys.stderr)
@@ -125,9 +140,9 @@ async def lifespan(app: FastAPI):
     # Seed default bots on first run
     if not pg.get_bots(admin=True):
         import dataclasses
-        for bot in seed.bots:
-            pg.create_bot(**dataclasses.asdict(bot))
-            print(f"[spin-core] Seeded bot: {bot.name}", file=sys.stderr)
+        for bot_data in seed.bots:
+            pg.create_bot(**dataclasses.asdict(bot_data))
+            print(f"[spin-core] Seeded bot: {bot_data.name}", file=sys.stderr)
 
     # Migrate legacy modules from settings.json into DB (one-time)
     legacy_modules = read_legacy_modules()
@@ -156,9 +171,42 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 print(f"[spin-core] Module seed failed for {scope}: {exc}", file=sys.stderr)
 
-    # Initialise ClickHouse early so it is available for auto-discovery log writes below
+    # Initialise ClickHouse: migrate legacy tables/columns, then provision the 5 base tables
     ch = get_ch()
-    ch.ensure_app_logs_mv()
+    ch.run_migrations()
+    ch.ensure_api_logs()
+    ch.ensure_app_logs()
+    ch.ensure_user_logs()
+    ch.ensure_module_logs_table()
+    ch.ensure_bot_logs_table()
+    ch.write_app_log("INFO", "app.start", "system", "spin-core backend started", name="spin-core")
+
+    # Runs every startup — catches bots that exist in PG but lost CH history after a wipe
+    # Write bot.init for any bot that has no CH history yet (covers first-run and CH wipes)
+    try:
+        bots_with_logs = ch.get_bot_names_with_logs()
+        for bot in pg.get_bots(admin=True):
+            if bot.name not in bots_with_logs:
+                ch.write_bot_log(
+                    bot.name, "system", BotEvent.INIT,
+                    {"bot_id": str(bot.id), "source": "startup"},
+                    level=LogLevel.INFO, name=bot.name,
+                    message=lifecycle_message(BotEvent.INIT, bot.name),
+                )
+    except Exception as exc:
+        print(f"[spin-core] Failed to write startup bot.init logs: {exc}", file=sys.stderr)
+
+    # Write user.init for the admin if it was just seeded this startup
+    if admin_created and admin_email:
+        try:
+            ch.write_user_log(
+                LogLevel.INFO, UserEvent.INIT, admin_email,
+                lifecycle_message(UserEvent.INIT, admin_name),
+                name=admin_name,
+                details={"source": "seed"},
+            )
+        except Exception as exc:
+            print(f"[spin-core] Failed to write admin user.init log: {exc}", file=sys.stderr)
 
     # Auto-discover from MODULE_REGISTRY_URLS (inserts only new scopes, never overwrites)
     registry_urls_env = os.getenv("MODULE_REGISTRY_URLS", "").strip()
@@ -184,12 +232,12 @@ async def lifespan(app: FastAPI):
                         })
                         registered_scopes.add(scope)
                         print(f"[spin-core] Auto-discovered module (inactive): {scope}", file=sys.stderr)
-                        ch.ensure_module_table(scope)
-                        ch.ensure_module_mv(scope)
-                        ch.write_module_log(scope, admin_email or "", "module.registered", {
-                            "scope": scope,
-                            "source": "auto-discovery",
-                        })
+                        ch.write_module_log(
+                            scope, "system", ModuleEvent.INIT,
+                            {"scope": scope, "source": "auto-discovery"},
+                            level=LogLevel.INFO, name=m.get("name", scope),
+                            message=lifecycle_message(ModuleEvent.INIT, m.get("name", scope)),
+                        )
                         mod = pg.get_module_by_scope(scope)
                         if mod:
                             i18n_data = m.get("i18n") or {}
@@ -205,14 +253,12 @@ async def lifespan(app: FastAPI):
                             if mod:
                                 new_bots = pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
                                 for bot in new_bots:
-                                    ch.ensure_bot_table(bot.name)
-                                    ch.ensure_bot_mv(bot.name)
-                                    ch.write_bot_log(bot.name, admin_email or "", "bot.registered", {
-                                        "bot_id": bot.id,
-                                        "bot_name": bot.name,
-                                        "module_scope": scope,
-                                        "source": "auto-discovery",
-                                    })
+                                    ch.write_bot_log(
+                                        bot.name, "system", BotEvent.INIT,
+                                        {"bot_id": bot.id, "module_scope": scope, "source": "auto-discovery"},
+                                        level=LogLevel.INFO, name=bot.name,
+                                        message=lifecycle_message(BotEvent.INIT, bot.name),
+                                    )
                 except Exception as exc:
                     print(f"[spin-core] Discovery failed for {base_url}: {exc}", file=sys.stderr)
 
@@ -224,14 +270,6 @@ async def lifespan(app: FastAPI):
     from app.i18n_defaults import DEFAULT_TRANSLATIONS
     for lang, data in DEFAULT_TRANSLATIONS.items():
         pg.merge_i18n_data(lang, data)
-
-    # Ensure ClickHouse tables + materialized views for all registered modules and their bots
-    for m in pg.get_modules():
-        ch.ensure_module_table(m["scope"])
-        ch.ensure_module_mv(m["scope"])
-        for bot in pg.get_bots_for_module(m["id"]):
-            ch.ensure_bot_table(bot.name)
-            ch.ensure_bot_mv(bot.name)
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())
@@ -274,15 +312,14 @@ async def log_requests(request: Request, call_next):
                 user_email = decode_token(auth_header.removeprefix("Bearer "))
             except Exception:
                 pass
-        get_ch().write_log(
+        get_ch().write_api_log(
             level="INFO",
             event_type="http.request",
-            user_email=user_email,
+            owner=user_email,
             path=request.url.path,
             method=request.method,
             status_code=response.status_code,
             duration_ms=round(duration_ms, 2),
-            details={},
         )
     except Exception:
         pass
