@@ -67,6 +67,7 @@ class BotRow(Base):
     restricted = Column(String, nullable=False, default="user")
     modules = Column(ARRAY(String), nullable=False, default=list)
     created_by = Column(String, nullable=True, default="")
+    config_schema = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
@@ -142,6 +143,7 @@ class PostgresAdapter:
             # without any manual data migration.
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS provider VARCHAR NOT NULL DEFAULT 'ollama'",
             "ALTER TABLE modules ADD COLUMN IF NOT EXISTS backend_url VARCHAR",
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS config_schema JSONB NOT NULL DEFAULT '{}'",
         ]
         with self._engine.connect() as conn:
             for stmt in stmts:
@@ -248,6 +250,8 @@ class PostgresAdapter:
             restricted=row.restricted or "user",
             modules=list(row.modules or []),
             created_by=row.created_by or "",
+            # Same guard as `provider` above — pre-migration rows may have NULL before the ALTER TABLE commits.
+            config_schema=dict(row.config_schema) if row.config_schema else {},
             created_at=row.created_at,
         )
 
@@ -298,7 +302,7 @@ class PostgresAdapter:
                 result.append(self._bot_row_to_record(r))
             return result
 
-    def seed_bots_for_module(self, module_id: str, bots_data: list[dict], created_by: str = "") -> None:
+    def seed_bots_for_module(self, module_id: str, bots_data: list[dict], created_by: str = "") -> list["BotRecord"]:
         """Provision bots declared in a module manifest, skipping any that already exist.
 
         Args:
@@ -306,7 +310,12 @@ class PostgresAdapter:
             bots_data: List of bot dicts from the module manifest.  Each dict may
                 include a ``provider`` key (defaults to ``"ollama"``).
             created_by: Email stored in ``created_by``; empty for system-provisioned bots.
+
+        Returns:
+            List of ``BotRecord`` instances for bots that were newly created (excludes skipped duplicates).
         """
+        import sys
+        new_bots: list[BotRecord] = []
         for bot in bots_data:
             name = bot.get("name", "").strip()
             if not name:
@@ -319,7 +328,7 @@ class PostgresAdapter:
                 )
             if exists:
                 continue
-            self.create_bot(
+            record = self.create_bot(
                 name=name,
                 description=bot.get("description", ""),
                 type=bot.get("type", "communicator"),
@@ -331,9 +340,11 @@ class PostgresAdapter:
                 restricted=bot.get("restricted", "user"),
                 modules=[module_id],
                 created_by=created_by,
+                config_schema=bot.get("config_schema") or {},
             )
-            import sys
+            new_bots.append(record)
             print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)
+        return new_bots
 
     def get_bot_types(self) -> list[dict]:
         """Return all bot types ordered alphabetically by name."""
@@ -391,6 +402,7 @@ class PostgresAdapter:
         restricted: str,
         modules: list[str],
         created_by: str = "",
+        config_schema: dict | None = None,
     ) -> BotRecord:
         """Insert a new bot row and return the resulting BotRecord.
 
@@ -427,6 +439,7 @@ class PostgresAdapter:
                 restricted=restricted,
                 modules=modules,
                 created_by=created_by,
+                config_schema=config_schema or {},
             )
             db.add(row)
             db.commit()
@@ -446,6 +459,7 @@ class PostgresAdapter:
         active: bool,
         restricted: str,
         modules: list[str],
+        config_schema: dict | None = None,
     ) -> BotRecord | None:
         """Update an existing bot by ID and return the updated BotRecord, or None if not found.
 
@@ -479,6 +493,10 @@ class PostgresAdapter:
             row.active = active and bool(modules)
             row.restricted = restricted
             row.modules = modules
+            # Only update when explicitly provided — admin-UI PUT omits this field and
+            # must not silently clobber the manifest-seeded schema.
+            if config_schema is not None:
+                row.config_schema = config_schema
             db.commit()
             db.refresh(row)
             return self._bot_row_to_record(row)

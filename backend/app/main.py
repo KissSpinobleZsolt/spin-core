@@ -115,6 +115,10 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 print(f"[spin-core] Module seed failed for {scope}: {exc}", file=sys.stderr)
 
+    # Initialise ClickHouse early so it is available for auto-discovery log writes below
+    ch = get_ch()
+    ch.ensure_app_logs_mv()
+
     # Auto-discover from MODULE_REGISTRY_URLS (inserts only new scopes, never overwrites)
     registry_urls_env = os.getenv("MODULE_REGISTRY_URLS", "").strip()
     if registry_urls_env:
@@ -139,11 +143,26 @@ async def lifespan(app: FastAPI):
                         })
                         registered_scopes.add(scope)
                         print(f"[spin-core] Auto-discovered module: {scope}", file=sys.stderr)
+                        ch.ensure_module_table(scope)
+                        ch.ensure_module_mv(scope)
+                        ch.write_module_log(scope, admin_email or "", "module.registered", {
+                            "scope": scope,
+                            "source": "auto-discovery",
+                        })
                         bots_from_manifest = m.get("bots") or []
                         if bots_from_manifest:
                             mod = pg.get_module_by_scope(scope)
                             if mod:
-                                pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
+                                new_bots = pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
+                                for bot in new_bots:
+                                    ch.ensure_bot_table(bot.name)
+                                    ch.ensure_bot_mv(bot.name)
+                                    ch.write_bot_log(bot.name, admin_email or "", "bot.registered", {
+                                        "bot_id": bot.id,
+                                        "bot_name": bot.name,
+                                        "module_scope": scope,
+                                        "source": "auto-discovery",
+                                    })
                 except Exception as exc:
                     print(f"[spin-core] Discovery failed for {base_url}: {exc}", file=sys.stderr)
 
@@ -156,12 +175,13 @@ async def lifespan(app: FastAPI):
     for lang, data in DEFAULT_TRANSLATIONS.items():
         pg.merge_i18n_data(lang, data)
 
-    # Ensure ClickHouse tables + materialized views for app_logs, chatbot, and all registered modules
-    ch = get_ch()
-    ch.ensure_app_logs_mv()
+    # Ensure ClickHouse tables + materialized views for all registered modules and their bots
     for m in pg.get_modules():
         ch.ensure_module_table(m["scope"])
         ch.ensure_module_mv(m["scope"])
+        for bot in pg.get_bots_for_module(m["id"]):
+            ch.ensure_bot_table(bot.name)
+            ch.ensure_bot_mv(bot.name)
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())

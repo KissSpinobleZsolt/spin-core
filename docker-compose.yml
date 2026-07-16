@@ -78,65 +78,7 @@ services:
         condition: service_healthy
     restart: on-failure
 
-  # ── Module frontend services (serve remoteEntry.js + manifest.json) ──────────
-
-  hello-world:
-    build: ./modules/hello-world
-    ports:
-      - "3001:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    restart: unless-stopped
-
-  cloud-insight-ai:
-    build: ./modules/cloud-insight-ai
-    ports:
-      - "3002:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      cloud-insight-ai-backend:
-        condition: service_started
-    restart: unless-stopped
-
-  anomascan:
-    build: ./modules/AnomaScan
-    ports:
-      - "3003:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      anomascan-backend:
-        condition: service_started
-    restart: unless-stopped
-
-  # ── Module backend services (plugin backends — each module owns its deps) ────
-  # Each module that declares `backend_url` in its manifest runs its own
-  # FastAPI service here.  The core backend proxies /api/plugin/{scope}/...
-  # to the module's backend_url using the registered DB record.
-
-  cloud-insight-ai-backend:
-    build: ./modules/cloud-insight-ai/backend
-    ports:
-      - "8002:8000"
-    environment:
-      JWT_SECRET_KEY: change-me-in-production
-      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
-      CLICKHOUSE_HOST: clickhouse
-      CLICKHOUSE_USER: core-ch
-      CLICKHOUSE_PASSWORD: core-ch
-      CLICKHOUSE_DB: core
-    restart: unless-stopped
-
+  # ────── Module AnomaScan service BE───────────────────────────────────────
   anomascan-backend:
     build: ./modules/AnomaScan/backend
     ports:
@@ -152,9 +94,95 @@ services:
     volumes:
       - anomascan_yolo_weights:/app/vision-models
     restart: unless-stopped
+  # ────── Module AnomaScan service FE
+  anomascan:
+    build: ./modules/AnomaScan
+    ports:
+      - "3003:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      anomascan-backend:
+        condition: service_started
+    restart: unless-stopped
+
+  # ────── Module Cloud Insight AI service FE───────────────────────────────────────
+  cloud-insight-ai:
+    build: ./modules/cloud-insight-ai
+    ports:
+      - "3002:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      cloud-insight-ai-backend:
+        condition: service_started
+    restart: unless-stopped
+
+ # ────── Module Cloud Insight AI service BE───────────────────────────────────────
+  cloud-insight-ai-backend:
+    build: ./modules/cloud-insight-ai/backend
+    ports:
+      - "8002:8000"
+    environment:
+      JWT_SECRET_KEY: change-me-in-production
+      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
+      CLICKHOUSE_HOST: clickhouse
+      CLICKHOUSE_USER: core-ch
+      CLICKHOUSE_PASSWORD: core-ch
+      CLICKHOUSE_DB: core
+    restart: unless-stopped
+
+  bots-trader-platform:
+    build: ./modules/bots-trader-platform
+    ports:
+      - "3004:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    depends_on:
+      bots-trader-platform-backend:
+        condition: service_started
+    restart: unless-stopped
+
+  bots-trader-platform-backend:
+    build: ./modules/bots-trader-platform/backend
+    ports:
+      - "8004:8000"
+    environment:
+      JWT_SECRET_KEY: change-me-in-production
+      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
+      OLLAMA_URL: http://ollama:11434
+      CORE_BACKEND_URL: http://backend:8000
+      REDDIT_CLIENT_ID: ""
+      REDDIT_CLIENT_SECRET: ""
+      REDDIT_USER_AGENT: "bots-trader-platform/0.1"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+ # ── Core Module Hello World frontend services (serve remoteEntry.js + manifest.json) ──────────
+  hello-world:
+    build: ./modules/hello-world
+    ports:
+      - "3001:80"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   # ── Core platform ─────────────────────────────────────────────────────────────
-
   backend:
     build: ./backend
     ports:
@@ -167,7 +195,7 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      MODULE_REGISTRY_URLS: http://cloud-insight-ai:80,http://hello-world:80,http://anomascan:80
+      MODULE_REGISTRY_URLS: http://cloud-insight-ai:80,http://hello-world:80,http://anomascan:80,http://bots-trader-platform:80
       # Cloud LLM providers — leave blank to disable; bots using that provider will
       # return an error chunk instead of streaming tokens.
       # Anthropic Claude: get your key at https://console.anthropic.com/settings/keys
@@ -222,5 +250,4 @@ volumes:
   clickhouse_data:
   app_data:
   ollama_data:
-  # renamed from vision_model_weights — scoped per-module so future vision modules don't share weights; existing deployments must manually migrate or re-download
   anomascan_yolo_weights:

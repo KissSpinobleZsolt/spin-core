@@ -220,6 +220,69 @@ class ClickHouseLogAdapter:
             [(user_email, event_type, json.dumps(details))],
         )
 
+    # --- per-bot log tables ---
+
+    @staticmethod
+    def _bot_table(bot_name: str) -> str:
+        """Return the ClickHouse log table name for the given bot."""
+        # Keyed by name rather than UUID for human-readable table names;
+        # if a bot is renamed the old table becomes orphaned and a new one is provisioned on next startup.
+        safe = re.sub(r"[^a-zA-Z0-9]", "_", bot_name).lower()
+        return f"bot_{safe}_logs"
+
+    @staticmethod
+    def _bot_mv(bot_name: str) -> str:
+        """Return the ClickHouse materialized view name for the given bot."""
+        safe = re.sub(r"[^a-zA-Z0-9]", "_", bot_name).lower()
+        return f"bot_{safe}_logs_mv"
+
+    def ensure_bot_table(self, bot_name: str) -> None:
+        """Create the per-bot event log table for the given bot name if it does not exist."""
+        table = self._bot_table(bot_name)
+        self._client.execute(f"""
+            CREATE TABLE IF NOT EXISTS {table} (
+                event_time  DateTime64(3) DEFAULT now64(),
+                user_email  String,
+                event_type  LowCardinality(String),
+                details     String
+            ) ENGINE = MergeTree()
+            ORDER BY event_time
+            TTL toDateTime(event_time) + INTERVAL 30 DAY
+        """)
+
+    def ensure_bot_mv(self, bot_name: str) -> None:
+        """Create the per-bot hourly aggregate materialized view if it does not exist."""
+        table = self._bot_table(bot_name)
+        mv = self._bot_mv(bot_name)
+        self._client.execute(f"""
+            CREATE MATERIALIZED VIEW IF NOT EXISTS {mv}
+            REFRESH EVERY 10 MINUTE
+            ENGINE = MergeTree()
+            ORDER BY (bucket, event_type)
+            AS
+            SELECT
+                toStartOfHour(event_time)   AS bucket,
+                event_type,
+                count()                     AS event_count,
+                uniq(user_email)            AS unique_users
+            FROM {table}
+            GROUP BY bucket, event_type
+        """)
+
+    def write_bot_log(
+        self,
+        bot_name: str,
+        user_email: str,
+        event_type: str,
+        details: dict,
+    ) -> None:
+        """Insert a single event row into the per-bot log table."""
+        table = self._bot_table(bot_name)
+        self._client.execute(
+            f"INSERT INTO {table} (user_email, event_type, details) VALUES",
+            [(user_email, event_type, json.dumps(details))],
+        )
+
     def query_module_logs(
         self,
         scope: str,

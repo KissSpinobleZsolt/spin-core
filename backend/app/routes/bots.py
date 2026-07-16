@@ -32,6 +32,7 @@ class BotPayload(BaseModel):
     active: bool = False
     restricted: str = "user"
     modules: List[str] = []
+    config_schema: dict = {}
 
 
 class BotOut(BaseModel):
@@ -40,6 +41,8 @@ class BotOut(BaseModel):
     Attributes:
         provider: LLM backend identifier stored on the bot — one of ``"ollama"``,
             ``"anthropic"``, or ``"openai"``.
+        config_schema: Declarative UI schema for the bot's configuration page, sourced
+            from the module manifest.  Empty dict for bots without a custom config UI.
     """
 
     id: str
@@ -54,6 +57,7 @@ class BotOut(BaseModel):
     restricted: str
     modules: List[str]
     created_by: str
+    config_schema: dict = {}
     created_at: Optional[datetime] = None
 
 
@@ -92,6 +96,7 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         restricted=payload.restricted,
         modules=payload.modules,
         created_by=admin_email,
+        config_schema=payload.config_schema,
     )
     return BotOut(**bot.__dict__)
 
@@ -132,6 +137,7 @@ def update_bot(bot_id: str, payload: BotPayload, _: str = Depends(admin_dep)):
         active=payload.active,
         restricted=payload.restricted,
         modules=payload.modules,
+        config_schema=payload.config_schema,
     )
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")

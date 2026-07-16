@@ -67,6 +67,13 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
     ch = get_ch()
     ch.ensure_module_table(module["scope"])
     ch.ensure_module_mv(module["scope"])
+    # Written outside the try/except — the module table is guaranteed to exist at this point;
+    # bot logs are inside the try/except because they depend on a reachable manifest URL.
+    ch.write_module_log(module["scope"], email, "module.registered", {
+        "module_id": module["id"],
+        "name": module["name"],
+        "scope": module["scope"],
+    })
     try:
         manifest_url = payload.remote_url.rsplit("/remoteEntry.js", 1)[0] + "/manifest.json"
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -74,8 +81,16 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
             resp.raise_for_status()
             manifest = resp.json()
         bots_data = manifest.get("bots") or []
-        if bots_data:
-            pg.seed_bots_for_module(module["id"], bots_data, created_by=email)
+        new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email) if bots_data else []
+        for bot in new_bots:
+            ch.ensure_bot_table(bot.name)
+            ch.ensure_bot_mv(bot.name)
+            ch.write_bot_log(bot.name, email, "bot.registered", {
+                "bot_id": bot.id,
+                "bot_name": bot.name,
+                "module_id": module["id"],
+                "module_scope": module["scope"],
+            })
         if not payload.backend_url and manifest.get("backend_url"):
             module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module
     except Exception:

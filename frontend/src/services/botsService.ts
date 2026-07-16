@@ -53,6 +53,33 @@ export const PROVIDER_MODEL_HINTS: Record<LLMProvider, string[]> = {
   ],
 }
 
+/** A single field in a bot's declarative config schema, sourced from the module manifest. */
+export interface BotConfigSchemaField {
+  key: string
+  label: string
+  type: 'number' | 'boolean' | 'text' | 'password' | 'select'
+  default: unknown
+  min?: number
+  max?: number
+  step?: number
+  options?: string[]
+}
+
+/**
+ * Declarative UI schema for a custom bot's configuration page.
+ * Stored from the module manifest at bot-seeding time.
+ *
+ * - `principals`: which Principals component to render
+ *   (`"watchlist"`, `"teams"`, `"risk_profiles"`, or absent/empty for none)
+ * - `configurations`: fields shown in the Configurations section
+ * - `scheduler`: fields shown in the Scheduler section
+ */
+export interface BotConfigSchema {
+  principals?: 'watchlist' | 'teams' | 'risk_profiles'
+  configurations?: BotConfigSchemaField[]
+  scheduler?: BotConfigSchemaField[]
+}
+
 /** Persisted bot configuration record including model, system prompt, and RBAC settings. */
 export interface Bot {
   id: string
@@ -70,6 +97,8 @@ export interface Bot {
   /** IDs of the modules this bot is scoped to; empty means globally available. */
   modules: string[]
   created_by: string
+  /** Declarative config page schema from the module manifest; empty object for non-custom bots. */
+  config_schema: BotConfigSchema
   created_at: string | null
 }
 
