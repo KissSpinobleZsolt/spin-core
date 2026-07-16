@@ -1,9 +1,9 @@
 [submodule "modules/hello-world"]
 	path = modules/hello-world
 	url = https://github.com/KissSpinobleZsolt/spi-module-hello-world.git
-[submodule "modules/data-ingestion"]
-	path = modules/data-ingestion
+[submodule "modules/cloud-insight-ai"]
+	path = modules/cloud-insight-ai
 	url = https://github.com/KissSpinobleZsolt/spi-module-data-ingestion.git
-[submodule "modules/vision-watch"]
-	path = modules/vision-watch
+[submodule "modules/AnomaScan"]
+	path = modules/AnomaScan
 	url = https://github.com/KissSpinobleZsolt/spi-module-vision-watch.git
