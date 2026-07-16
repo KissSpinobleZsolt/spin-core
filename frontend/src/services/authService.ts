@@ -1,12 +1,14 @@
 import { apiService } from './apiService'
 import { safeJsonParse } from '../utils/safeJsonParse'
 
+/** Shape of an authenticated user as returned by the login endpoint. */
 export type AuthUser = {
   name: string
   roles: string[]
   defaultTheme: 'dark' | 'light'
 }
 
+/** Credentials payload for email/password login. */
 export type AuthCredentials = {
   email: string
   password: string
@@ -21,6 +23,7 @@ const MOCK_USER: AuthUser = {
   defaultTheme: 'dark',
 }
 
+/** Handles login, logout, and persisting the authenticated user in localStorage. */
 export const authService = {
   async login(_credentials: AuthCredentials): Promise<AuthUser> {
     if (IS_MOCK) {

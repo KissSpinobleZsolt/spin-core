@@ -19,6 +19,7 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 
 def create_token(email: str) -> str:
+    """Create a signed JWT for the given email that expires in TOKEN_EXPIRE_HOURS."""
     payload = {
         "sub": email,
         "exp": datetime.now(timezone.utc) + timedelta(hours=TOKEN_EXPIRE_HOURS),

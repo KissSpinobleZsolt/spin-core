@@ -18,3 +18,8 @@ Thumbs.db
 # Claude Code — ignore entirely
 .claude/
 CLAUDE.*
+
+# Module build artefacts — submodule contents tracked via .gitmodules
+modules/*/node_modules/
+modules/*/dist/
+modules/*/build/

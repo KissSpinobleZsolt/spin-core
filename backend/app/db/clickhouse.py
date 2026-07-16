@@ -40,12 +40,15 @@ GROUP BY bucket, event_type, path, status_code
 
 
 def _month_start() -> datetime:
+    """Return the UTC datetime for midnight on the first day of the current month."""
     now = datetime.now(timezone.utc)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 class ClickHouseLogAdapter:
+    """Manages ClickHouse log tables, materialized views, and all query operations."""
     def __init__(self, db_url: str) -> None:
+        """Create the ClickHouse client and ensure the app_logs table exists."""
         self._client = Client.from_url(db_url)
         self._client.execute(_DDL_APP_LOGS)
 
@@ -66,6 +69,7 @@ class ClickHouseLogAdapter:
         duration_ms: float,
         details: dict,
     ) -> None:
+        """Insert a single HTTP request log entry into the app_logs table."""
         self._client.execute(
             "INSERT INTO app_logs "
             "(level, event_type, user_email, path, method, status_code, duration_ms, details) VALUES",
@@ -85,6 +89,7 @@ class ClickHouseLogAdapter:
         order_col: str = "event_time",
         time_col: str = "event_time",
     ):
+        """Execute a time-bounded, paginated SELECT and return (rows, total_count)."""
         from_dt = from_dt or _month_start()
         to_dt = to_dt or datetime.now(timezone.utc)
         where_parts = [f"{time_col} >= %(from_dt)s", f"{time_col} <= %(to_dt)s"] + extra_filters
@@ -108,6 +113,7 @@ class ClickHouseLogAdapter:
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
+        """Query app_logs with optional filters and return paginated items and total count."""
         extra_filters: list = []
         extra_params: dict = {}
         if event_type:
@@ -134,6 +140,7 @@ class ClickHouseLogAdapter:
         limit: int = 500,
         offset: int = 0,
     ) -> dict:
+        """Query the hourly aggregate materialized view and return paginated buckets."""
         extra_filters: list = []
         extra_params: dict = {}
         if event_type:
@@ -156,15 +163,18 @@ class ClickHouseLogAdapter:
 
     @staticmethod
     def _module_table(scope: str) -> str:
+        """Return the ClickHouse log table name for the given module scope."""
         safe = re.sub(r"[^a-zA-Z0-9]", "_", scope).lower()
         return f"module_{safe}_logs"
 
     @staticmethod
     def _module_mv(scope: str) -> str:
+        """Return the ClickHouse materialized view name for the given module scope."""
         safe = re.sub(r"[^a-zA-Z0-9]", "_", scope).lower()
         return f"module_{safe}_logs_mv"
 
     def ensure_module_table(self, scope: str) -> None:
+        """Create the per-module event log table for the given scope if it does not exist."""
         table = self._module_table(scope)
         self._client.execute(f"""
             CREATE TABLE IF NOT EXISTS {table} (
@@ -178,6 +188,7 @@ class ClickHouseLogAdapter:
         """)
 
     def ensure_module_mv(self, scope: str) -> None:
+        """Create the per-module hourly aggregate materialized view if it does not exist."""
         table = self._module_table(scope)
         mv = self._module_mv(scope)
         self._client.execute(f"""
@@ -202,6 +213,7 @@ class ClickHouseLogAdapter:
         event_type: str,
         details: dict,
     ) -> None:
+        """Insert a single event row into the per-module log table."""
         table = self._module_table(scope)
         self._client.execute(
             f"INSERT INTO {table} (user_email, event_type, details) VALUES",
@@ -217,6 +229,7 @@ class ClickHouseLogAdapter:
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
+        """Query a module's event log table with optional filters and return paginated results."""
         table = self._module_table(scope)
         extra_filters: list = []
         extra_params: dict = {}
@@ -231,6 +244,19 @@ class ClickHouseLogAdapter:
         keys = ["event_time", "user_email", "event_type", "details"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
 
+    def optimize_tables(self, module_scopes: list[str]) -> dict:
+        """Run OPTIMIZE TABLE FINAL on app_logs and all per-module log tables."""
+        tables = ["app_logs"] + [self._module_table(s) for s in module_scopes]
+        purged: list[str] = []
+        errors: list[str] = []
+        for table in tables:
+            try:
+                self._client.execute(f"OPTIMIZE TABLE {table} FINAL")
+                purged.append(table)
+            except Exception as exc:
+                errors.append(f"{table}: {exc}")
+        return {"purged": purged, "errors": errors}
+
     def query_module_logs_mv(
         self,
         scope: str,
@@ -240,6 +266,7 @@ class ClickHouseLogAdapter:
         limit: int = 500,
         offset: int = 0,
     ) -> dict:
+        """Query the hourly aggregate materialized view for a module and return paginated buckets."""
         mv = self._module_mv(scope)
         extra_filters: list = []
         extra_params: dict = {}

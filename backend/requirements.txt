@@ -7,3 +7,8 @@ python-jose[cryptography]
 bcrypt
 python-dotenv
 httpx
+# Cloud LLM provider SDKs — optional; imported lazily so the backend starts even
+# if these are absent.  They are only needed when at least one bot uses the
+# corresponding provider.
+anthropic
+openai

@@ -1,5 +1,5 @@
 import { type ReactNode, useState, useEffect } from 'react'
-import { botsService, type Bot, type BotPayload, type BotType } from '../services/botsService'
+import { botsService, type Bot, type BotPayload, type BotType, type LLMProvider, PROVIDER_LABELS, PROVIDER_MODEL_HINTS } from '../services/botsService'
 import { settingsService, type ModuleConfig } from '../services/settingsService'
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
@@ -10,7 +10,7 @@ import { Modal } from '../components/ui/Modal'
 import { Toggle } from '../components/ui/Toggle'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { PageTitle } from '../components/ui/PageTitle'
-import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
+import { BOT_TYPES, CUSTOM_ICONS, TYPE_BADGE } from '../constants/botConstants'
 import { type InstalledModelsData } from '../services/modelStatusService'
 
 // ---------------------------------------------------------------------------
@@ -34,7 +34,7 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
 // ---------------------------------------------------------------------------
 
 const BLANK: BotPayload = {
-  name: '', description: '', type: 'communicator', model: '',
+  name: '', description: '', type: 'communicator', provider: 'ollama', model: '',
   system_prompt: '', icon: '💬', active: false, restricted: 'user', modules: [],
 }
 
@@ -56,6 +56,7 @@ function BotModal({
     name: initial.name,
     description: initial.description,
     type: initial.type,
+    provider: initial.provider ?? 'ollama',
     model: initial.model,
     system_prompt: initial.system_prompt,
     icon: initial.icon,
@@ -74,15 +75,14 @@ function BotModal({
 
   function handleTypeChange(newType: string) {
     const bt = botTypes.find(t => t.name === newType)
-    if (!bt) {
-      setForm(f => ({ ...f, type: newType }))
-      return
-    }
+    const clearCore = newType !== 'communicator'
     setForm(f => ({
       ...f,
       type: newType,
-      icon: bt.icon,
-      ...(isNew ? {
+      // For communicator, adopt its icon; for custom, keep current icon (user picks via picker)
+      ...(newType !== 'custom' && bt ? { icon: bt.icon } : {}),
+      modules: clearCore ? f.modules.filter(m => m !== 'core') : f.modules,
+      ...(isNew && bt ? {
         system_prompt: f.system_prompt || bt.preprompt,
         model: f.model || bt.default_model,
       } : {}),
@@ -90,11 +90,9 @@ function BotModal({
   }
 
   useEffect(() => {
-    if (isNew && botTypes.length > 0) {
+    if (isNew && botTypes.length > 0 && form.type !== 'custom') {
       const bt = botTypes.find(t => t.name === form.type)
-      if (bt) {
-        setForm(f => ({ ...f, icon: bt.icon }))
-      }
+      if (bt) setForm(f => ({ ...f, icon: bt.icon }))
     }
   }, [botTypes])
 
@@ -133,13 +131,34 @@ function BotModal({
         <div>
           <Label>Type</Label>
           <div className="flex items-center gap-2">
-            <span className="text-xl leading-none">{currentBotType?.icon ?? form.icon}</span>
+            <span className="text-xl leading-none">{form.type === 'custom' ? form.icon : (currentBotType?.icon ?? form.icon)}</span>
             <div className="flex-1">
               <Select value={form.type} onChange={handleTypeChange}>
                 {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </Select>
             </div>
           </div>
+          {form.type === 'custom' && (
+            <div className="mt-2">
+              <Label>Icon</Label>
+              <div className="flex flex-wrap gap-1 mt-1">
+                {CUSTOM_ICONS.map(ic => (
+                  <button
+                    key={ic}
+                    type="button"
+                    onClick={() => setForm(f => ({ ...f, icon: ic }))}
+                    className={`text-xl px-2 py-1 rounded-lg border transition-colors ${
+                      form.icon === ic
+                        ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/40'
+                        : 'border-slate-300 dark:border-slate-600 hover:border-slate-400 dark:hover:border-slate-500 bg-slate-100 dark:bg-slate-700'
+                    }`}
+                  >
+                    {ic}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -148,17 +167,52 @@ function BotModal({
         <Input value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="What does this bot do?" />
       </div>
 
+      {/* Provider selector — determines which LLM backend the chat route calls */}
+      <div>
+        <Label>Provider</Label>
+        <Select
+          value={form.provider}
+          onChange={v => setForm(f => ({
+            ...f,
+            provider: v as LLMProvider,
+            // Clear the model when switching providers so stale identifiers
+            // (e.g. an Ollama tag) are not accidentally sent to a cloud API.
+            model: '',
+          }))}
+        >
+          {(Object.entries(PROVIDER_LABELS) as [LLMProvider, string][]).map(([id, label]) => (
+            <option key={id} value={id}>{label}</option>
+          ))}
+        </Select>
+        {form.provider !== 'ollama' && (
+          <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+            Requires the corresponding API key set in docker-compose.yml / k8s secrets.
+          </p>
+        )}
+      </div>
+
+      {/* Model field — hints are provider-aware; Ollama shows installed models */}
       <div>
         <Label>Model</Label>
         <input
-          list="ollama-models"
+          list="bot-model-hints"
           value={form.model}
           onChange={e => setForm(f => ({ ...f, model: e.target.value }))}
-          placeholder={currentBotType?.default_model || 'Default (env var)'}
+          placeholder={
+            form.provider === 'ollama'
+              ? (currentBotType?.default_model || 'Default (OLLAMA_MODEL env var)')
+              : form.provider === 'anthropic'
+              ? 'e.g. claude-sonnet-5'
+              : 'e.g. gpt-4o'
+          }
           className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         />
-        <datalist id="ollama-models">
-          {models.map(m => <option key={m} value={m} />)}
+        {/* Datalist merges Ollama installed-model names with static cloud hints */}
+        <datalist id="bot-model-hints">
+          {form.provider === 'ollama'
+            ? models.map(m => <option key={m} value={m} />)
+            : PROVIDER_MODEL_HINTS[form.provider as LLMProvider].map(m => <option key={m} value={m} />)
+          }
         </datalist>
       </div>
 
@@ -176,15 +230,19 @@ function BotModal({
       <div>
         <Label>Modules</Label>
         <div className="mt-1 max-h-36 overflow-y-auto space-y-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 p-2">
-          {/* Platform core — always first */}
-          <label className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600">
+          {/* Platform core — communicator only */}
+          <label className={`flex items-center gap-2 px-1 py-0.5 rounded ${form.type === 'communicator' ? 'cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600' : 'cursor-not-allowed opacity-40'}`}>
             <input
               type="checkbox"
               checked={form.modules.includes('core')}
+              disabled={form.type !== 'communicator'}
               onChange={() => toggleModule('core')}
-              className="rounded border-slate-400"
+              className="rounded border-slate-400 disabled:cursor-not-allowed"
             />
             <span className="text-sm text-slate-700 dark:text-slate-200">🧩 Platform (core)</span>
+            {form.type !== 'communicator' && (
+              <span className="ml-auto text-xs text-slate-400 italic">Communicator only</span>
+            )}
           </label>
           {installedModules.map(mod => (
             <label key={mod.id} className="flex items-center gap-2 px-1 py-0.5 rounded cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600">
@@ -274,7 +332,8 @@ export default function BotsAdmin() {
 
   async function handleToggle(bot: Bot) {
     try {
-      const { id, created_by, roles, ...payload } = bot
+      // Spread the full bot into BotPayload; created_by and created_at are server-only.
+      const { id, created_by, created_at, ...payload } = bot
       await botsService.updateBot(id, { ...payload, active: !bot.active })
       await refetch()
     } catch (err) {
@@ -301,6 +360,7 @@ export default function BotsAdmin() {
                   <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                     <th className="pb-2 pr-4">Bot</th>
                     <th className="pb-2 pr-4">Type</th>
+                    <th className="pb-2 pr-4">Provider</th>
                     <th className="pb-2 pr-4">Model</th>
                     <th className="pb-2 pr-4">Created by</th>
                     <th className="pb-2 pr-4">Active</th>
@@ -322,6 +382,18 @@ export default function BotsAdmin() {
                       <td className="py-2 pr-4">
                         <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_BADGE[bot.type] ?? TYPE_BADGE.custom}`}>
                           {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
+                        </span>
+                      </td>
+                      <td className="py-2 pr-4 text-xs">
+                        {/* Provider badge — colour-coded by backend type */}
+                        <span className={`px-2 py-0.5 rounded-full font-medium ${
+                          bot.provider === 'anthropic'
+                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
+                            : bot.provider === 'openai'
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
+                        }`}>
+                          {bot.provider ?? 'ollama'}
                         </span>
                       </td>
                       <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400 text-xs">

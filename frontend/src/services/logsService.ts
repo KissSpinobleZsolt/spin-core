@@ -1,5 +1,6 @@
 import { apiService } from './apiService'
 
+/** Single HTTP request log entry from ClickHouse. */
 export interface LogEntry {
   event_time: string
   level: string
@@ -12,11 +13,13 @@ export interface LogEntry {
   details: string
 }
 
+/** Paginated list of HTTP log entries. */
 export interface LogsPage {
   items: LogEntry[]
   total: number
 }
 
+/** Aggregated log summary row keyed by time bucket, path, and status code. */
 export interface SummaryEntry {
   bucket: string
   event_type: string
@@ -28,11 +31,13 @@ export interface SummaryEntry {
   error_count: number
 }
 
+/** Paginated list of hourly summary entries. */
 export interface SummaryPage {
   items: SummaryEntry[]
   total: number
 }
 
+/** Detailed payload of a single chat completion log event. */
 export interface ChatLogDetails {
   model: string
   messages: { role: string; content: string }[]
@@ -42,18 +47,22 @@ export interface ChatLogDetails {
   duration_ms: number
 }
 
+/** Single chat completion log entry stored in ClickHouse. */
 export interface ChatLogEntry {
   event_time: string
   user_email: string
   event_type: string
+  /** JSON-encoded ChatLogDetails payload. */
   details: string        // JSON-encoded ChatLogDetails
 }
 
+/** Paginated list of chat log entries. */
 export interface ChatLogsPage {
   items: ChatLogEntry[]
   total: number
 }
 
+/** Aggregated chat activity summary keyed by time bucket and event type. */
 export interface ChatSummaryEntry {
   bucket: string
   event_type: string
@@ -61,11 +70,13 @@ export interface ChatSummaryEntry {
   unique_users: number
 }
 
+/** Paginated list of chat summary entries. */
 export interface ChatSummaryPage {
   items: ChatSummaryEntry[]
   total: number
 }
 
+/** Optional filter and pagination parameters for the HTTP logs endpoint. */
 export interface LogsParams {
   limit?: number
   offset?: number
@@ -75,6 +86,7 @@ export interface LogsParams {
   to?: string
 }
 
+/** Optional filter and pagination parameters for the log summary endpoint. */
 export interface SummaryParams {
   from?: string
   to?: string
@@ -84,6 +96,7 @@ export interface SummaryParams {
   offset?: number
 }
 
+/** Optional filter and pagination parameters for the chat logs endpoint. */
 export interface ChatLogsParams {
   from?: string
   to?: string
@@ -92,18 +105,22 @@ export interface ChatLogsParams {
   offset?: number
 }
 
+/** Single event log entry emitted by a module. */
 export interface ModuleLogEntry {
   event_time: string
   user_email: string
   event_type: string
+  /** JSON-encoded structured event payload. */
   details: string
 }
 
+/** Paginated list of module log entries. */
 export interface ModuleLogsPage {
   items: ModuleLogEntry[]
   total: number
 }
 
+/** Aggregated module activity summary keyed by time bucket and event type. */
 export interface ModuleLogSummaryEntry {
   bucket: string
   event_type: string
@@ -111,11 +128,13 @@ export interface ModuleLogSummaryEntry {
   unique_users: number
 }
 
+/** Paginated list of module log summary entries. */
 export interface ModuleLogSummaryPage {
   items: ModuleLogSummaryEntry[]
   total: number
 }
 
+/** Optional filter and pagination parameters for module log events. */
 export interface ModuleLogsParams {
   from?: string
   to?: string
@@ -133,6 +152,7 @@ function buildQs(params: Record<string, string | number | undefined>): string {
   return s ? '?' + s : ''
 }
 
+/** Retrieve, summarise, and purge ClickHouse log records across HTTP, chat, and module scopes. */
 export const logsService = {
   async getLogs(params: LogsParams = {}): Promise<LogsPage> {
     const qs = buildQs({
@@ -188,5 +208,9 @@ export const logsService = {
   async getModuleLogsSummary(moduleId: string, params: { from?: string; to?: string } = {}): Promise<ModuleLogSummaryPage> {
     const qs = buildQs({ from: params.from, to: params.to })
     return apiService.get(`/module-logs/${moduleId}/summary${qs}`)
+  },
+
+  async purgeExpiredLogs(): Promise<{ purged: string[]; errors: string[] }> {
+    return apiService.post('/logs/purge')
   },
 }

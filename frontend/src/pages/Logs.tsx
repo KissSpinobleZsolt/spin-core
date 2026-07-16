@@ -348,6 +348,19 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
 export default function Logs() {
   const [tab, setTab] = useState<Tab>('http')
   const [timeRange, setTimeRange] = useState<TimeRange>(defaultTimeRange())
+  const [purging, setPurging] = useState(false)
+  const [purgeResult, setPurgeResult] = useState<{ purged: string[]; errors: string[] } | null>(null)
+
+  async function handlePurge() {
+    setPurging(true)
+    setPurgeResult(null)
+    try {
+      const result = await logsService.purgeExpiredLogs()
+      setPurgeResult(result)
+    } finally {
+      setPurging(false)
+    }
+  }
 
   const tabCls = (t: Tab) =>
     `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
@@ -358,7 +371,21 @@ export default function Logs() {
 
   return (
     <div className="space-y-4">
-      <PageTitle>Logs</PageTitle>
+      <div className="flex items-center justify-between">
+        <PageTitle>Logs</PageTitle>
+        <div className="flex items-center gap-3">
+          {purgeResult && (
+            <span className={`text-xs ${purgeResult.errors.length ? 'text-yellow-600 dark:text-yellow-400' : 'text-green-600 dark:text-green-400'}`}>
+              {purgeResult.errors.length
+                ? `${purgeResult.purged.length} purged, ${purgeResult.errors.length} error(s)`
+                : `${purgeResult.purged.length} table(s) purged`}
+            </span>
+          )}
+          <Btn variant="secondary" disabled={purging} onClick={handlePurge}>
+            {purging ? 'Purging…' : 'Purge expired logs'}
+          </Btn>
+        </div>
+      </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4">
         <TimeRangeFilter value={timeRange} onChange={range => setTimeRange(range)} />

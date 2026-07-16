@@ -14,12 +14,13 @@ from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
 from app.state import get_settings, set_settings
 
-from app.routes import auth, dashboard, ingestion, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status, bots
+from app.routes import auth, dashboard, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy
 from app.routes.model_status import _required_models
 
 
 def _build_module_dict(m: dict) -> dict:
     return {
+        "id": m.get("id"),
         "name": m.get("name", ""),
         "description": m.get("description", ""),
         "remote_url": m.get("remote_url", ""),
@@ -30,7 +31,23 @@ def _build_module_dict(m: dict) -> dict:
         "enabled": m.get("enabled", True),
         "roles": m.get("roles", ["user", "admin"]),
         "presets": m.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
+        "backend_url": m.get("backend_url"),
     }
+
+
+_PURGE_INTERVAL_SECONDS = 24 * 60 * 60  # 24 hours
+
+
+async def _daily_log_purge() -> None:
+    await asyncio.sleep(_PURGE_INTERVAL_SECONDS)
+    while True:
+        try:
+            scopes = [m["scope"] for m in get_pg().get_modules()]
+            result = get_ch().optimize_tables(scopes)
+            print(f"[spin-core] Daily log purge: {len(result['purged'])} table(s) optimized", file=sys.stderr)
+        except Exception as exc:
+            print(f"[spin-core] Daily log purge failed: {exc}", file=sys.stderr)
+        await asyncio.sleep(_PURGE_INTERVAL_SECONDS)
 
 
 @asynccontextmanager
@@ -122,6 +139,11 @@ async def lifespan(app: FastAPI):
                         })
                         registered_scopes.add(scope)
                         print(f"[spin-core] Auto-discovered module: {scope}", file=sys.stderr)
+                        bots_from_manifest = m.get("bots") or []
+                        if bots_from_manifest:
+                            mod = pg.get_module_by_scope(scope)
+                            if mod:
+                                pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
                 except Exception as exc:
                     print(f"[spin-core] Discovery failed for {base_url}: {exc}", file=sys.stderr)
 
@@ -137,19 +159,23 @@ async def lifespan(app: FastAPI):
     # Ensure ClickHouse tables + materialized views for app_logs, chatbot, and all registered modules
     ch = get_ch()
     ch.ensure_app_logs_mv()
-    ch.ensure_module_table("chatbot")
-    ch.ensure_module_mv("chatbot")
     for m in pg.get_modules():
         ch.ensure_module_table(m["scope"])
         ch.ensure_module_mv(m["scope"])
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
+    purge_task = asyncio.create_task(_daily_log_purge())
 
     yield
 
     tracker_task.cancel()
+    purge_task.cancel()
     try:
         await tracker_task
+    except asyncio.CancelledError:
+        pass
+    try:
+        await purge_task
     except asyncio.CancelledError:
         pass
 
@@ -197,7 +223,6 @@ async def log_requests(request: Request, call_next):
 app.include_router(auth.router)
 app.include_router(dashboard.router)
 app.include_router(settings.router)
-app.include_router(ingestion.router)
 app.include_router(logs.router)
 app.include_router(module_data.router)
 app.include_router(module_logs.router)
@@ -206,3 +231,4 @@ app.include_router(health.router)
 app.include_router(chat.router)
 app.include_router(model_status.router)
 app.include_router(bots.router)
+app.include_router(plugin_proxy.router)

@@ -56,6 +56,7 @@ async function request<T>(
   return res.json() as Promise<T>
 }
 
+/** Typed HTTP client for the spin-core API, attaching auth tokens and enforcing a 15-second timeout. */
 export const apiService = {
   get<T>(url: string, options?: RequestOptions) {
     return request<T>('GET', url, undefined, options)

@@ -4,9 +4,37 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 
 ## Available modules
 
-| Module | Port | Scope | Description |
-|--------|------|-------|-------------|
-| [hello-world](hello-world/README.md) | 3001 | `helloWorld` | Reference remote — counter widget |
+Each module lives in its own GitHub repository and is wired into spin-core as a git submodule (see `workspace.yml`).
+
+| Module | Repo | Frontend port | Backend port | Scope | Description |
+|--------|------|--------------|--------------|-------|-------------|
+| [hello-world](hello-world/README.md) | [spi-module-hello-world](https://github.com/KissSpinobleZsolt/spi-module-hello-world) | 3001 | — | `helloWorld` | Reference remote — counter widget (frontend only) |
+| [CloudInsight AI](cloud-insight-ai/README.md) | [spi-module-cloud-insight-ai](https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai) | 3002 | 8002 | `cloudInsightAI` | Data source upload, processing, and management |
+| [AnomaScan](AnomaScan/README.md) | [spi-module-anomascan](https://github.com/KissSpinobleZsolt/spi-module-anomascan) | 3003 | 8003 | `anomaScan` | YOLO object detection and model fine-tuning |
+
+### Submodule workflow
+
+**First-time setup after cloning spin-core without `--recurse-submodules`:**
+```bash
+bash scripts/setup-workspace.sh
+```
+
+**Working on a module:**
+```bash
+cd modules/hello-world        # full git repo — push/PR against spi-module-hello-world
+git checkout -b feat/my-thing
+# ... make changes, then:
+git push origin feat/my-thing
+```
+
+**Bumping a module version in spin-core (after a module PR is merged):**
+```bash
+cd modules/hello-world
+git pull origin main
+cd ../..
+git add modules/hello-world
+git commit -m "chore: bump hello-world submodule to <sha>"
+```
 
 > The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
 
@@ -56,7 +84,8 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
   "icon": "🔧",
   "roles": ["user", "admin"],
   "description": "Short description shown in the discovery panel.",
-  "remote_entry": "http://localhost:3001/remoteEntry.js"
+  "remote_entry": "http://localhost:3001/remoteEntry.js",
+  "backend_url": "http://my-module-backend:8000"
 }
 ```
 
@@ -64,7 +93,34 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
 
 `description` is shown in the discovery panel and the admin module list. Kept short (one sentence).
 
+`backend_url` is **optional** — only set it if your module has its own plugin backend service. When present, the core backend registers it in the `modules` table and proxies `POST /api/plugin/{scope}/…` requests to it. Omit the field for frontend-only modules.
+
 `presets` are **not** part of `manifest.json` — they are set by admins in the platform UI and stored in PostgreSQL, then injected as `props.presets` into the remote component at load time. The remote does not need to declare them in the manifest.
+
+## Plugin backends
+
+Some modules need server-side logic (file processing, ML inference, database writes) that does not belong in the core backend. The **plugin backend pattern** keeps the core image lightweight:
+
+```
+Browser
+  └─ Module frontend (remoteEntry.js)
+       └─ REST calls ──► POST /api/plugin/{scope}/{path}
+                              └─ core backend proxy
+                                   └─ module backend (backend_url)
+
+       └─ WebSocket ──► direct to module backend URL
+                         (passed via presets.settings.backend_url)
+```
+
+**To add a backend to your module:**
+
+1. Create `your-module/backend/` — a standalone FastAPI app.
+2. Add `your-module/backend/Dockerfile` — install only what your module needs (e.g. PyTorch, ultralytics).
+3. Add `"backend_url": "http://your-module-backend:8000"` to `manifest.json`.
+4. Add the backend service to `docker-compose.yml` (expose DB credentials via env vars — the module backend shares the same PostgreSQL and ClickHouse instance as the core).
+5. Register or re-scan the module in Admin → Modules — the core will store `backend_url` and start proxying.
+
+The `Authorization` header is forwarded verbatim from the proxy to the module backend. Module backends validate the same `JWT_SECRET_KEY` env var.
 
 ## React singleton contract
 

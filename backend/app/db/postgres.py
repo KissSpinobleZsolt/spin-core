@@ -12,6 +12,7 @@ Base = declarative_base()
 
 
 class UserRow(Base):
+    """SQLAlchemy ORM model for the users table."""
     __tablename__ = "users"
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, nullable=False, index=True)
@@ -22,6 +23,7 @@ class UserRow(Base):
 
 
 class PageRow(Base):
+    """SQLAlchemy ORM model for the page_responses table."""
     __tablename__ = "page_responses"
     id = Column(Integer, primary_key=True, index=True)
     page_key = Column(String, unique=True, nullable=False, index=True)
@@ -29,6 +31,7 @@ class PageRow(Base):
 
 
 class BotTypeRow(Base):
+    """SQLAlchemy ORM model for the bot_types table."""
     __tablename__ = "bot_types"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False, unique=True)
@@ -43,17 +46,25 @@ class BotTypeRow(Base):
 
 
 class BotRow(Base):
+    """SQLAlchemy ORM model for the bots table.
+
+    Attributes:
+        provider: LLM backend identifier — ``"ollama"`` (default), ``"anthropic"``,
+            or ``"openai"``.  Added via migration so existing rows default to ``"ollama"``.
+    """
+
     __tablename__ = "bots"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False, default="")
     type = Column(String, nullable=False, default="communicator")
+    # provider selects the LLM backend; "ollama" keeps existing bots unchanged.
+    provider = Column(String, nullable=False, default="ollama")
     model = Column(String, nullable=False, default="")
     system_prompt = Column(Text, nullable=False, default="")
     icon = Column(String, nullable=False, default="🤖")
     active = Column(Boolean, nullable=False, default=False)
     restricted = Column(String, nullable=False, default="user")
-    roles = Column(ARRAY(String), nullable=False, default=list)
     modules = Column(ARRAY(String), nullable=False, default=list)
     created_by = Column(String, nullable=True, default="")
     created_at = Column(DateTime, server_default=func.now())
@@ -61,6 +72,7 @@ class BotRow(Base):
 
 
 class TranslationRow(Base):
+    """SQLAlchemy ORM model for the translations table."""
     __tablename__ = "translations"
     lang = Column(String, primary_key=True)
     data = Column(JSON, nullable=False)
@@ -68,6 +80,7 @@ class TranslationRow(Base):
 
 
 class ModuleRow(Base):
+    """SQLAlchemy ORM model for the modules table."""
     __tablename__ = "modules"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     name = Column(String, nullable=False)
@@ -80,9 +93,11 @@ class ModuleRow(Base):
     enabled = Column(Boolean, nullable=False, default=True)
     roles = Column(ARRAY(String), nullable=False, default=list)
     presets = Column(JSON, nullable=False, default=dict)
+    backend_url = Column(String, nullable=True)
 
 
 class ModuleDocumentRow(Base):
+    """SQLAlchemy ORM model for the module_documents table."""
     __tablename__ = "module_documents"
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     module_id = Column(String, nullable=False)
@@ -95,6 +110,7 @@ class ModuleDocumentRow(Base):
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
+    """Recursively merge override into base, returning a new dict with override values preferred."""
     result = dict(base)
     for key, value in override.items():
         if key in result and isinstance(result[key], dict) and isinstance(value, dict):
@@ -105,19 +121,27 @@ def _deep_merge(base: dict, override: dict) -> dict:
 
 
 class PostgresAdapter:
+    """Manages all PostgreSQL CRUD operations for the platform via SQLAlchemy."""
     def __init__(self, db_url: str) -> None:
+        """Create the SQLAlchemy engine, session factory, schema, and run migrations."""
         self._engine = create_engine(db_url)
         self._Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
         Base.metadata.create_all(bind=self._engine)
         self._run_migrations()
 
     def _run_migrations(self) -> None:
+        """Apply idempotent ALTER TABLE migrations to bring the schema up to date."""
         stmts = [
             "ALTER TABLE translations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS restricted VARCHAR NOT NULL DEFAULT 'user'",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS modules VARCHAR[] NOT NULL DEFAULT '{}'",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_by VARCHAR DEFAULT ''",
+            "ALTER TABLE bots DROP COLUMN IF EXISTS roles",
+            # provider column: existing bots default to "ollama" so they keep working
+            # without any manual data migration.
+            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS provider VARCHAR NOT NULL DEFAULT 'ollama'",
+            "ALTER TABLE modules ADD COLUMN IF NOT EXISTS backend_url VARCHAR",
         ]
         with self._engine.connect() as conn:
             for stmt in stmts:
@@ -133,6 +157,7 @@ class PostgresAdapter:
 
     @contextmanager
     def _session_ctx(self):
+        """Context manager that opens a SQLAlchemy session and closes it on exit."""
         db = self._session()
         try:
             yield db
@@ -140,6 +165,7 @@ class PostgresAdapter:
             db.close()
 
     def get_user_by_email(self, email: str) -> UserRecord | None:
+        """Return the UserRecord for the given email, or None if not found."""
         with self._session_ctx() as db:
             row = db.query(UserRow).filter(UserRow.email == email).first()
             if not row:
@@ -160,6 +186,7 @@ class PostgresAdapter:
         roles: list[str],
         default_theme: str,
     ) -> UserRecord:
+        """Insert a new user row and return the resulting UserRecord."""
         with self._session_ctx() as db:
             row = UserRow(
                 email=email,
@@ -173,6 +200,7 @@ class PostgresAdapter:
             return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)
 
     def update_user_theme(self, email: str, theme: str) -> None:
+        """Update the stored default_theme preference for a user by email."""
         with self._session_ctx() as db:
             row = db.query(UserRow).filter(UserRow.email == email).first()
             if row:
@@ -180,11 +208,13 @@ class PostgresAdapter:
                 db.commit()
 
     def get_page(self, key: str) -> str | None:
+        """Return the content string for the given page key, or None if absent."""
         with self._session_ctx() as db:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()
             return row.content if row else None
 
     def upsert_page(self, key: str, content: str) -> None:
+        """Insert or update the page_responses row for the given key."""
         with self._session_ctx() as db:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()
             if row:
@@ -194,22 +224,35 @@ class PostgresAdapter:
             db.commit()
 
     def _bot_row_to_record(self, row: BotRow) -> BotRecord:
+        """Convert a BotRow ORM instance to a BotRecord dataclass.
+
+        Args:
+            row: SQLAlchemy ORM instance loaded from the ``bots`` table.
+
+        Returns:
+            A `BotRecord` dataclass with all fields populated.  The ``provider``
+            field defaults to ``"ollama"`` when the column contains ``None`` (pre-migration rows).
+        """
         return BotRecord(
             id=row.id,
             name=row.name,
             description=row.description,
             type=row.type,
+            # Guard against pre-migration NULL in case the migration ran while the
+            # server was live and an old row slips through before the transaction commits.
+            provider=row.provider or "ollama",
             model=row.model,
             system_prompt=row.system_prompt,
             icon=row.icon,
             active=row.active,
             restricted=row.restricted or "user",
-            roles=list(row.roles or []),
             modules=list(row.modules or []),
             created_by=row.created_by or "",
+            created_at=row.created_at,
         )
 
     def _bot_type_row_to_dict(self, row: BotTypeRow) -> dict:
+        """Convert a BotTypeRow ORM instance to a plain dictionary."""
         return {
             "id": row.id,
             "name": row.name,
@@ -224,6 +267,7 @@ class PostgresAdapter:
         }
 
     def get_bots(self, admin: bool = False, user_roles: list[str] | None = None) -> list[BotRecord]:
+        """Return bots filtered by active status and role visibility depending on the caller."""
         with self._session_ctx() as db:
             q = db.query(BotRow)
             if not admin:
@@ -233,17 +277,72 @@ class PostgresAdapter:
                 return [self._bot_row_to_record(r) for r in rows]
             result = []
             for r in rows:
-                bot_roles = list(r.roles or [])
-                if not bot_roles or any(role in bot_roles for role in (user_roles or [])):
-                    result.append(self._bot_row_to_record(r))
+                if r.restricted == "admin" and "admin" not in (user_roles or []):
+                    continue
+                result.append(self._bot_row_to_record(r))
             return result
 
+    def get_bots_for_module(self, module_id: str, user_roles: list[str] | None = None) -> list[BotRecord]:
+        """Return active bots associated with a specific module, filtered by the caller's roles."""
+        with self._session_ctx() as db:
+            rows = (
+                db.query(BotRow)
+                .filter(BotRow.active == True, BotRow.modules.contains([module_id]))
+                .order_by(BotRow.created_at)
+                .all()
+            )
+            result = []
+            for r in rows:
+                if r.restricted == "admin" and "admin" not in (user_roles or []):
+                    continue
+                result.append(self._bot_row_to_record(r))
+            return result
+
+    def seed_bots_for_module(self, module_id: str, bots_data: list[dict], created_by: str = "") -> None:
+        """Provision bots declared in a module manifest, skipping any that already exist.
+
+        Args:
+            module_id: ID of the owning module; used as the sole entry in ``modules``.
+            bots_data: List of bot dicts from the module manifest.  Each dict may
+                include a ``provider`` key (defaults to ``"ollama"``).
+            created_by: Email stored in ``created_by``; empty for system-provisioned bots.
+        """
+        for bot in bots_data:
+            name = bot.get("name", "").strip()
+            if not name:
+                continue
+            with self._session_ctx() as db:
+                exists = (
+                    db.query(BotRow)
+                    .filter(BotRow.name == name, BotRow.modules.contains([module_id]))
+                    .first()
+                )
+            if exists:
+                continue
+            self.create_bot(
+                name=name,
+                description=bot.get("description", ""),
+                type=bot.get("type", "communicator"),
+                provider=bot.get("provider", "ollama"),
+                model=bot.get("model", ""),
+                system_prompt=bot.get("system_prompt", ""),
+                icon=bot.get("icon", "🤖"),
+                active=bot.get("active", True),
+                restricted=bot.get("restricted", "user"),
+                modules=[module_id],
+                created_by=created_by,
+            )
+            import sys
+            print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)
+
     def get_bot_types(self) -> list[dict]:
+        """Return all bot types ordered alphabetically by name."""
         with self._session_ctx() as db:
             rows = db.query(BotTypeRow).order_by(BotTypeRow.name).all()
             return [self._bot_type_row_to_dict(r) for r in rows]
 
     def upsert_bot_type(self, data: dict) -> dict:
+        """Insert or update a bot type by name and return the resulting dict."""
         with self._session_ctx() as db:
             row = db.query(BotTypeRow).filter(BotTypeRow.name == data["name"]).first()
             if not row:
@@ -274,6 +373,7 @@ class PostgresAdapter:
             return self._bot_type_row_to_dict(row)
 
     def get_bot_by_id(self, bot_id: str) -> BotRecord | None:
+        """Return the BotRecord for the given ID, or None if not found."""
         with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             return self._bot_row_to_record(row) if row else None
@@ -283,6 +383,7 @@ class PostgresAdapter:
         name: str,
         description: str,
         type: str,
+        provider: str,
         model: str,
         system_prompt: str,
         icon: str,
@@ -291,18 +392,39 @@ class PostgresAdapter:
         modules: list[str],
         created_by: str = "",
     ) -> BotRecord:
+        """Insert a new bot row and return the resulting BotRecord.
+
+        Args:
+            name: Display name for the bot.
+            description: Short description of the bot's purpose.
+            type: Bot-type slug (e.g. ``"communicator"``).
+            provider: LLM backend — ``"ollama"``, ``"anthropic"``, or ``"openai"``.
+            model: Provider-specific model identifier; empty string uses the provider default.
+            system_prompt: Custom instructions prepended to each conversation.
+            icon: Emoji representing the bot.
+            active: Whether the bot is visible to non-admin users.  Forced to
+                ``False`` when ``modules`` is empty.
+            restricted: Role required to use this bot (``"user"`` or ``"admin"``).
+            modules: Module IDs this bot is scoped to.
+            created_by: Email of the creating admin.
+
+        Returns:
+            The newly inserted `BotRecord`.
+        """
         with self._session_ctx() as db:
             row = BotRow(
                 id=str(uuid.uuid4()),
                 name=name,
                 description=description,
                 type=type,
+                provider=provider,
                 model=model,
                 system_prompt=system_prompt,
                 icon=icon,
+                # A bot with no module assignments can never appear in any UI surface,
+                # so activating it would be confusing — force it off.
                 active=active and bool(modules),
                 restricted=restricted,
-                roles=["user", "admin"],
                 modules=modules,
                 created_by=created_by,
             )
@@ -317,6 +439,7 @@ class PostgresAdapter:
         name: str,
         description: str,
         type: str,
+        provider: str,
         model: str,
         system_prompt: str,
         icon: str,
@@ -324,6 +447,24 @@ class PostgresAdapter:
         restricted: str,
         modules: list[str],
     ) -> BotRecord | None:
+        """Update an existing bot by ID and return the updated BotRecord, or None if not found.
+
+        Args:
+            bot_id: UUID of the bot to update.
+            name: New display name.
+            description: New description.
+            type: New bot-type slug.
+            provider: New LLM backend identifier.
+            model: New provider-specific model identifier.
+            system_prompt: New custom system instructions.
+            icon: New emoji icon.
+            active: New active flag; forced to ``False`` when ``modules`` is empty.
+            restricted: New role restriction.
+            modules: New module-ID list.
+
+        Returns:
+            Updated `BotRecord` on success, or ``None`` when ``bot_id`` is not found.
+        """
         with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             if not row:
@@ -331,18 +472,19 @@ class PostgresAdapter:
             row.name = name
             row.description = description
             row.type = type
+            row.provider = provider
             row.model = model
             row.system_prompt = system_prompt
             row.icon = icon
             row.active = active and bool(modules)
             row.restricted = restricted
-            row.roles = list(row.roles or ["user", "admin"])
             row.modules = modules
             db.commit()
             db.refresh(row)
             return self._bot_row_to_record(row)
 
     def delete_bot(self, bot_id: str) -> bool:
+        """Delete a bot by ID and return True if the row existed."""
         with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()
             if not row:
@@ -356,6 +498,7 @@ class PostgresAdapter:
     # ------------------------------------------------------------------
 
     def _module_row_to_dict(self, row: "ModuleRow") -> dict:
+        """Convert a ModuleRow ORM instance to a plain dictionary."""
         return {
             "id": row.id,
             "name": row.name,
@@ -368,9 +511,11 @@ class PostgresAdapter:
             "enabled": row.enabled,
             "roles": list(row.roles or []),
             "presets": row.presets or {"i18n": {}, "layout": {}, "settings": {}},
+            "backend_url": row.backend_url or None,
         }
 
     def get_modules(self, enabled_only: bool = False, user_roles: list[str] | None = None) -> list[dict]:
+        """Return modules, optionally limited to enabled ones and filtered by the caller's roles."""
         with self._session_ctx() as db:
             q = db.query(ModuleRow)
             if enabled_only:
@@ -386,8 +531,15 @@ class PostgresAdapter:
             return result
 
     def get_module(self, module_id: str) -> dict | None:
+        """Return the module dict for the given ID, or None if not found."""
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            return self._module_row_to_dict(row) if row else None
+
+    def get_module_by_scope(self, scope: str) -> dict | None:
+        """Return the module dict for the given Webpack federation scope, or None if not found."""
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.scope == scope).first()
             return self._module_row_to_dict(row) if row else None
 
     def upsert_module(self, data: dict) -> dict:
@@ -404,6 +556,8 @@ class PostgresAdapter:
                 row.enabled = data.get("enabled", row.enabled)
                 row.roles = data.get("roles", list(row.roles or []))
                 row.presets = data.get("presets", row.presets)
+                if "backend_url" in data:
+                    row.backend_url = data["backend_url"] or None
             else:
                 row = ModuleRow(
                     id=data.get("id") or str(uuid.uuid4()),
@@ -417,6 +571,7 @@ class PostgresAdapter:
                     enabled=data.get("enabled", True),
                     roles=data.get("roles", ["user", "admin"]),
                     presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
+                    backend_url=data.get("backend_url") or None,
                 )
                 db.add(row)
             db.commit()
@@ -424,6 +579,7 @@ class PostgresAdapter:
             return self._module_row_to_dict(row)
 
     def create_module(self, data: dict) -> dict:
+        """Insert a new module row and return its dict representation."""
         with self._session_ctx() as db:
             row = ModuleRow(
                 id=str(uuid.uuid4()),
@@ -437,6 +593,7 @@ class PostgresAdapter:
                 enabled=data.get("enabled", True),
                 roles=data.get("roles", ["user", "admin"]),
                 presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
+                backend_url=data.get("backend_url") or None,
             )
             db.add(row)
             db.commit()
@@ -444,6 +601,7 @@ class PostgresAdapter:
             return self._module_row_to_dict(row)
 
     def update_module(self, module_id: str, data: dict) -> dict | None:
+        """Update a module by ID and return the updated dict, or None if not found."""
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
             if not row:
@@ -457,11 +615,14 @@ class PostgresAdapter:
             row.enabled = data.get("enabled", row.enabled)
             row.roles = data.get("roles", list(row.roles or []))
             row.presets = data.get("presets", row.presets)
+            if "backend_url" in data:
+                row.backend_url = data["backend_url"] or None
             db.commit()
             db.refresh(row)
             return self._module_row_to_dict(row)
 
     def delete_module(self, module_id: str) -> bool:
+        """Delete a module by ID and return True if the row existed."""
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
             if not row:
@@ -475,11 +636,13 @@ class PostgresAdapter:
     # ------------------------------------------------------------------
 
     def get_i18n_data(self, lang: str) -> dict | None:
+        """Return the translation dict for the given language code, or None if absent."""
         with self._session_ctx() as db:
             row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
             return dict(row.data) if row else None
 
     def set_i18n_data(self, lang: str, data: dict) -> None:
+        """Upsert the full translation data dict for the given language code."""
         from datetime import datetime
         with self._session_ctx() as db:
             row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
@@ -491,10 +654,12 @@ class PostgresAdapter:
             db.commit()
 
     def merge_i18n_data(self, lang: str, defaults: dict) -> None:
+        """Deep-merge defaults into the existing translation data, preserving admin overrides."""
         existing = self.get_i18n_data(lang) or {}
         self.set_i18n_data(lang, _deep_merge(defaults, existing))
 
     def get_i18n_versions(self) -> dict[str, str]:
+        """Return a mapping of language code to ISO-formatted last-updated timestamp."""
         with self._session_ctx() as db:
             rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()
             return {
@@ -513,6 +678,7 @@ class PostgresAdapter:
         limit: int = 50,
         skip: int = 0,
     ) -> list[dict]:
+        """Return paginated documents from a module collection, each merged with its ID."""
         with self._session_ctx() as db:
             q = (
                 db.query(ModuleDocumentRow)
@@ -526,6 +692,7 @@ class PostgresAdapter:
             return [{"id": row.id, **(row.data or {})} for row in q.all()]
 
     def insert_document(self, module_id: str, collection: str, data: dict) -> str:
+        """Insert a document into a module collection and return its generated ID."""
         with self._session_ctx() as db:
             row = ModuleDocumentRow(
                 id=str(uuid.uuid4()),
@@ -538,6 +705,7 @@ class PostgresAdapter:
             return row.id
 
     def update_document(self, module_id: str, collection: str, doc_id: str, update: dict) -> bool:
+        """Replace a document's data payload and return True if the document existed."""
         with self._session_ctx() as db:
             row = (
                 db.query(ModuleDocumentRow)
@@ -555,6 +723,7 @@ class PostgresAdapter:
             return True
 
     def delete_document(self, module_id: str, collection: str, doc_id: str) -> bool:
+        """Delete a document from a module collection and return True if it existed."""
         with self._session_ctx() as db:
             row = (
                 db.query(ModuleDocumentRow)

@@ -5,12 +5,14 @@ from app.database import get_pg
 
 
 def require_token(authorization: str) -> str:
+    """Validate the Bearer token and return the authenticated user's email."""
     if not authorization.startswith("Bearer "):
         raise HTTPException(status_code=401, detail="Missing token")
     return decode_token(authorization.removeprefix("Bearer "))
 
 
 def require_admin(authorization: str) -> str:
+    """Validate the Bearer token and raise HTTP 403 if the user does not have the admin role."""
     email = require_token(authorization)
     user = get_pg().get_user_by_email(email)
     if not user or "admin" not in user.roles:

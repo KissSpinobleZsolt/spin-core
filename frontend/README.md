@@ -22,9 +22,9 @@ React 19 SPA for the spin-core platform.
 | `/bots/:botId` | Bot chat | Yes | Full-page streaming chat with a specific bot |
 | `/admin/llms` | LLMs | Admin | Ollama model management — pull, list, delete |
 | `/admin/users` | Users | Admin | User listing (stub) |
-| `/admin/modules` | Modules | Admin | Module CRUD — register (with description + JSON presets), edit, delete, toggle, scan for new modules, view per-module log drawer |
+| `/admin/modules` | Modules | Admin | Module CRUD — register (with i18n translations + manifest auto-fill), edit, delete, toggle, scan for new modules, view per-module log drawer |
 | `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
-| `/logs` | Logs | Admin | ClickHouse event log viewer |
+| `/logs` | Logs | Admin | ClickHouse event log viewer + "Purge expired logs" admin button |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
 | `/modules/:id` | Federated module | Yes | Webpack container protocol |
@@ -40,6 +40,7 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 | `SettingsContext` | — | Polls `GET /api/settings` |
 | `UIPrefsContext` | `ui_prefs` (localStorage) | Sidebar collapsed state, cross-tab sync |
 | `HealthContext` | — | Receives DB liveness updates from the health Web Worker |
+| `ModelStatusContext` | — | Provides Ollama model readiness state — consumed by `ChatBubble` to decide visibility |
 
 ## Health monitoring
 
@@ -122,9 +123,11 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`/bots`** (`src/pages/Bots.tsx`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
 
-**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model.
+**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots render a `BotConfigSkeleton` placeholder instead of the chat UI.
 
-**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default "AI Assistant" bot is seeded on first backend startup.
+**`ModuleBotPanel`** (`src/components/modules/ModuleBotPanel.tsx`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
+
+**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
 
 ### Module presets
 
@@ -134,7 +137,19 @@ Each registered module stores a `presets` JSON blob (`{ i18n, layout, settings }
 <RemoteComponent presets={mod.presets} />
 ```
 
-Remote components can read `props.presets` to receive platform configuration without any additional API calls. Admins set preset values in the **Admin → Modules** form via three collapsible JSON editors (one per preset type).
+Remote components can read `props.presets` to receive platform configuration without any additional API calls.
+
+### Add / Edit module form
+
+The **Admin → Modules** add/edit modal exposes two additional actions beyond the basic fields:
+
+**Load manifest** — button next to the Remote entry URL field. The browser fetches `manifest.json` from the module's base URL directly (no backend proxy — nginx serves it with `Access-Control-Allow-Origin: *`). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots will be provisioned on save.
+
+**i18n translations** — a JSON textarea that accepts a multi-language object:
+```json
+{ "en": { "key": "value" }, "ro": { "cheie": "valoare" } }
+```
+When the form is saved, each language key is posted to `PUT /api/i18n/{lang}` before the module record is persisted, merging the translations into the database.
 
 ### Module discovery
 
@@ -170,7 +185,7 @@ All reusable primitives live in `src/components/ui/`. Always import from there �
 | `src/utils/safeJsonParse.ts` | `safeJsonParse<T>(raw, fallback)` |
 | `src/constants/botConstants.ts` | `BOT_TYPES`, `TYPE_BADGE` |
 | `src/services/modelStatusService.ts` | `InstalledModel`, `InstalledModelsData` types |
-| `src/hooks/useChatStream.ts` | `useChatStream(botId, model)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
+| `src/hooks/useChatStream.ts` | `useChatStream(botId, model, moduleId?)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
 | `src/hooks/useModelStatus.ts` | `useModelStatus()` → `{ status, dismissed, dismiss }` |
 
 ## First-visit modals

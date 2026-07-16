@@ -1,8 +1,10 @@
 import { useState } from 'react'
 
+/** A single chat message with a role and text content. */
 export type Message = { role: 'user' | 'assistant'; content: string }
 
-export function useChatStream(botId: string | undefined, selectedModel: string) {
+/** Manages chat history, input state, and streaming responses from the /api/chat endpoint. */
+export function useChatStream(botId: string | undefined, selectedModel: string, moduleId?: string) {
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -19,6 +21,7 @@ export function useChatStream(botId: string | undefined, selectedModel: string) 
     const body: Record<string, unknown> = { messages: history }
     if (botId) {
       body.bot_id = botId
+      if (moduleId) body.module_id = moduleId
     } else if (selectedModel) {
       body.model = selectedModel
     }

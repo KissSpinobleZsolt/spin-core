@@ -1,3 +1,4 @@
+/** Metadata for a model currently installed in Ollama. */
 export type InstalledModel = {
   name: string
   size_bytes: number | null
@@ -8,6 +9,7 @@ export type InstalledModel = {
   format?: string | null
 }
 
+/** Ollama reachability status together with the list of installed models. */
 export type InstalledModelsData = {
   ollama: 'ok' | 'unreachable'
   models: InstalledModel[]

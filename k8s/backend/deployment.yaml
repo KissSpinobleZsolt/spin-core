@@ -43,6 +43,20 @@ spec:
                 secretKeyRef:
                   name: spin-core-secrets
                   key: ADMIN_NAME
+            # Cloud LLM provider API keys — stored in spin-core-secrets, not the ConfigMap.
+            # Keys are optional; bots using a missing provider return a stream error.
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spin-core-secrets
+                  key: ANTHROPIC_API_KEY
+                  optional: true
+            - name: OPENAI_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: spin-core-secrets
+                  key: OPENAI_API_KEY
+                  optional: true
           volumeMounts:
             - name: app-data
               mountPath: /app/data

@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 
+/** Lifecycle phase of a model pull operation. */
 export type ModelPhase = 'pending' | 'pulling' | 'verifying' | 'writing' | 'done' | 'error'
 
+/** Progress details for an active model pull, including speed and ETA. */
 export type ProgressInfo = {
   phase: ModelPhase
   total_bytes: number
@@ -12,6 +14,7 @@ export type ProgressInfo = {
   eta_str: string | null
 }
 
+/** Status and pull progress for a single Ollama model. */
 export type ModelInfo = {
   model: string
   status: 'ready' | 'pending' | 'unknown' | 'pulling' | 'verifying' | 'writing' | 'error'
@@ -19,6 +22,7 @@ export type ModelInfo = {
   progress: ProgressInfo | null
 }
 
+/** Top-level Ollama status payload listing all required models and their readiness. */
 export type ModelStatusPayload = {
   ollama: 'ok' | 'unreachable'
   all_ready: boolean
@@ -27,6 +31,7 @@ export type ModelStatusPayload = {
 
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '')
 
+/** Subscribes to the model-status SSE stream and auto-dismisses once all models are ready. */
 export function useModelStatus() {
   const [status, setStatus] = useState<ModelStatusPayload | null>(null)
   const [dismissed, setDismissed] = useState(false)

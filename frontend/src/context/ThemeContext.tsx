@@ -11,6 +11,7 @@ type ThemeContextValue = {
 
 const ThemeContext = createContext<ThemeContextValue | null>(null)
 
+/** Persists, syncs across tabs, and applies the active UI theme to the document element. */
 export function ThemeProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth()
 
@@ -58,6 +59,7 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   )
 }
 
+/** Returns the current theme and a setter that persists to localStorage and the backend; must be inside ThemeProvider. */
 export function useTheme(): ThemeContextValue {
   const ctx = useContext(ThemeContext)
   if (!ctx) throw new Error('useTheme must be used inside ThemeProvider')

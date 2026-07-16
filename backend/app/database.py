@@ -7,6 +7,7 @@ _ch = None
 
 
 def init_db() -> None:
+    """Instantiate and store the PostgreSQL and ClickHouse adapter singletons."""
     global _pg, _ch
     from app.db.postgres import PostgresAdapter
     from app.db.clickhouse import ClickHouseLogAdapter
@@ -15,12 +16,14 @@ def init_db() -> None:
 
 
 def get_pg():
+    """Return the PostgresAdapter singleton, raising RuntimeError if not yet initialised."""
     if _pg is None:
         raise RuntimeError("Database not initialised")
     return _pg
 
 
 def get_ch():
+    """Return the ClickHouseLogAdapter singleton, raising RuntimeError if not yet initialised."""
     if _ch is None:
         raise RuntimeError("Database not initialised")
     return _ch

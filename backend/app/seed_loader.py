@@ -12,7 +12,7 @@ _FALLBACK_BOT = {
     "description": "General-purpose AI assistant powered by Ollama.",
     "type": "communicator",
     "model": "qwen2.5:7b",
-    "system_prompt": "You are a helpful AI assistant.",
+    "system_prompt": "You are a helpful AI assistant for this platform. Use the platform context above to help users understand what they can do, which pages to visit, and which bots or modules are available. Be concise and friendly.",
     "icon": "💬",
     "active": True,
     "restricted": "user",
@@ -22,6 +22,7 @@ _FALLBACK_BOT = {
 
 @dataclass
 class BotSeed:
+    """Represents a single bot entry parsed from seed.json."""
     name: str
     description: str
     type: str
@@ -35,6 +36,7 @@ class BotSeed:
 
 @dataclass
 class SeedData:
+    """Aggregated defaults loaded from seed.json used to initialise an empty database."""
     dashboard_content: str = "Hello welcome"
     bot_types: list[dict] = field(default_factory=list)
     bots: list[BotSeed] = field(default_factory=lambda: [BotSeed(**_FALLBACK_BOT)])
@@ -43,6 +45,7 @@ class SeedData:
 
 
 def load_seed() -> SeedData:
+    """Parse seed.json and return a SeedData instance, falling back to defaults on any error."""
     if not SEED_PATH.exists():
         return SeedData()
 

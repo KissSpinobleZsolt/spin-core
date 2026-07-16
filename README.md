@@ -19,12 +19,16 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 |---------|------|-------------|
 | `frontend` | 3000 | React SPA (nginx, proxies `/api/*` to backend) |
 | `frontend-dev` | 3000 | Vite dev server with HMR |
-| `backend` | 8000 | FastAPI REST + WebSocket API |
+| `backend` | 8000 | FastAPI REST API — core platform only (no module-specific logic) |
 | `postgres` | 5432 | PostgreSQL |
 | `clickhouse` | 8123/9000 | ClickHouse HTTP + native |
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
-| `hello-world` | 3001 | Reference MF remote |
+| `hello-world` | 3001 | Reference MF remote (frontend only) |
+| `cloud-insight-ai` | 3002 | CloudInsight AI MF remote (frontend only) |
+| `cloud-insight-ai-backend` | 8002 | Plugin backend for CloudInsight AI |
+| `anomascan` | 3003 | AnomaScan MF remote (frontend only) |
+| `anomascan-backend` | 8003 | Plugin backend for AnomaScan (YOLO, PyTorch) |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -41,6 +45,16 @@ New to running Docker with an NVIDIA GPU on Windows? See **[GUIDE.md](GUIDE.md)*
 > If you already have Docker + GPU working, skip straight to Quick start below.
 
 ## Quick start
+
+### Clone (with submodules)
+
+```bash
+git clone --recurse-submodules https://github.com/KissSpinobleZsolt/spin-core.git
+# or, if you already cloned without --recurse-submodules:
+bash scripts/setup-workspace.sh
+```
+
+See [`workspace.yml`](workspace.yml) for the full multi-repo layout.
 
 ### Development (hot reload)
 
@@ -90,8 +104,9 @@ To start fresh: `docker compose down -v`
 | `backend/` | [backend/README.md](backend/README.md) | API routes, env vars, architecture, local dev |
 | `frontend/` | [frontend/README.md](frontend/README.md) | Pages, context providers, module federation loader, build |
 | `data/` | [data/README.md](data/README.md) | seed.json format, fields, first-run customisation |
-| `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract |
+| `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract, submodule workflow |
 | `modules/hello-world/` | [modules/hello-world/README.md](modules/hello-world/README.md) | Reference remote — how to build and register |
+| `workspace.yml` | — | Multi-repo workspace manifest (shell + module repos, ports) |
 | `k8s/` | [k8s/README.md](k8s/README.md) | Kubernetes deploy guide, secrets, day-to-day ops |
 | `scripts/` | [scripts/README.md](scripts/README.md) | restart.sh, k8s-deploy.sh usage |
 
@@ -119,7 +134,16 @@ Browser
        │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs
        └─ Module Federation (optional third-party remotes)
-            └─ hello-world remote (port 3001)  — reference implementation
+            ├─ hello-world (port 3001)                — reference implementation (frontend only)
+            ├─ cloud-insight-ai (port 3002)          — CloudInsight AI: data upload and management
+            │    └─ cloud-insight-ai-backend (8002)  — plugin backend (REST + WebSocket)
+            └─ anomascan (port 3003)                 — AnomaScan: YOLO object detection
+                 └─ anomascan-backend (8003)          — plugin backend (PyTorch, ultralytics)
+
+Plugin backend pattern:
+  core backend (/api/plugin/{scope}/…) ──► module backend (backend_url from modules table)
+  Each module that needs server-side logic runs its own FastAPI service and declares
+  "backend_url" in its manifest.json — no module-specific code lives in the core backend.
 
 Ollama stack:
   ollama (pure server)  ◄──  model-downloader (HTTP client via OLLAMA_HOST)
@@ -173,7 +197,11 @@ spin-core/
 ├── frontend/         # React SPA — see frontend/README.md
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
-│   └── hello-world/  # Reference MF remote — see modules/hello-world/README.md
+│   ├── hello-world/          # Reference MF remote — see modules/hello-world/README.md
+│   ├── data-ingestion/       # CloudInsight AI MF remote
+│   │   └── backend/          # Plugin backend (FastAPI) — optional, per-module
+│   └── vision-watch/         # AnomaScan MF remote (YOLO)
+│       └── backend/          # Plugin backend with PyTorch + ultralytics
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml
