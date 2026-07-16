@@ -58,12 +58,8 @@ export interface DiscoveredModule {
   already_registered: boolean
 }
 
-/** CRUD operations for platform settings, module registry, and theme preference. */
+/** CRUD operations for platform settings and module registry. */
 export const settingsService = {
-  async updateTheme(theme: Theme): Promise<void> {
-    await apiService.patch('/settings/theme', { theme })
-  },
-
   async getModules(): Promise<ModuleConfig[]> {
     return apiService.get('/settings/modules')
   },

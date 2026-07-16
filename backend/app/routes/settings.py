@@ -37,13 +37,6 @@ class DiscoveredModule(BaseModel):
     error: Optional[str] = None
 
 
-@router.get("")
-async def get_settings_route(_: str = Depends(admin_dep)):
-    """Return the current platform-level settings (theme only)."""
-    s = get_settings()
-    return {"theme": {"default_theme": s.theme.default_theme}}
-
-
 @router.patch("/theme", status_code=204)
 async def update_theme(payload: ThemePayload, _: str = Depends(admin_dep)):
     """Update the platform default theme and persist it to settings.json (admin only)."""

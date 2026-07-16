@@ -200,8 +200,6 @@ export default function Sidebar() {
                 label="Bots"
                 collapsed={collapsed}
               />
-              {/* Users — hidden until user management is implemented */}
-              {/* Modules */}
               <NavItem
                 to="/admin/modules"
                 icon={

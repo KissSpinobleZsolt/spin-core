@@ -460,7 +460,7 @@ export default function Modules() {
         )}
 
         <div className="flex gap-2 flex-wrap">
-          <Btn disabled onClick={() => setModal('add')}>+ Add module</Btn>
+          <Btn disabled>+ Add module</Btn>
           <Btn variant="secondary" disabled={scanning} onClick={scanModules}>
             {scanning ? 'Scanning…' : '🔍 Scan for modules'}
           </Btn>
