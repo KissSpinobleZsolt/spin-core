@@ -2,6 +2,21 @@ import { useState, useEffect } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
 import { DocPageShell } from '../../../components/layout/DocPageShell'
 import { Input } from '../../../components/ui/Input'
+import { Btn } from '../../../components/ui/Button'
+import { Card } from '../../../components/ui/Card'
+import { ErrorBanner } from '../../../components/ui/ErrorBanner'
+import { Label } from '../../../components/ui/Label'
+import { Modal } from '../../../components/ui/Modal'
+import { Spinner } from '../../../components/ui/Spinner'
+import { Toggle } from '../../../components/ui/Toggle'
+import { Badge } from '../../../components/ui/Badge'
+import { StatCard } from '../../../components/ui/StatCard'
+import { Tabs } from '../../../components/ui/Tabs'
+import { ProgressBar } from '../../../components/ui/ProgressBar'
+import { Chip } from '../../../components/ui/Chip'
+import { DropZone } from '../../../components/ui/DropZone'
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface Prop {
   name: string
@@ -18,7 +33,176 @@ interface ComponentDoc {
   description: string
   props: Prop[]
   notes?: string
+  // factory so each card gets its own isolated state
+  preview?: React.FC
 }
+
+// ─── Preview components ───────────────────────────────────────────────────────
+
+function PreviewButton() {
+  return (
+    <div className="flex flex-wrap gap-3">
+      <Btn variant="primary">Primary</Btn>
+      <Btn variant="secondary">Secondary</Btn>
+      <Btn variant="danger">Danger</Btn>
+      <Btn variant="primary" disabled>Disabled</Btn>
+    </div>
+  )
+}
+
+function PreviewCard() {
+  return (
+    <Card>
+      <p className="text-sm text-slate-600 dark:text-slate-300">White / dark rounded container with p-6 padding and a border.</p>
+    </Card>
+  )
+}
+
+function PreviewErrorBanner() {
+  return <ErrorBanner message="Something went wrong. Please try again." />
+}
+
+function PreviewInput() {
+  const [v, setV] = useState('')
+  return (
+    <div className="space-y-3 max-w-xs">
+      <Input label="With label" placeholder="Type something…" value={v} onChange={e => setV(e.target.value)} />
+      <Input placeholder="Without label" />
+      <Input placeholder="Disabled" disabled />
+    </div>
+  )
+}
+
+function PreviewLabel() {
+  return <Label>Standalone Label element</Label>
+}
+
+function PreviewModal() {
+  const [open, setOpen] = useState(false)
+  return (
+    <>
+      <Btn variant="secondary" onClick={() => setOpen(true)}>Open Modal</Btn>
+      {open && (
+        <Modal title="Example Modal" onClose={() => setOpen(false)}>
+          <p className="text-sm text-slate-600 dark:text-slate-300">Modal body content. Click × or the buttons below to close.</p>
+          <div className="mt-4 flex gap-2 justify-end">
+            <Btn variant="secondary" onClick={() => setOpen(false)}>Cancel</Btn>
+            <Btn variant="primary" onClick={() => setOpen(false)}>Confirm</Btn>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
+function PreviewPageTitle() {
+  return <PageTitle>Page Title</PageTitle>
+}
+
+function PreviewSpinner() {
+  return (
+    <div className="flex items-center gap-8">
+      {(['sm', 'md', 'lg'] as const).map(size => (
+        <div key={size} className="flex flex-col items-center gap-2">
+          <Spinner size={size} />
+          <span className="text-xs text-slate-500">{size}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function PreviewToggle() {
+  const [a, setA] = useState(true)
+  const [b, setB] = useState(false)
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-3">
+        <Toggle checked={a} onChange={setA} />
+        <span className="text-sm text-slate-600 dark:text-slate-300">{a ? 'On' : 'Off'}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <Toggle checked={b} onChange={setB} />
+        <span className="text-sm text-slate-600 dark:text-slate-300">{b ? 'On' : 'Off'}</span>
+      </div>
+      <div className="flex items-center gap-3">
+        <Toggle checked disabled onChange={() => {}} />
+        <span className="text-sm text-slate-400">Disabled (on)</span>
+      </div>
+    </div>
+  )
+}
+
+function PreviewBadge() {
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Badge variant="info">Info</Badge>
+      <Badge variant="success">Success</Badge>
+      <Badge variant="warn">Warning</Badge>
+      <Badge variant="error">Error</Badge>
+      <Badge variant="neutral">Neutral</Badge>
+      <Badge variant="success" dot>With dot</Badge>
+      <Badge variant="error" dot>Critical</Badge>
+    </div>
+  )
+}
+
+function PreviewStatCard() {
+  return (
+    <div className="grid grid-cols-2 gap-3">
+      <StatCard value="1,284" label="Total Records" sub="across all sources" />
+      <StatCard value="99.8%" label="Uptime" sub="last 30 days" />
+    </div>
+  )
+}
+
+function PreviewTabs() {
+  const [active, setActive] = useState('one')
+  return (
+    <div className="space-y-3">
+      <Tabs
+        tabs={[{ key: 'one', label: 'Overview' }, { key: 'two', label: 'Details' }, { key: 'three', label: 'Logs' }]}
+        active={active}
+        onChange={setActive}
+      />
+      <p className="text-sm text-slate-500">Active: <strong className="text-slate-700 dark:text-slate-300">{active}</strong></p>
+    </div>
+  )
+}
+
+function PreviewProgressBar() {
+  return (
+    <div className="space-y-3 max-w-xs">
+      <ProgressBar value={72} label="Upload" color="blue" />
+      <ProgressBar value={48} label="Storage" color="amber" />
+      <ProgressBar value={90} label="CPU load" color="red" />
+    </div>
+  )
+}
+
+function PreviewChip() {
+  const [chips, setChips] = useState(['AAPL', 'TSLA', 'MSFT'])
+  return (
+    <div className="flex flex-wrap gap-2">
+      {chips.map(c => (
+        <Chip key={c} onRemove={() => setChips(p => p.filter(x => x !== c))}>{c}</Chip>
+      ))}
+      <Chip>Read-only</Chip>
+    </div>
+  )
+}
+
+function PreviewDropZone() {
+  const [file, setFile] = useState<File | null>(null)
+  return (
+    <div className="max-w-xs">
+      <DropZone file={file} hint="CSV, XLSX — max 50 MB" onFiles={([f]) => setFile(f)} />
+      {file && <Btn variant="secondary" className="mt-2" onClick={() => setFile(null)}>Clear</Btn>}
+    </div>
+  )
+}
+
+// ─── Data ─────────────────────────────────────────────────────────────────────
 
 const DOCS: ComponentDoc[] = [
   {
@@ -31,6 +215,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'className', type: 'string', default: "''", description: 'Extra Tailwind classes merged onto the button element.' },
       { name: '...rest',   type: 'React.ButtonHTMLAttributes<HTMLButtonElement>', description: 'All standard button attributes (onClick, disabled, type, …).' },
     ],
+    preview: PreviewButton,
   },
   {
     name: 'Card',
@@ -41,6 +226,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'children',  type: 'ReactNode', required: true, description: 'Content rendered inside the card.' },
       { name: 'className', type: 'string', description: 'Extra Tailwind classes appended to the wrapper div.' },
     ],
+    preview: PreviewCard,
   },
   {
     name: 'ErrorBanner',
@@ -50,6 +236,7 @@ const DOCS: ComponentDoc[] = [
     props: [
       { name: 'message', type: 'string', required: true, description: 'Error text to display.' },
     ],
+    preview: PreviewErrorBanner,
   },
   {
     name: 'Input',
@@ -62,6 +249,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'className', type: 'string', description: 'Extra Tailwind classes on the <input> element.' },
       { name: '...rest',   type: 'React.InputHTMLAttributes<HTMLInputElement>', description: 'All standard input attributes (value, onChange, placeholder, disabled, …).' },
     ],
+    preview: PreviewInput,
   },
   {
     name: 'Label',
@@ -71,6 +259,7 @@ const DOCS: ComponentDoc[] = [
     props: [
       { name: '...rest', type: 'React.LabelHTMLAttributes<HTMLLabelElement>', description: 'All standard label attributes (htmlFor, children, …).' },
     ],
+    preview: PreviewLabel,
   },
   {
     name: 'Modal',
@@ -83,6 +272,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'maxWidth', type: 'string', default: "'max-w-lg'", description: 'Tailwind max-width class controlling the dialog width.' },
       { name: 'children', type: 'ReactNode', required: true, description: 'Content rendered inside the modal body.' },
     ],
+    preview: PreviewModal,
   },
   {
     name: 'PageTitle',
@@ -92,6 +282,7 @@ const DOCS: ComponentDoc[] = [
     props: [
       { name: 'children', type: 'ReactNode', required: true, description: 'Title text or elements.' },
     ],
+    preview: PreviewPageTitle,
   },
   {
     name: 'Spinner',
@@ -101,6 +292,7 @@ const DOCS: ComponentDoc[] = [
     props: [
       { name: 'size', type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'sm = 16 px, md = 24 px, lg = 32 px ring.' },
     ],
+    preview: PreviewSpinner,
   },
   {
     name: 'Toggle',
@@ -112,6 +304,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'onChange', type: '(v: boolean) => void', required: true, description: 'Called with the new value when the user clicks.' },
       { name: 'disabled', type: 'boolean', description: 'When true, interaction is blocked and the knob is greyed out.' },
     ],
+    preview: PreviewToggle,
   },
   {
     name: 'Badge',
@@ -123,6 +316,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'dot',      type: 'boolean', description: 'When true, prepends a small filled circle matching the variant colour.' },
       { name: 'children', type: 'ReactNode', required: true, description: 'Badge text or content.' },
     ],
+    preview: PreviewBadge,
   },
   {
     name: 'StatCard',
@@ -134,6 +328,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'label', type: 'string',          required: true, description: 'Short descriptor shown below the value in uppercase.' },
       { name: 'sub',   type: 'string', description: 'Secondary detail line shown below the label in muted text.' },
     ],
+    preview: PreviewStatCard,
   },
   {
     name: 'Tabs',
@@ -145,6 +340,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'active',   type: 'string', required: true, description: 'The key of the currently active tab.' },
       { name: 'onChange', type: '(key: string) => void', required: true, description: "Called with the clicked tab's key." },
     ],
+    preview: PreviewTabs,
   },
   {
     name: 'ProgressBar',
@@ -156,6 +352,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'label', type: 'string', description: 'When provided, renders a row above the bar with the label left and percentage right.' },
       { name: 'color', type: "'blue' | 'green' | 'amber' | 'red'", default: "'blue'", description: 'Fill colour of the progress bar.' },
     ],
+    preview: PreviewProgressBar,
   },
   {
     name: 'Chip',
@@ -166,6 +363,7 @@ const DOCS: ComponentDoc[] = [
       { name: 'children', type: 'ReactNode', required: true, description: 'Chip content.' },
       { name: 'onRemove', type: '() => void', description: 'When provided, an × button is rendered that calls this handler.' },
     ],
+    preview: PreviewChip,
   },
   {
     name: 'DropZone',
@@ -179,10 +377,13 @@ const DOCS: ComponentDoc[] = [
       { name: 'file',    type: 'File | null', description: 'When set, replaces the placeholder text with the file name.' },
     ],
     notes: 'DropZone manages its own internal dragging state. The file prop is display-only — keep the actual File object in the parent and pass it back in.',
+    preview: PreviewDropZone,
   },
 ]
 
 const IDS = DOCS.map(d => d.name.toLowerCase())
+
+// ─── Active section tracking ──────────────────────────────────────────────────
 
 function useActiveSection(ids: string[]): string {
   const [active, setActive] = useState(ids[0] ?? '')
@@ -215,6 +416,8 @@ function useActiveSection(ids: string[]): string {
   return active
 }
 
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
 function PropTable({ props }: { props: Prop[] }) {
   return (
     <div className="overflow-x-auto">
@@ -244,6 +447,8 @@ function PropTable({ props }: { props: Prop[] }) {
 }
 
 function ComponentCard({ doc }: { doc: ComponentDoc }) {
+  const [tab, setTab] = useState<'props' | 'preview'>('props')
+
   return (
     <div id={doc.name.toLowerCase()} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
       <div className="px-5 py-4 bg-white dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700 flex items-start justify-between gap-4">
@@ -268,17 +473,44 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
           <span className="text-green-600 dark:text-green-400">'../../{doc.file.replace('.tsx', '')}'</span>
         </code>
       </div>
-      <div className="px-5 py-4 bg-white dark:bg-slate-800">
-        {doc.props.length > 0 ? <PropTable props={doc.props} /> : <p className="text-xs text-slate-400">No props.</p>}
-        {doc.notes && (
-          <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
-            ℹ️ {doc.notes}
-          </p>
+      <div className="bg-white dark:bg-slate-800">
+        {doc.preview && (
+          <div className="flex border-b border-slate-200 dark:border-slate-700 px-5">
+            {(['props', 'preview'] as const).map(t => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`mr-4 py-2.5 text-xs font-medium capitalize border-b-2 -mb-px transition-colors ${
+                  tab === t
+                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    : 'border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
         )}
+        <div className="px-5 py-4">
+          {tab === 'props' || !doc.preview ? (
+            <>
+              {doc.props.length > 0 ? <PropTable props={doc.props} /> : <p className="text-xs text-slate-400">No props.</p>}
+              {doc.notes && (
+                <p className="mt-3 text-xs text-amber-600 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 rounded-lg px-3 py-2">
+                  ℹ️ {doc.notes}
+                </p>
+              )}
+            </>
+          ) : (
+            <doc.preview />
+          )}
+        </div>
       </div>
     </div>
   )
 }
+
+// ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DocsUI() {
   const [query, setQuery] = useState('')
