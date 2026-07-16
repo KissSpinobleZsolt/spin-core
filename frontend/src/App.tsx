@@ -18,7 +18,6 @@ const LLMs           = lazy(() => import('./pages/admin/LLMs'))
 const Users          = lazy(() => import('./pages/admin/Users'))
 const Modules        = lazy(() => import('./pages/admin/Modules'))
 const Status         = lazy(() => import('./pages/admin/Status'))
-const Components     = lazy(() => import('./pages/admin/Components'))
 const Layouts        = lazy(() => import('./pages/admin/Layouts'))
 const DocsUI         = lazy(() => import('./pages/admin/docs/UI'))
 const DocsApi        = lazy(() => import('./pages/admin/docs/Api'))
@@ -103,14 +102,6 @@ const router = createBrowserRouter([
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <Status />
-              </RoleGuard>
-            ),
-          },
-          {
-            path: 'admin/components',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <Components />
               </RoleGuard>
             ),
           },

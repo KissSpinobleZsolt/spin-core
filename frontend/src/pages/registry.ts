@@ -12,7 +12,6 @@ export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType<obj
   Users:           lazy(() => import('./admin/Users')),
   Modules:         lazy(() => import('./admin/Modules')),
   Status:          lazy(() => import('./admin/Status')),
-  Components:      lazy(() => import('./admin/Components')),
   Layouts:         lazy(() => import('./admin/Layouts')),
   DocsUI:          lazy(() => import('./admin/docs/UI')),
   DocsApi:         lazy(() => import('./admin/docs/Api')),

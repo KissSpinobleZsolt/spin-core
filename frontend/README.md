@@ -28,7 +28,6 @@ React 19 SPA for the spin-core platform.
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
 | `/admin/layouts` | Layouts | Admin | Page layout management |
-| `/admin/components` | Component preview | Admin | Live interactive showcase of every UI primitive in `src/components/ui/` |
 | `/admin/docs/ui` | UI docs | Admin | Component reference with props tables, import paths, and a sticky scroll-tracked sidebar |
 | `/admin/docs/api` | API docs | Admin | Full API endpoint reference with method/auth legend, search, and sticky scroll-tracked sidebar |
 | `/admin/docs/deployment` | Deployment docs | Admin | Docker Compose and Kubernetes deployment guide |
