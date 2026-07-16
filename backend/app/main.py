@@ -15,7 +15,7 @@ from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
 from app.state import get_settings, set_settings
 
-from app.routes import auth, dashboard, settings, logs, module_data, module_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy
+from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy
 from app.routes.model_status import _required_models
 
 
@@ -295,6 +295,7 @@ app.include_router(settings.router)
 app.include_router(logs.router)
 app.include_router(module_data.router)
 app.include_router(module_logs.router)
+app.include_router(bot_logs.router)
 app.include_router(i18n_router.router)
 app.include_router(health.router)
 app.include_router(chat.router)

@@ -34,6 +34,9 @@ class DiscoveredModule(BaseModel):
     description: Optional[str] = None
     remote_url: Optional[str] = None
     already_registered: bool = False
+    # Populated only when already_registered=True so the frontend can enable disabled modules.
+    module_id: Optional[str] = None
+    enabled: Optional[bool] = None
     error: Optional[str] = None
 
 
@@ -135,7 +138,10 @@ async def discover_modules(_: str = Depends(admin_dep)):
     if not raw:
         return []
     base_urls = [u.strip().rstrip("/") for u in raw.split(",") if u.strip()]
-    registered_scopes = {m["scope"] for m in get_pg().get_modules()}
+    all_modules = get_pg().get_modules(enabled_only=False)
+    registered_scopes = {m["scope"] for m in all_modules}
+    # Keyed by scope to let fetch_one attach id + enabled without a second DB round-trip.
+    registered_scopes_full = {m["scope"]: m for m in all_modules}
 
     async def fetch_one(base_url: str) -> dict | None:
         try:
@@ -144,6 +150,8 @@ async def discover_modules(_: str = Depends(admin_dep)):
                 resp.raise_for_status()
                 m = resp.json()
             scope = m.get("scope")
+            already = bool(scope and scope in registered_scopes)
+            existing = registered_scopes_full.get(scope) if already else None
             return DiscoveredModule(
                 source_url=base_url,
                 name=m.get("name"),
@@ -154,7 +162,9 @@ async def discover_modules(_: str = Depends(admin_dep)):
                 roles=m.get("roles"),
                 description=m.get("description"),
                 remote_url=m.get("remote_url") or m.get("remote_entry") or f"{base_url}/remoteEntry.js",
-                already_registered=bool(scope and scope in registered_scopes),
+                already_registered=already,
+                module_id=existing["id"] if existing else None,
+                enabled=existing["enabled"] if existing else None,
             ).model_dump()
         except Exception:
             return None
