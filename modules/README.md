@@ -12,6 +12,7 @@ Each module lives in its own GitHub repository and is wired into spin-core as a 
 | [CloudInsight AI](cloud-insight-ai/README.md) | [spi-module-cloud-insight-ai](https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai) | 3002 | 8002 | `cloudInsightAI` | Data source upload, processing, and management |
 | [AnomaScan](AnomaScan/README.md) | [spi-module-anomascan](https://github.com/KissSpinobleZsolt/spi-module-anomascan) | 3003 | 8003 | `anomaScan` | YOLO object detection and model fine-tuning |
 
+
 ### Submodule workflow
 
 **First-time setup after cloning spin-core without `--recurse-submodules`:**

@@ -3,7 +3,7 @@
 	url = https://github.com/KissSpinobleZsolt/spi-module-hello-world.git
 [submodule "modules/cloud-insight-ai"]
 	path = modules/cloud-insight-ai
-	url = https://github.com/KissSpinobleZsolt/spi-module-data-ingestion.git
+	url = https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai.git
 [submodule "modules/AnomaScan"]
 	path = modules/AnomaScan
-	url = https://github.com/KissSpinobleZsolt/spi-module-vision-watch.git
+	url = https://github.com/KissSpinobleZsolt/spi-module-anomascan.git
