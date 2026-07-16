@@ -1,3 +1,4 @@
+/** @module services/i18n — Translation load and save for locale key-value maps. */
 import { apiService } from './apiService'
 
 /** Arbitrary key-value translation map for a given locale. */

@@ -1,3 +1,5 @@
+/** @module services/modelStatus — Ollama model installation status types. */
+
 /** Metadata for a model currently installed in Ollama. */
 export type InstalledModel = {
   name: string
