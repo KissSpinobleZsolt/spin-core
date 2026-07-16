@@ -5,6 +5,7 @@
     "paths": {
       "@components/*": ["./src/components/*"],
       "@pages/*":      ["./src/pages/*"],
+      "@services":     ["./src/services/index.ts"],
       "@services/*":   ["./src/services/*"],
       "@hooks/*":      ["./src/hooks/*"],
       "@context/*":    ["./src/context/*"],

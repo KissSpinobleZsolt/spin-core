@@ -349,7 +349,7 @@ export default function BotConfigPage({ bot, scope }: { bot: Bot; scope: string 
   const schedulerFields = schema.scheduler ?? []
   const principalsType = schema.principals
   const showWatchlist = principalsType === 'watchlist'
-  const riskLevels = (schema.risk_levels as string[] | undefined) ?? ['Conservative', 'Moderate', 'Aggressive']
+  const riskLevels = schema.risk_levels ?? ['Conservative', 'Moderate', 'Aggressive']
 
   useEffect(() => {
     setLoadingConfig(true)

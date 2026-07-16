@@ -48,6 +48,7 @@ export interface BotConfigSchema {
   principals?: 'watchlist' | 'teams' | 'risk_profiles'
   configurations?: BotConfigSchemaField[]
   scheduler?: BotConfigSchemaField[]
+  risk_levels?: string[]
 }
 
 /** Persisted bot configuration record including model, system prompt, and RBAC settings. */
