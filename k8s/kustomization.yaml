@@ -8,6 +8,15 @@ secretGenerator:
     options:
       disableNameSuffixHash: true
 
+# newTag: latest is the static default; k8s-deploy.sh overrides it with the git SHA at deploy time via kustomize edit set image
+images:
+  - name: ghcr.io/kissspinoblezsolt/spin-core-backend
+    newTag: latest
+  - name: ghcr.io/kissspinoblezsolt/spin-core-frontend
+    newTag: latest
+  - name: ghcr.io/kissspinoblezsolt/spin-core-hello-world
+    newTag: latest
+
 resources:
   - namespace.yaml
   - configmap.yaml
