@@ -150,7 +150,7 @@ services:
       CLICKHOUSE_DB: core
       YOLO_MODELS_DIR: /app/vision-models
     volumes:
-      - vision_model_weights:/app/vision-models
+      - anomascan_yolo_weights:/app/vision-models
     restart: unless-stopped
 
   # ── Core platform ─────────────────────────────────────────────────────────────
@@ -222,4 +222,5 @@ volumes:
   clickhouse_data:
   app_data:
   ollama_data:
-  vision_model_weights:
+  # renamed from vision_model_weights — scoped per-module so future vision modules don't share weights; existing deployments must manually migrate or re-download
+  anomascan_yolo_weights:
