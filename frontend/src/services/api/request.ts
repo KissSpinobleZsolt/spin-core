@@ -21,6 +21,8 @@ export async function request<T>(
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
+  // Own controller drives the timeout; external signal is bridged in rather than passed directly
+  // because AbortSignal.any() lacks broad browser support and fetch only accepts one signal
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
 

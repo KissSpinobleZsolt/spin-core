@@ -5,6 +5,7 @@
     "paths": {
       "@components/*": ["./src/components/*"],
       "@pages/*":      ["./src/pages/*"],
+      // bare entry needed: @services/* only matches sub-paths; from '@services' falls through without it
       "@services":     ["./src/services/index.ts"],
       "@services/*":   ["./src/services/*"],
       "@hooks/*":      ["./src/hooks/*"],

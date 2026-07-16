@@ -26,6 +26,7 @@ const DocsApi        = lazy(() => import('./pages/admin/docs/Api'))
 const DocsDeployment = lazy(() => import('./pages/admin/docs/Deployment'))
 const NotFound       = lazy(() => import('./pages/NotFound'))
 
+// Defined outside the router so the JSX object is stable across re-renders
 const loginFallback = (
   <div className="min-h-screen flex items-center justify-center bg-slate-900">
     <Spinner size="lg" />
@@ -35,6 +36,7 @@ const loginFallback = (
 const router = createBrowserRouter([
   {
     path: '/login',
+    // Login is outside <Layout>, so it has no access to Layout's Outlet Suspense boundary
     element: <Suspense fallback={loginFallback}><Login /></Suspense>,
   },
   {
