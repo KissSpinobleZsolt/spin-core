@@ -2,13 +2,11 @@ import { useNavigate } from 'react-router-dom'
 import { useHealth } from '../../context/HealthContext'
 import { useSettings } from '../../context/SettingsContext'
 import { useGet } from '../../hooks/useApi'
-import { apiService } from '../../services/apiService'
-import { botsService, type Bot } from '../../services/botsService'
+import { apiService, botsService, type Bot, type InstalledModelsData } from '@services'
 import { Badge } from '../../components/ui/Badge'
 import { PageTitle } from '../../components/ui/PageTitle'
 import { Spinner } from '../../components/ui/Spinner'
 import { fmtBytes } from '../../utils/formatters'
-import { type InstalledModelsData } from '../../services/modelStatusService'
 
 function SectionCard({
   title,

@@ -1,4 +1,4 @@
-import { apiService } from '../apiService'
+import { apiService } from '../api'
 import type { BotConfig, BotEntity, BotProcesses, EntityAddPayload, EntityPatchPayload } from './types'
 
 /** API calls to the bots-trader-platform plugin backend via the core proxy. */

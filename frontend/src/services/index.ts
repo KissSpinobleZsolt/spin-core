@@ -1,0 +1,11 @@
+/** @module services — Unified entry point for all frontend API services and types. */
+export * from './api'
+export * from './auth'
+export * from './bots'
+export * from './botConfig'
+export * from './logs'
+export * from './settings'
+export * from './modelStatusService'
+export * from './i18nService'
+export * from './themeService'
+export * from './dashboardService'

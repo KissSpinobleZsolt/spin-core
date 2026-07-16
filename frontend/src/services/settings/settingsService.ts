@@ -1,4 +1,4 @@
-import { apiService } from '../apiService'
+import { apiService } from '../api'
 import type { DiscoveredModule, ModuleConfig, ModuleInput } from './types'
 
 /** CRUD operations for platform settings and module registry. */

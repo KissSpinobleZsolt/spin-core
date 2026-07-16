@@ -1,4 +1,4 @@
-import { apiService } from '../apiService'
+import { apiService } from '../api'
 import type { Bot, BotPayload, BotType } from './types'
 
 /** CRUD and query operations for bots and bot types. */

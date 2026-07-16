@@ -7,7 +7,7 @@ import {
   type LogEntry,
   type SummaryEntry,
   type UserLogEntry,
-} from '../services/logsService'
+} from '@services'
 import { Btn } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
 import { PageTitle } from '../components/ui/PageTitle'

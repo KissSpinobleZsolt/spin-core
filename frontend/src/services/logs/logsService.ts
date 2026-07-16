@@ -1,4 +1,4 @@
-import { apiService } from '../apiService'
+import { apiService } from '../api'
 import { buildQs } from './buildQs'
 import type { LogsParams, LogsPage, SummaryParams, SummaryPage } from './api.types'
 import type { ChatLogsParams, ChatLogsPage, ChatSummaryPage } from './chat.types'

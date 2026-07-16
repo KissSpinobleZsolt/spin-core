@@ -2,7 +2,7 @@ import {
   useQuery,
   type UseQueryOptions,
 } from '@tanstack/react-query'
-import { apiService } from '../services/apiService'
+import { apiService } from '@services'
 
 /** Read a resource. Re-fetches when queryKey changes. */
 export function useGet<T>(

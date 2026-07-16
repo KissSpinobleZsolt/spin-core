@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom'
-import { botsService, type Bot } from '../services/botsService'
+import { botsService, type Bot } from '@services'
 import { useGet } from '../hooks/useApi'
 import { Btn } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'

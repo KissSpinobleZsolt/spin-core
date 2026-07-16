@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import i18n from './index'
-import { i18nService } from '../services/i18nService'
+import { i18nService } from '@services'
 import { useHealth } from '../context/HealthContext'
 
 // Only fetches and adds bundle — does NOT call changeLanguage (that fires languageChanged → loop)

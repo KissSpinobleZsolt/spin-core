@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
-import { botsService, type Bot } from '../services/botsService'
+import { botsService, type Bot } from '@services'
 import { useGet } from '../hooks/useApi'
 import { useChatStream } from '../hooks/useChatStream'
 import { Btn } from '../components/ui/Button'

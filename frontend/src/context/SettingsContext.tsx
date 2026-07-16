@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState } from 'react'
-import { settingsService, type ModuleConfig } from '../services/settingsService'
+import { settingsService, type ModuleConfig } from '@services'
 import { useAuth } from './AuthContext'
 
 type ReachabilityMap = Record<string, boolean>

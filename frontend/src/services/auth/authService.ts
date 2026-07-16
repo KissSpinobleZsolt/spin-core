@@ -1,4 +1,4 @@
-import { apiService } from '../apiService'
+import { apiService } from '../api'
 import { safeJsonParse } from '../../utils/safeJsonParse'
 import type { AuthCredentials, AuthUser } from './types'
 

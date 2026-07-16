@@ -1,5 +1,5 @@
 /** @module services/i18n — Translation load and save for locale key-value maps. */
-import { apiService } from './apiService'
+import { apiService } from './api'
 
 /** Arbitrary key-value translation map for a given locale. */
 export type TranslationData = Record<string, unknown>

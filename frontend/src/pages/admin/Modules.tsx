@@ -1,11 +1,8 @@
 import { useEffect, useState } from 'react'
-import { settingsService, type ModuleConfig, type DiscoveredModule, type ModulePresets } from '../../services/settingsService'
 import {
-  logsService,
-  type ModuleLogEntry,
-  type ModuleLogSummaryEntry,
-  type ModuleLogsParams,
-} from '../../services/logsService'
+  settingsService, type ModuleConfig, type DiscoveredModule, type ModulePresets,
+  logsService, type ModuleLogEntry, type ModuleLogSummaryEntry, type ModuleLogsParams,
+} from '@services'
 import { useSettings } from '../../context/SettingsContext'
 import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../../components/TimeRangeFilter'
 import { Btn } from '../../components/ui/Button'

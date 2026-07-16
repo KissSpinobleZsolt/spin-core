@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
-import { i18nService, type TranslationData } from '../services/i18nService'
+import { i18nService, type TranslationData } from '@services'
 import { reloadTranslations } from '../i18n/useI18nSync'
 import { Btn } from '../components/ui/Button'
 import { Input } from '../components/ui/Input'

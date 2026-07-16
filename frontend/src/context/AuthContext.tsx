@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, type ReactNode } from 'react'
-import { authService, type AuthCredentials, type AuthUser } from '../services/authService'
+import { authService, type AuthCredentials, type AuthUser } from '@services'
 
 type AuthContextValue = {
   user: AuthUser | null

@@ -1,15 +1,14 @@
 import { type ReactNode, useState, useEffect } from 'react'
-import { botsService, type Bot, type BotPayload, type BotType, type LLMProvider, PROVIDER_LABELS, PROVIDER_MODEL_HINTS } from '../services/botsService'
-import { settingsService, type ModuleConfig } from '../services/settingsService'
 import {
-  logsService,
-  type BotLogEntry,
-  type BotLogSummaryEntry,
-  type BotLogsParams,
-} from '../services/logsService'
+  botsService, type Bot, type BotPayload, type BotType, type LLMProvider,
+  PROVIDER_LABELS, PROVIDER_MODEL_HINTS,
+  settingsService, type ModuleConfig,
+  logsService, type BotLogEntry, type BotLogSummaryEntry, type BotLogsParams,
+  apiService,
+  type InstalledModelsData,
+} from '@services'
 import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../components/TimeRangeFilter'
 import { useGet } from '../hooks/useApi'
-import { apiService } from '../services/apiService'
 import { Btn } from '../components/ui/Button'
 import { Badge } from '../components/ui/Badge'
 import { Input } from '../components/ui/Input'
@@ -21,7 +20,6 @@ import { Spinner } from '../components/ui/Spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { PageTitle } from '../components/ui/PageTitle'
 import { BOT_TYPES, CUSTOM_ICONS } from '../constants/botConstants'
-import { type InstalledModelsData } from '../services/modelStatusService'
 
 // ---------------------------------------------------------------------------
 // Select helper (local, not shared)
