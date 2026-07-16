@@ -202,6 +202,7 @@ function useActiveSection(ids: string[]): string {
           const first = ids.find(i => visible.has(i))
           if (first) setActive(first)
         },
+        // -60% bottom margin: a section is only "active" once it enters the top 40% of the viewport
         { root, rootMargin: '0px 0px -60% 0px', threshold: 0 },
       )
       obs.observe(el)
