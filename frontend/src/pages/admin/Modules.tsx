@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
-import { settingsService, type ModuleConfig, type DiscoveredModule } from '../../services/settingsService'
-import { i18nService } from '../../services/i18nService'
+import { settingsService, type ModuleConfig, type DiscoveredModule, type ModulePresets } from '../../services/settingsService'
 import {
   logsService,
   type ModuleLogEntry,
@@ -54,21 +53,71 @@ const BLANK: Omit<ModuleConfig, 'id'> = {
 
 type ModalState = 'add' | ModuleConfig | { prefill: Omit<ModuleConfig, 'id'> } | null
 
+function I18nSnapshotSection({ moduleId, presets }: { moduleId: string; presets: ModulePresets }) {
+  const [open, setOpen] = useState(false)
+  const [resetting, setResetting] = useState(false)
+  const [resetStatus, setResetStatus] = useState<{ ok: boolean; message: string } | null>(null)
+  const hasI18n = Object.keys(presets.i18n).length > 0
+
+  async function handleReset() {
+    setResetting(true)
+    setResetStatus(null)
+    try {
+      await settingsService.resetModuleI18n(moduleId)
+      setResetStatus({ ok: true, message: 'i18n re-merged successfully' })
+    } catch {
+      setResetStatus({ ok: false, message: 'Failed to reset i18n' })
+    } finally {
+      setResetting(false)
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="text-xs font-medium text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-colors"
+      >
+        {open ? '▲' : '▼'} i18n snapshot {hasI18n ? `(${Object.keys(presets.i18n).length} language(s))` : '(empty)'}
+      </button>
+      {open && (
+        <pre className="text-xs bg-slate-100 dark:bg-slate-700/50 rounded-lg p-3 overflow-auto max-h-40 text-slate-600 dark:text-slate-300">
+          {hasI18n
+            ? JSON.stringify(presets.i18n, null, 2)
+            : 'No snapshot — delete and re-register this module to populate from its manifest.'}
+        </pre>
+      )}
+      <div className="flex items-center gap-3">
+        <Btn variant="secondary" disabled={!hasI18n || resetting} onClick={handleReset}>
+          {resetting ? '…' : '↺ Reset i18n to defaults'}
+        </Btn>
+        {resetStatus && (
+          <span className={`text-xs ${resetStatus.ok ? 'text-emerald-500' : 'text-red-500'}`}>
+            {resetStatus.message}
+          </span>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function ModuleModal({
   initial,
+  moduleId,
   title,
   onSave,
   onClose,
 }: {
   initial?: Omit<ModuleConfig, 'id'>
+  moduleId?: string
   title?: string
   onSave: (m: Omit<ModuleConfig, 'id'>) => void
   onClose: () => void
 }) {
   const base = initial ? { ...BLANK, ...initial } : { ...BLANK }
   const [form, setForm] = useState<Omit<ModuleConfig, 'id'>>(base)
-  const [i18nStr, setI18nStr] = useState('{}')
-  const [i18nError, setI18nError] = useState<string | null>(null)
+  const [previewI18n, setPreviewI18n] = useState<Record<string, unknown> | null>(null)
   const [manifestLoading, setManifestLoading] = useState(false)
   const [manifestStatus, setManifestStatus] = useState<{ ok: boolean; message: string } | null>(null)
 
@@ -81,6 +130,7 @@ function ModuleModal({
   async function loadManifest() {
     setManifestLoading(true)
     setManifestStatus(null)
+    setPreviewI18n(null)
     try {
       const base = form.remote_url.replace(/\/remoteEntry\.js$/, '').replace(/\/$/, '')
       const resp = await fetch(`${base}/manifest.json`)
@@ -99,40 +149,17 @@ function ModuleModal({
       const remoteEntry = (manifest.remote_entry as string) || (manifest.remote_url as string)
       if (remoteEntry) setForm(f => ({ ...f, remote_url: remoteEntry }))
       const bots = (manifest.bots as unknown[]) ?? []
-      setManifestStatus({ ok: true, message: `Loaded — ${bots.length} bot${bots.length !== 1 ? 's' : ''} will be provisioned on save` })
+      const i18n = (manifest.i18n as Record<string, unknown>) ?? {}
+      const i18nLangs = Object.keys(i18n).length
+      if (i18nLangs > 0) setPreviewI18n(i18n)
+      const parts = [`${bots.length} bot${bots.length !== 1 ? 's' : ''}`]
+      if (i18nLangs > 0) parts.push(`${i18nLangs} i18n language(s)`)
+      setManifestStatus({ ok: true, message: `Loaded — ${parts.join(', ')} will be provisioned on save` })
     } catch {
       setManifestStatus({ ok: false, message: 'Could not fetch manifest.json from the given URL' })
     } finally {
       setManifestLoading(false)
     }
-  }
-
-  async function submit() {
-    let i18nData: Record<string, Record<string, unknown>> = {}
-    if (i18nStr.trim() && i18nStr.trim() !== '{}') {
-      try {
-        i18nData = JSON.parse(i18nStr)
-        setI18nError(null)
-      } catch {
-        setI18nError('Invalid JSON.')
-        return
-      }
-    }
-
-    if (Object.keys(i18nData).length > 0) {
-      try {
-        await Promise.all(
-          Object.entries(i18nData).map(([lang, translations]) =>
-            i18nService.saveTranslations(lang, translations as Record<string, unknown>)
-          )
-        )
-      } catch {
-        setI18nError('Failed to save translations to the database.')
-        return
-      }
-    }
-
-    onSave({ ...form })
   }
 
   return (
@@ -204,23 +231,23 @@ function ModuleModal({
         <label htmlFor="enabled" className="text-sm text-slate-600 dark:text-slate-300">Enabled</label>
       </div>
 
-      <div>
-        <Label>i18n translations (JSON)</Label>
-        <Textarea
-          value={i18nStr}
-          onChange={v => { setI18nStr(v); setI18nError(null) }}
-          placeholder={'{\n  "en": { "key": "value" },\n  "ro": { "cheie": "valoare" }\n}'}
-          rows={5}
-        />
-        {i18nError && <p className="text-xs text-red-500 mt-1">{i18nError}</p>}
-        <p className="text-xs text-slate-400 dark:text-slate-500 mt-1">
-          Merged into the database translations on save. Keys are language codes (en, ro, …).
+      {/* Creating: show i18n preview from manifest load */}
+      {!moduleId && previewI18n && (
+        <p className="text-xs text-slate-500 dark:text-slate-400">
+          i18n: {Object.keys(previewI18n).length} language(s) will be loaded from manifest on save
         </p>
-      </div>
+      )}
+
+      {/* Editing: show stored i18n snapshot with reset button */}
+      {moduleId && (
+        <div className="border-t border-slate-200 dark:border-slate-700 pt-3">
+          <I18nSnapshotSection moduleId={moduleId} presets={form.presets} />
+        </div>
+      )}
 
       <div className="flex justify-end gap-2 pt-2">
         <Btn variant="secondary" onClick={onClose}>Cancel</Btn>
-        <Btn onClick={submit} disabled={!valid}>Save</Btn>
+        <Btn onClick={() => onSave({ ...form })} disabled={!valid}>Save</Btn>
       </div>
     </Modal>
   )
@@ -460,7 +487,7 @@ export default function Modules() {
         )}
 
         <div className="flex gap-2 flex-wrap">
-          <Btn disabled onClick={() => setModal('add')}>+ Add module</Btn>
+          <Btn disabled>+ Add module</Btn>
           <Btn variant="secondary" disabled={scanning} onClick={scanModules}>
             {scanning ? 'Scanning…' : '🔍 Scan for modules'}
           </Btn>
@@ -530,6 +557,7 @@ export default function Modules() {
       {modal && (
         <ModuleModal
           initial={modal === 'add' ? undefined : 'prefill' in modal ? modal.prefill : modal}
+          moduleId={modal !== 'add' && typeof modal === 'object' && 'id' in modal ? modal.id : undefined}
           title={modal !== 'add' && typeof modal === 'object' && 'prefill' in modal ? 'Add module' : undefined}
           onSave={handleSave}
           onClose={() => setModal(null)}

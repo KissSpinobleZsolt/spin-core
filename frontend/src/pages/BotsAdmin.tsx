@@ -36,6 +36,7 @@ function Select({ value, onChange, children }: { value: string; onChange: (v: st
 const BLANK: BotPayload = {
   name: '', description: '', type: 'communicator', provider: 'ollama', model: '',
   system_prompt: '', icon: '💬', active: false, restricted: 'user', modules: [],
+  config_schema: {},
 }
 
 function BotModal({
@@ -63,6 +64,7 @@ function BotModal({
     active: initial.active,
     restricted: initial.restricted,
     modules: initial.modules,
+    config_schema: initial.config_schema ?? {},
   } : { ...BLANK })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)

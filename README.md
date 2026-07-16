@@ -304,10 +304,6 @@ spin-core/
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
 │   ├── hello-world/          # Reference MF remote — see modules/hello-world/README.md
-│   ├── data-ingestion/       # CloudInsight AI MF remote
-│   │   └── backend/          # Plugin backend (FastAPI) — optional, per-module
-│   └── vision-watch/         # AnomaScan MF remote (YOLO)
-│       └── backend/          # Plugin backend with PyTorch + ultralytics
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml

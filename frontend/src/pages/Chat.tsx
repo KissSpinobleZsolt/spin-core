@@ -5,6 +5,8 @@ import { useGet } from '../hooks/useApi'
 import { useChatStream } from '../hooks/useChatStream'
 import { Btn } from '../components/ui/Button'
 import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
+import { useSettings } from '../context/SettingsContext'
+import BotConfigPage from './BotConfigPage'
 
 // ---------------------------------------------------------------------------
 // Skeleton config view for non-communicator bots
@@ -92,6 +94,7 @@ function BotConfigSkeleton({ bot }: { bot: Bot }) {
 export default function Chat() {
   const { botId } = useParams<{ botId: string }>()
   const navigate = useNavigate()
+  const { modules } = useSettings()
 
   const { data: bot, isError: botError } = useGet<Bot>(
     ['bot', botId ?? ''],
@@ -124,6 +127,12 @@ export default function Chat() {
   }
 
   if (bot && bot.type !== 'communicator') {
+    // Resolve UUID → scope via SettingsContext; the module list is already loaded for the sidebar.
+    const moduleScope = modules.find((m) => bot.modules.includes(m.id))?.scope
+    if (moduleScope) {
+      return <BotConfigPage bot={bot} scope={moduleScope} />
+    }
+    // Skeleton covers two cases: modules context still loading, or the module was deregistered after this bot was created.
     return <BotConfigSkeleton bot={bot} />
   }
 

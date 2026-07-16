@@ -25,6 +25,7 @@ export interface ModuleInput {
   enabled: boolean
   roles: string[]
   presets: ModulePresets
+  backend_url?: string
 }
 
 /** Full module record as returned by the API, including its generated ID. */
@@ -40,6 +41,7 @@ export interface ModuleConfig {
   enabled: boolean
   roles: string[]
   presets: ModulePresets
+  backend_url?: string
 }
 
 /** Module candidate discovered from a registry URL, before being formally registered. */
@@ -58,12 +60,8 @@ export interface DiscoveredModule {
   already_registered: boolean
 }
 
-/** CRUD operations for platform settings, module registry, and theme preference. */
+/** CRUD operations for platform settings and module registry. */
 export const settingsService = {
-  async updateTheme(theme: Theme): Promise<void> {
-    await apiService.patch('/settings/theme', { theme })
-  },
-
   async getModules(): Promise<ModuleConfig[]> {
     return apiService.get('/settings/modules')
   },
@@ -82,5 +80,9 @@ export const settingsService = {
 
   async discoverModules(): Promise<DiscoveredModule[]> {
     return apiService.get('/settings/modules/discover')
+  },
+
+  async resetModuleI18n(id: string): Promise<void> {
+    await apiService.post(`/settings/modules/${id}/reset-i18n`, {})
   },
 }

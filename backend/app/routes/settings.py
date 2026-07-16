@@ -37,13 +37,6 @@ class DiscoveredModule(BaseModel):
     error: Optional[str] = None
 
 
-@router.get("")
-async def get_settings_route(_: str = Depends(admin_dep)):
-    """Return the current platform-level settings (theme only)."""
-    s = get_settings()
-    return {"theme": {"default_theme": s.theme.default_theme}}
-
-
 @router.patch("/theme", status_code=204)
 async def update_theme(payload: ThemePayload, _: str = Depends(admin_dep)):
     """Update the platform default theme and persist it to settings.json (admin only)."""
@@ -67,6 +60,13 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
     ch = get_ch()
     ch.ensure_module_table(module["scope"])
     ch.ensure_module_mv(module["scope"])
+    # Written outside the try/except — the module table is guaranteed to exist at this point;
+    # bot logs are inside the try/except because they depend on a reachable manifest URL.
+    ch.write_module_log(module["scope"], email, "module.registered", {
+        "module_id": module["id"],
+        "name": module["name"],
+        "scope": module["scope"],
+    })
     try:
         manifest_url = payload.remote_url.rsplit("/remoteEntry.js", 1)[0] + "/manifest.json"
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -74,13 +74,40 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
             resp.raise_for_status()
             manifest = resp.json()
         bots_data = manifest.get("bots") or []
-        if bots_data:
-            pg.seed_bots_for_module(module["id"], bots_data, created_by=email)
+        new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email) if bots_data else []
+        for bot in new_bots:
+            ch.ensure_bot_table(bot.name)
+            ch.ensure_bot_mv(bot.name)
+            ch.write_bot_log(bot.name, email, "bot.registered", {
+                "bot_id": bot.id,
+                "bot_name": bot.name,
+                "module_id": module["id"],
+                "module_scope": module["scope"],
+            })
         if not payload.backend_url and manifest.get("backend_url"):
             module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module
+        i18n_data = manifest.get("i18n") or {}
+        if i18n_data:
+            updated_presets = {**module.get("presets", {}), "i18n": i18n_data}
+            module = pg.update_module(module["id"], {"presets": updated_presets}) or module
+            for lang, translations in i18n_data.items():
+                pg.merge_i18n_data(lang, translations)
     except Exception:
         pass
     return module
+
+
+@router.post("/modules/{module_id}/reset-i18n", status_code=204)
+async def reset_module_i18n(module_id: str, _: str = Depends(admin_dep)):
+    """Re-merge the i18n snapshot stored in module.presets.i18n back into the translations table (admin only)."""
+    pg = get_pg()
+    module = pg.get_module_by_id(module_id)
+    if module is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    i18n = module.get("presets", {}).get("i18n", {})
+    for lang, data in i18n.items():
+        pg.merge_i18n_data(lang, data)
+    return Response(status_code=204)
 
 
 @router.put("/modules/{module_id}")

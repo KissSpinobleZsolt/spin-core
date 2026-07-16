@@ -148,9 +148,16 @@ Leave the `externals` block **untouched**. React must remain external so the mod
   "route": "your-route",
   "icon": "🔧",
   "roles": ["admin", "user"],
-  "remote_entry": "http://localhost:YOUR_PORT/remoteEntry.js"
+  "remote_entry": "http://localhost:YOUR_PORT/remoteEntry.js",
+  "i18n": {
+    "en": { "yourModule": { "title": "Your Module" } },
+    "ro": { "yourModule": { "title": "Modulul tău" } }
+  },
+  "bots": []
 }
 ```
+
+`i18n` is optional — add your module's translation keys here; the platform loads them automatically on registration. `bots` is optional — list any companion bots the platform should provision for your module.
 
 If your module needs a backend service, add `backend_url` pointing to it (see step 3b below). Omit the field for frontend-only modules.
 
@@ -178,7 +185,7 @@ Visit `http://localhost:YOUR_PORT` to verify the module works on its own.
 Open the host app and go to **Admin → Modules**. Use either:
 
 - **Scan** — if your module URL is listed in `MODULE_REGISTRY_URLS`, click Scan and then Add.
-- **Manual** — fill in name, description, remote URL (`…/remoteEntry.js`), scope, component (`./App`), root slug, icon, and optionally presets (JSON blobs for i18n / layout / settings injected as props into the remote).
+- **Manual** — fill in name, description, remote URL (`…/remoteEntry.js`), scope, component (`./App`), root slug, and icon. Click **Load manifest** to auto-fill from your running module's `manifest.json`. i18n translations and companion bots declared in the manifest are loaded automatically by the backend when you save.
 
 Module registration is stored in PostgreSQL, not in configuration files. Changes take effect immediately — no restart required.
 

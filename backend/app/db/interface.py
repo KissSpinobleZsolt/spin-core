@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime
 
 
@@ -37,6 +37,7 @@ class BotRecord:
     restricted: str
     modules: list[str]
     created_by: str
+    config_schema: dict = field(default_factory=dict)
     created_at: datetime | None = None
 
 

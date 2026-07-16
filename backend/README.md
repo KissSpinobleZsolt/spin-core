@@ -44,6 +44,8 @@ Every HTTP request is automatically appended to `app_logs` by the middleware in 
 | `app_logs_mv` | Refreshable MV — hourly aggregates of `app_logs` (request count, avg/max duration, error count). Rebuilt every 10 minutes. |
 | `module_{scope}_logs` | Per-module event log — created automatically when a module is registered |
 | `module_{scope}_logs_mv` | Refreshable MV — hourly aggregates per module (event count, unique users). Rebuilt every 10 minutes. |
+| `bot_{name}_logs` | Per-bot event log — created automatically when a bot is provisioned from a module manifest |
+| `bot_{name}_logs_mv` | Refreshable MV — hourly aggregates per bot (event count, unique users). Rebuilt every 10 minutes. |
 | `module_chatbot_logs` | Chat completions — provider, model, messages, response, token counts, duration |
 | `module_chatbot_logs_mv` | Refreshable MV — hourly chat aggregates (completion count, avg/total tokens, avg duration). Rebuilt every 10 minutes. |
 
@@ -100,8 +102,10 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Modules (migration) | `settings.json` contains `modules` array | migrated to PostgreSQL; `settings.json` rewritten without `modules` |
 | Modules (seed) | `modules` table is empty after migration | seeded from `data/seed.json` |
 | Modules (discovery) | `MODULE_REGISTRY_URLS` is set | new scopes inserted; existing admin edits never overwritten |
+| Module i18n (discovery / manual create) | manifest contains `i18n` key | stored in `module.presets.i18n` snapshot; merged into `translations` table immediately |
 | Module bots (discovery) | new scope registered via discovery and manifest contains `bots` | `[spin-core] Provisioned bot '…' for module …` (idempotent — name+module_id guard) |
-| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning; best-effort (failure does not fail the create response) |
+| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning + i18n merge; best-effort (failure does not fail the create response) |
+| Bot ClickHouse tables | bot provisioned from manifest (discovery or manual create) | `bot_{name}_logs` table + `bot_{name}_logs_mv` created; also ensured for all existing bots at every startup |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
 | Daily log purge (background task) | always started; first run after 24 h | `[spin-core] Daily log purge: N table(s) optimized` |
@@ -161,10 +165,10 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 
 | Method | Path | Description |
 |--------|------|-------------|
-| `GET` | `/api/settings` | `AppSettings` (theme only) |
 | `PATCH` | `/api/settings/theme` | Update default theme |
 | `GET` | `/api/settings/modules` | List registered modules (from PostgreSQL) |
-| `POST` | `/api/settings/modules` | Create a module (also provisions ClickHouse log tables and fetches manifest to auto-create module bots) |
+| `POST` | `/api/settings/modules` | Create a module (provisions ClickHouse log tables; fetches manifest to auto-create module bots, load `i18n`, and set `backend_url`) |
+| `POST` | `/api/settings/modules/{id}/reset-i18n` | Re-merge the i18n snapshot stored in `module.presets.i18n` back into the translations table |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
 | `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |
@@ -219,7 +223,7 @@ Namespaced document store in PostgreSQL (`module_documents` table). Documents ar
 
 CRUD for bot configurations. Bots are stored in PostgreSQL (`bots` table).
 
-**Bot fields:** `id`, `name`, `description`, `type` (references `bot_types.name`), `provider` (`"ollama"` | `"anthropic"` | `"openai"` — determines the LLM backend), `model` (provider-specific model identifier; empty = provider default), `system_prompt`, `icon`, `active` (bool — requires at least one module), `restricted`, `modules` (string array of module IDs; `"core"` = visible in ChatBubble only, other IDs = visible on `/bots` page), `created_by`.
+**Bot fields:** `id`, `name`, `description`, `type` (references `bot_types.name`), `provider` (`"ollama"` | `"anthropic"` | `"openai"` — determines the LLM backend), `model` (provider-specific model identifier; empty = provider default), `system_prompt`, `icon`, `active` (bool — requires at least one module), `restricted`, `modules` (string array of module IDs; `"core"` = visible in ChatBubble only, other IDs = visible on `/bots` page), `config_schema` (JSON — arbitrary configuration schema injected from the module's manifest; holds UI enumeration keys such as `severity_levels` and `risk_levels`), `created_by`.
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|

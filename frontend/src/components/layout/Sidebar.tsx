@@ -50,10 +50,29 @@ function NavItem({ to, end, icon, label, collapsed }: NavItemProps) {
   )
 }
 
+function OfflineModuleItem({ icon, label, collapsed }: { icon: string; label: string; collapsed: boolean }) {
+  return (
+    <div
+      title={collapsed ? `${label} (offline)` : undefined}
+      className={`flex items-center gap-3 rounded-lg text-sm font-medium opacity-40 cursor-not-allowed select-none ${
+        collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
+      } text-slate-500`}
+    >
+      <span className="shrink-0 text-base leading-none">{icon}</span>
+      {!collapsed && (
+        <>
+          <span className="truncate flex-1">{label}</span>
+          <span className="text-[10px] font-semibold uppercase tracking-wide text-red-400 shrink-0">offline</span>
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function Sidebar() {
   const { logout, user } = useAuth()
   const { t } = useTranslation()
-  const { modules } = useSettings()
+  const { modules, moduleReachability } = useSettings()
   const { sidebarCollapsed, toggleSidebar } = useUIPrefs()
 
   const collapsed = sidebarCollapsed
@@ -153,15 +172,19 @@ export default function Sidebar() {
             )}
             {collapsed && <div className="my-3 border-t border-slate-700/60" />}
             <div className="space-y-1">
-              {visibleModules.map(m => (
-                <NavItem
-                  key={m.id}
-                  to={`/modules/${m.id}`}
-                  icon={<span className="text-base leading-none">{m.icon}</span>}
-                  label={m.name}
-                  collapsed={collapsed}
-                />
-              ))}
+              {visibleModules.map(m =>
+                moduleReachability[m.id] === false ? (
+                  <OfflineModuleItem key={m.id} icon={m.icon} label={m.name} collapsed={collapsed} />
+                ) : (
+                  <NavItem
+                    key={m.id}
+                    to={`/modules/${m.id}`}
+                    icon={<span className="text-base leading-none">{m.icon}</span>}
+                    label={m.name}
+                    collapsed={collapsed}
+                  />
+                )
+              )}
             </div>
           </>
         )}
@@ -200,8 +223,6 @@ export default function Sidebar() {
                 label="Bots"
                 collapsed={collapsed}
               />
-              {/* Users — hidden until user management is implemented */}
-              {/* Modules */}
               <NavItem
                 to="/admin/modules"
                 icon={

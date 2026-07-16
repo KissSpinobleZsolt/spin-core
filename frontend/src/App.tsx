@@ -15,6 +15,7 @@ import LLMs from './pages/admin/LLMs'
 import Users from './pages/admin/Users'
 import Modules from './pages/admin/Modules'
 import Status from './pages/admin/Status'
+import NotFound from './pages/NotFound'
 import { useI18nSync } from './i18n/useI18nSync'
 import { CookieConsentModal } from './components/CookieConsentModal'
 import { Spinner } from './components/ui/Spinner'
@@ -59,6 +60,7 @@ const router = createBrowserRouter([
           { path: 'bots', element: <Bots /> },
           { path: 'bots/:botId', element: <Chat /> },
           { path: 'modules/:moduleId', element: <FederatedPage /> },
+          { path: '*', element: <NotFound /> },
           {
             path: 'admin/llms',
             element: (
