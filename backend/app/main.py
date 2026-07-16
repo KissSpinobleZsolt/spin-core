@@ -138,11 +138,11 @@ async def lifespan(app: FastAPI):
                             "remote_url": m.get("remote_url") or m.get("remote_entry") or f"{base_url}/remoteEntry.js",
                             "scope": scope,
                             "route": m.get("route", scope.lower()),
-                            "enabled": True,
+                            "enabled": False,  # admin must enable explicitly — auto-discovery never activates on its own
                             "presets": {"i18n": {}, "layout": {}, "settings": {}},
                         })
                         registered_scopes.add(scope)
-                        print(f"[spin-core] Auto-discovered module: {scope}", file=sys.stderr)
+                        print(f"[spin-core] Auto-discovered module (inactive): {scope}", file=sys.stderr)
                         ch.ensure_module_table(scope)
                         ch.ensure_module_mv(scope)
                         ch.write_module_log(scope, admin_email or "", "module.registered", {
