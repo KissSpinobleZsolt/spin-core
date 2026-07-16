@@ -1,4 +1,5 @@
 /** @module services — Unified entry point for all frontend API services and types. */
+export * from './health'
 export * from './api'
 export * from './auth'
 export * from './bots'

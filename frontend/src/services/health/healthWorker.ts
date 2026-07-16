@@ -1,14 +1,9 @@
-const INTERVAL_MS = 30_000
-const TIMEOUT_MS = 5_000
+import type { HealthPayload } from './types'
+
+const INTERVAL_MS = Number(import.meta.env.VITE_HEALTH_INTERVAL_MS) || 30_000
+const TIMEOUT_MS  = Number(import.meta.env.VITE_HEALTH_TIMEOUT_MS)  || 5_000
 
 const OFFLINE: HealthPayload = { api: false, postgres: false, clickhouse: false }
-
-export type HealthPayload = {
-  api: boolean
-  postgres: boolean
-  clickhouse: boolean
-  translations?: Record<string, string>
-}
 
 async function ping() {
   try {
@@ -16,10 +11,7 @@ async function ping() {
     const timer = setTimeout(() => controller.abort(), TIMEOUT_MS)
     const res = await fetch('/api/health', { signal: controller.signal })
     clearTimeout(timer)
-    if (!res.ok) {
-      self.postMessage(OFFLINE)
-      return
-    }
+    if (!res.ok) { self.postMessage(OFFLINE); return }
     const data: HealthPayload = await res.json()
     self.postMessage({ ...data, api: true })
   } catch {

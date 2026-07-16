@@ -11,8 +11,7 @@
       "@context/*":    ["./src/context/*"],
       "@utils/*":      ["./src/utils/*"],
       "@constants/*":  ["./src/constants/*"],
-      "@i18n/*":       ["./src/i18n/*"],
-      "@workers/*":    ["./src/workers/*"]
+      "@i18n/*":       ["./src/i18n/*"]
     },
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
