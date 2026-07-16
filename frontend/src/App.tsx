@@ -15,6 +15,11 @@ import LLMs from './pages/admin/LLMs'
 import Users from './pages/admin/Users'
 import Modules from './pages/admin/Modules'
 import Status from './pages/admin/Status'
+import Components from './pages/admin/Components'
+import Layouts from './pages/admin/Layouts'
+import DocsUI from './pages/admin/docs/UI'
+import DocsApi from './pages/admin/docs/Api'
+import DocsDeployment from './pages/admin/docs/Deployment'
 import NotFound from './pages/NotFound'
 import { useI18nSync } from './i18n/useI18nSync'
 import { CookieConsentModal } from './components/CookieConsentModal'
@@ -90,6 +95,46 @@ const router = createBrowserRouter([
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <Status />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/components',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <Components />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/layouts',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <Layouts />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/docs/ui',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <DocsUI />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/docs/api',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <DocsApi />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/docs/deployment',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <DocsDeployment />
               </RoleGuard>
             ),
           },
