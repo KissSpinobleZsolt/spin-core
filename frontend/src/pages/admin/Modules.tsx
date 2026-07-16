@@ -436,6 +436,20 @@ export default function Modules() {
     }
   }
 
+  async function handleEnableDiscovered(d: DiscoveredModule) {
+    if (!d.module_id) return
+    try {
+      // Must spread the full ModuleConfig — the PUT endpoint requires all fields, not just enabled.
+      const existing = modules.find(m => m.id === d.module_id)
+      if (!existing) return
+      await settingsService.updateModule(d.module_id, { ...existing, enabled: true })
+      await refreshModules()
+      setDiscovered(prev => prev ? prev.map(x => x.source_url === d.source_url ? { ...x, enabled: true } : x) : prev)
+    } catch (err) {
+      setError(String(err))
+    }
+  }
+
   return (
     <div className="max-w-4xl space-y-6">
       <PageTitle>Modules</PageTitle>
@@ -521,10 +535,14 @@ export default function Modules() {
                     )}
                     <p className="text-xs font-mono text-slate-400 truncate mt-0.5">{d.remote_url}</p>
                   </div>
-                  {d.already_registered ? (
+                  {d.already_registered && d.enabled ? (
                     <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
                       Registered
                     </span>
+                  ) : d.already_registered && !d.enabled ? (
+                    // Module is in the DB but disabled — auto-disabled by health checker or inserted
+                    // inactive by startup discovery. Let the admin re-enable it directly from the scan.
+                    <Btn onClick={() => handleEnableDiscovered(d)}>Enable</Btn>
                   ) : (
                     <Btn
                       onClick={() =>

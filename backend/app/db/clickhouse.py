@@ -283,6 +283,55 @@ class ClickHouseLogAdapter:
             [(user_email, event_type, json.dumps(details))],
         )
 
+    def query_bot_logs(
+        self,
+        bot_name: str,
+        limit: int = 100,
+        offset: int = 0,
+        event_type: str | None = None,
+        from_dt: datetime | None = None,
+        to_dt: datetime | None = None,
+    ) -> dict:
+        """Query a bot's event log table with optional filters and return paginated results."""
+        table = self._bot_table(bot_name)
+        extra_filters: list = []
+        extra_params: dict = {}
+        if event_type:
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        rows, total = self._paginated_query(
+            table,
+            "event_time, user_email, event_type, details",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+        )
+        keys = ["event_time", "user_email", "event_type", "details"]
+        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
+
+    def query_bot_logs_mv(
+        self,
+        bot_name: str,
+        from_dt: datetime | None = None,
+        to_dt: datetime | None = None,
+        event_type: str | None = None,
+        limit: int = 500,
+        offset: int = 0,
+    ) -> dict:
+        """Query the hourly aggregate materialized view for a bot and return paginated buckets."""
+        mv = self._bot_mv(bot_name)
+        extra_filters: list = []
+        extra_params: dict = {}
+        if event_type:
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        rows, total = self._paginated_query(
+            mv,
+            "bucket, event_type, event_count, unique_users",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+            order_col="bucket", time_col="bucket",
+        )
+        keys = ["bucket", "event_type", "event_count", "unique_users"]
+        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
+
     def query_module_logs(
         self,
         scope: str,

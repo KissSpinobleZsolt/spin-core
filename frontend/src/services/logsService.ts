@@ -143,6 +143,43 @@ export interface ModuleLogsParams {
   offset?: number
 }
 
+/** Single event log entry emitted by a bot. */
+export interface BotLogEntry {
+  event_time: string
+  user_email: string
+  event_type: string
+  details: string
+}
+
+/** Paginated list of bot log entries. */
+export interface BotLogsPage {
+  items: BotLogEntry[]
+  total: number
+}
+
+/** Aggregated bot activity summary keyed by time bucket and event type. */
+export interface BotLogSummaryEntry {
+  bucket: string
+  event_type: string
+  event_count: number
+  unique_users: number
+}
+
+/** Paginated list of bot log summary entries. */
+export interface BotLogSummaryPage {
+  items: BotLogSummaryEntry[]
+  total: number
+}
+
+/** Optional filter and pagination parameters for bot log events. */
+export interface BotLogsParams {
+  from?: string
+  to?: string
+  event_type?: string
+  limit?: number
+  offset?: number
+}
+
 function buildQs(params: Record<string, string | number | undefined>): string {
   const q = new URLSearchParams()
   for (const [k, v] of Object.entries(params)) {
@@ -208,6 +245,22 @@ export const logsService = {
   async getModuleLogsSummary(moduleId: string, params: { from?: string; to?: string } = {}): Promise<ModuleLogSummaryPage> {
     const qs = buildQs({ from: params.from, to: params.to })
     return apiService.get(`/module-logs/${moduleId}/summary${qs}`)
+  },
+
+  async getBotLogs(botId: string, params: BotLogsParams = {}): Promise<BotLogsPage> {
+    const qs = buildQs({
+      from: params.from,
+      to: params.to,
+      event_type: params.event_type,
+      limit: params.limit,
+      offset: params.offset,
+    })
+    return apiService.get(`/bot-logs/${botId}${qs}`)
+  },
+
+  async getBotLogsSummary(botId: string, params: { from?: string; to?: string } = {}): Promise<BotLogSummaryPage> {
+    const qs = buildQs({ from: params.from, to: params.to })
+    return apiService.get(`/bot-logs/${botId}/summary${qs}`)
   },
 
   async purgeExpiredLogs(): Promise<{ purged: string[]; errors: string[] }> {

@@ -1,6 +1,13 @@
 import { type ReactNode, useState, useEffect } from 'react'
 import { botsService, type Bot, type BotPayload, type BotType, type LLMProvider, PROVIDER_LABELS, PROVIDER_MODEL_HINTS } from '../services/botsService'
 import { settingsService, type ModuleConfig } from '../services/settingsService'
+import {
+  logsService,
+  type BotLogEntry,
+  type BotLogSummaryEntry,
+  type BotLogsParams,
+} from '../services/logsService'
+import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../components/TimeRangeFilter'
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
 import { Btn } from '../components/ui/Button'
@@ -289,11 +296,144 @@ function BotModal({
 }
 
 // ---------------------------------------------------------------------------
+// Bot logs drawer
+// ---------------------------------------------------------------------------
+
+const PAGE_SIZE = 50
+
+function BotLogsDrawer({ bot, onClose }: { bot: Bot; onClose: () => void }) {
+  const [timeRange, setTimeRange] = useState<TimeRange>(defaultTimeRange())
+  const [summary, setSummary] = useState<BotLogSummaryEntry[]>([])
+  const [logs, setLogs] = useState<BotLogEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
+  const [loading, setLoading] = useState(false)
+
+  const params: BotLogsParams = {
+    from: timeRange.from ? new Date(timeRange.from).toISOString() : undefined,
+    to: timeRange.to ? new Date(timeRange.to).toISOString() : undefined,
+    limit: PAGE_SIZE,
+    offset: (page - 1) * PAGE_SIZE,
+  }
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([
+      logsService.getBotLogsSummary(bot.id, { from: params.from, to: params.to }),
+      logsService.getBotLogs(bot.id, params),
+    ])
+      .then(([s, l]) => {
+        setSummary(s.items)
+        setLogs(l.items)
+        setTotal(l.total)
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [bot.id, timeRange, page])
+
+  const totalEvents = summary.reduce((a, s) => a + (s.event_count ?? 0), 0)
+  const uniqueUsers = new Set(summary.flatMap(s => Array(s.unique_users ?? 0).fill(''))).size
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  return (
+    <div className="fixed inset-0 z-50 flex">
+      <div className="flex-1 bg-black/40" onClick={onClose} />
+      <div className="w-full max-w-2xl bg-white dark:bg-slate-900 border-l border-slate-200 dark:border-slate-700 flex flex-col h-full shadow-2xl">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 dark:border-slate-700">
+          <div>
+            <p className="font-semibold text-slate-800 dark:text-white">
+              {bot.icon && <span className="mr-2">{bot.icon}</span>}{bot.name} — Logs
+            </p>
+            <p className="text-xs text-slate-500 font-mono mt-0.5">{bot.type}</p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-xl leading-none"
+          >
+            ✕
+          </button>
+        </div>
+
+        <div className="px-6 py-3 border-b border-slate-200 dark:border-slate-700">
+          <TimeRangeFilter value={timeRange} onChange={r => { setTimeRange(r); setPage(1) }} />
+        </div>
+
+        <div className="px-6 py-3 flex gap-3 border-b border-slate-200 dark:border-slate-700">
+          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
+            <p className="text-xs text-slate-500">Total events</p>
+            <p className="text-lg font-semibold text-slate-800 dark:text-white">{totalEvents}</p>
+          </div>
+          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
+            <p className="text-xs text-slate-500">Unique users</p>
+            <p className="text-lg font-semibold text-slate-800 dark:text-white">{uniqueUsers}</p>
+          </div>
+          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
+            <p className="text-xs text-slate-500">Total raw</p>
+            <p className="text-lg font-semibold text-slate-800 dark:text-white">{total}</p>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-y-auto px-6 py-4">
+          {loading ? (
+            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading…</div>
+          ) : logs.length === 0 ? (
+            <p className="text-sm text-slate-500 text-center mt-8">No log entries found for this period.</p>
+          ) : (
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
+                  <th className="pb-2 pr-3">Time</th>
+                  <th className="pb-2 pr-3">User</th>
+                  <th className="pb-2 pr-3">Event type</th>
+                  <th className="pb-2">Details</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
+                {logs.map((entry, i) => (
+                  <tr key={i}>
+                    <td className="py-1.5 pr-3 text-slate-400 whitespace-nowrap font-mono">
+                      {new Date(entry.event_time).toLocaleString()}
+                    </td>
+                    <td className="py-1.5 pr-3 text-slate-600 dark:text-slate-300 truncate max-w-[120px]">
+                      {entry.user_email || '—'}
+                    </td>
+                    <td className="py-1.5 pr-3">
+                      <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-mono">
+                        {entry.event_type}
+                      </span>
+                    </td>
+                    <td className="py-1.5 text-slate-500 dark:text-slate-400 font-mono truncate max-w-[200px]">
+                      {entry.details}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+
+        {totalPages > 1 && (
+          <div className="px-6 py-3 border-t border-slate-200 dark:border-slate-700 flex items-center justify-between">
+            <span className="text-xs text-slate-500">Page {page} of {totalPages}</span>
+            <div className="flex gap-1">
+              <Btn variant="secondary" className="px-2 py-1 rounded-md text-xs" disabled={page === 1} onClick={() => setPage(p => Math.max(1, p - 1))}>‹ Prev</Btn>
+              <Btn variant="secondary" className="px-2 py-1 rounded-md text-xs" disabled={page === totalPages} onClick={() => setPage(p => Math.min(totalPages, p + 1))}>Next ›</Btn>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
 export default function BotsAdmin() {
   const [modal, setModal] = useState<'add' | Bot | null>(null)
+  const [logsBot, setLogsBot] = useState<Bot | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const { data: bots = [], isLoading, isError, refetch } = useGet<Bot[]>(
@@ -409,6 +549,7 @@ export default function BotsAdmin() {
                       </td>
                       <td className="py-2">
                         <div className="flex gap-2">
+                          <Btn variant="secondary" onClick={() => setLogsBot(bot)}>Logs</Btn>
                           <Btn variant="secondary" onClick={() => setModal(bot)}>Edit</Btn>
                           <Btn variant="danger" onClick={() => handleDelete(bot)}>Delete</Btn>
                         </div>
@@ -433,6 +574,8 @@ export default function BotsAdmin() {
           onClose={() => setModal(null)}
         />
       )}
+
+      {logsBot && <BotLogsDrawer bot={logsBot} onClose={() => setLogsBot(null)} />}
     </div>
   )
 }

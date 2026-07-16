@@ -25,10 +25,6 @@ Full-stack platform shell with a fixed tri-database architecture, env-var-seeded
 | `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
 | `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
 | `hello-world` | 3001 | Reference MF remote (frontend only) |
-| `cloud-insight-ai` | 3002 | CloudInsight AI MF remote (frontend only) |
-| `cloud-insight-ai-backend` | 8002 | Plugin backend for CloudInsight AI |
-| `anomascan` | 3003 | AnomaScan MF remote (frontend only) |
-| `anomascan-backend` | 8003 | Plugin backend for AnomaScan (YOLO, PyTorch) |
 
 All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
 
@@ -124,7 +120,7 @@ docker compose up --build backend
 docker compose up --build frontend-dev
 
 # Terminal 3 — one module (example: CloudInsight AI)
-cd modules/cloud-insight-ai && npm install && npm start
+cd modules/hello-world && npm install && npm start
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full 3-terminal module dev workflow and the VSCode task shortcuts.
@@ -303,7 +299,9 @@ spin-core/
 ├── frontend/         # React SPA — see frontend/README.md
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
-│   ├── hello-world/          # Reference MF remote — see modules/hello-world/README.md
+|   ├── AnomaScan/            # Reference MF remote — see modules/anomascan/README.md
+|   ├── cloud-insight-ai/     # Reference MF remote — see modules/cloud-insight-ai/README.md
+│   └── hello-world/          # Reference MF remote — see modules/hello-world/README.md
 ├── k8s/              # Kubernetes manifests — see k8s/README.md
 ├── scripts/          # Utility scripts — see scripts/README.md
 └── docker-compose.yml
