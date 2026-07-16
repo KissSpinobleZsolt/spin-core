@@ -70,7 +70,7 @@ Modules are registered in **Admin → Modules** (`/admin/modules`). Two ways:
 | Component | `./App` | Exposed component name |
 | Root slug | `hello-world` | URL path under `/modules/` |
 | Icon | `👋` | Emoji shown in sidebar |
-| Presets | `{ "i18n": {}, "layout": {}, "settings": {} }` | JSON blobs injected as `presets` prop into the remote component |
+| Presets | (auto-populated) | `{ i18n, layout, settings }` injected as `presets` prop; `i18n` is loaded automatically from the manifest on registration — do not enter it manually |
 
 ## manifest.json
 
@@ -86,7 +86,23 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
   "roles": ["user", "admin"],
   "description": "Short description shown in the discovery panel.",
   "remote_entry": "http://localhost:3001/remoteEntry.js",
-  "backend_url": "http://my-module-backend:8000"
+  "backend_url": "http://my-module-backend:8000",
+  "i18n": {
+    "en": { "myModule": { "title": "My Module" } },
+    "ro": { "myModule": { "title": "Modulul meu" } }
+  },
+  "bots": [
+    {
+      "name": "My Bot",
+      "type": "communicator",
+      "description": "Answers questions about this module.",
+      "model": "",
+      "system_prompt": "You are a helpful assistant for My Module.",
+      "icon": "🤖",
+      "active": true,
+      "restricted": "user"
+    }
+  ]
 }
 ```
 
@@ -96,7 +112,11 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
 
 `backend_url` is **optional** — only set it if your module has its own plugin backend service. When present, the core backend registers it in the `modules` table and proxies `POST /api/plugin/{scope}/…` requests to it. Omit the field for frontend-only modules.
 
-`presets` are **not** part of `manifest.json` — they are set by admins in the platform UI and stored in PostgreSQL, then injected as `props.presets` into the remote component at load time. The remote does not need to declare them in the manifest.
+`i18n` is **optional** — declare per-language translation keys under your module's i18n namespace. On registration (auto-discovery or manual create) the backend stores this as `module.presets.i18n` and merges it into the translations table. Admins can re-apply it at any time via **Admin → Modules → Reset i18n to defaults**.
+
+`bots` is **optional** — declare companion bots that the platform provisions automatically when the module is registered. Bot records are stored in PostgreSQL and ClickHouse log tables are created for each one. Registration is idempotent (keyed on `name + module_id`).
+
+`presets.layout` and `presets.settings` are **not** part of `manifest.json` — they are set by admins in the platform UI and stored in PostgreSQL, then injected as `props.presets` into the remote component at load time.
 
 ## Plugin backends
 

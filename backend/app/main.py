@@ -159,6 +159,7 @@ async def lifespan(app: FastAPI):
                         bots_from_manifest = m.get("bots") or []
                         if bots_from_manifest:
                             if not mod:
+                                # Re-fetch only when the i18n block above didn't load it
                                 mod = pg.get_module_by_scope(scope)
                             if mod:
                                 new_bots = pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")

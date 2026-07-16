@@ -37,7 +37,7 @@ All authenticated routes redirect to `/login` if no token is present. The admin 
 |----------|-----------|---------|
 | `AuthContext` | `token` (localStorage) | JWT + user object |
 | `ThemeContext` | `theme` (localStorage) | Dark / light, cross-tab sync |
-| `SettingsContext` | — | Polls `GET /api/settings` |
+| `SettingsContext` | — | Polls `GET /api/settings/modules` |
 | `UIPrefsContext` | `ui_prefs` (localStorage) | Sidebar collapsed state, cross-tab sync |
 | `HealthContext` | — | Receives DB liveness updates from the health Web Worker |
 | `ModelStatusContext` | — | Provides Ollama model readiness state — consumed by `ChatBubble` to decide visibility |
@@ -123,7 +123,7 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`/bots`** (`src/pages/Bots.tsx`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
 
-**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots render a `BotConfigSkeleton` placeholder instead of the chat UI.
+**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots with a module backend render `BotConfigPage` (manifest-driven config UI with teams, risk profiles, and process monitoring); others render a `BotConfigSkeleton` placeholder.
 
 **`ModuleBotPanel`** (`src/components/modules/ModuleBotPanel.tsx`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
 
@@ -139,17 +139,15 @@ Each registered module stores a `presets` JSON blob (`{ i18n, layout, settings }
 
 Remote components can read `props.presets` to receive platform configuration without any additional API calls.
 
+`presets.i18n` is auto-populated from the module's `manifest.json` at registration time (both via auto-discovery and manual **Admin → Modules** create). The stored snapshot is the source of truth for translation resets.
+
 ### Add / Edit module form
 
-The **Admin → Modules** add/edit modal exposes two additional actions beyond the basic fields:
+The **Admin → Modules** add/edit modal exposes two additional sections beyond the basic fields:
 
-**Load manifest** — button next to the Remote entry URL field. The browser fetches `manifest.json` from the module's base URL directly (no backend proxy — nginx serves it with `Access-Control-Allow-Origin: *`). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots will be provisioned on save.
+**Load manifest** — button next to the Remote entry URL field. The browser fetches `manifest.json` from the module's base URL directly (no backend proxy — nginx serves it with `Access-Control-Allow-Origin: *`). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots and how many i18n languages will be loaded on save.
 
-**i18n translations** — a JSON textarea that accepts a multi-language object:
-```json
-{ "en": { "key": "value" }, "ro": { "cheie": "valoare" } }
-```
-When the form is saved, each language key is posted to `PUT /api/i18n/{lang}` before the module record is persisted, merging the translations into the database.
+**i18n snapshot** (edit mode only) — a collapsible read-only viewer showing the `presets.i18n` snapshot stored in the database. Includes a **↺ Reset i18n to defaults** button that calls `POST /api/settings/modules/{id}/reset-i18n`, re-merging the stored snapshot into the translations table. The button is disabled when the snapshot is empty (module was registered before manifest-driven i18n was wired up — re-saving the module repopulates it).
 
 ### Module discovery
 

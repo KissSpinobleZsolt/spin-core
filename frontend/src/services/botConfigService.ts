@@ -63,6 +63,7 @@ export const botConfigService = {
     return apiService.post(`/plugin/${scope}/bots/${botUuid}/entities`, payload)
   },
 
+  // patch and delete are entity-scoped, not bot-scoped — entity IDs are globally unique in the module backend
   patchEntity(scope: string, entityId: string, patch: EntityPatchPayload): Promise<BotEntity> {
     return apiService.patch(`/plugin/${scope}/entities/${entityId}`, patch)
   },
