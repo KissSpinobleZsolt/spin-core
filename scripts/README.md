@@ -21,22 +21,33 @@ bash scripts/restart.sh --rebuild frontend
 
 Does a `docker compose stop` + `docker compose up -d` on the named service(s). With `--rebuild` it prepends `docker compose build` before starting.
 
-## `k8s-deploy.sh`
+## `k8s-push.sh`
 
-Full Kubernetes deploy via minikube. See [k8s/README.md](../k8s/README.md) for prerequisites and environment setup.
+Builds the three app images (`backend`, `frontend`, `hello-world`) and pushes them to
+`ghcr.io/kissspinoblezsolt/spin-core-<name>` tagged with the current git SHA and `:latest`.
+Run this before `k8s-deploy.sh` whenever the source changes.
 
 ```bash
-cp k8s/.env.example k8s/.env   # fill in ADMIN_EMAIL, ADMIN_PASSWORD, JWT_SECRET_KEY
-minikube start --driver=docker
-bash scripts/k8s-deploy.sh
+bash scripts/k8s-push.sh
+
+# Override the tag (e.g. for a release)
+IMAGE_TAG=v1.2.3 bash scripts/k8s-push.sh
 ```
 
-The script:
-1. Points `docker` CLI at the minikube daemon so images are built directly into the cluster.
-2. Builds backend and frontend Docker images.
-3. Applies all manifests from `k8s/` in dependency order.
-4. Waits for core pods to become ready.
-5. Prints the NodePort URLs for frontend and backend.
+## `k8s-deploy.sh`
+
+Pure Kubernetes deploy — no Docker build step. Stamps the git SHA tag into the Kustomize
+image references, applies all manifests from `k8s/`, and waits for rollouts.
+See [k8s/README.md](../k8s/README.md) for prerequisites and cluster setup.
+
+```bash
+cp k8s/.env.example k8s/.env   # fill in credentials
+bash scripts/k8s-push.sh       # build + push images first
+bash scripts/k8s-deploy.sh     # apply manifests + wait for rollouts
+
+# Pass an explicit tag to deploy a specific build
+IMAGE_TAG=abc1234 bash scripts/k8s-deploy.sh
+```
 
 ## `generate-docs.sh`
 
