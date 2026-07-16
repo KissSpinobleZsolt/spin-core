@@ -11,13 +11,16 @@ import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../components
 import { useGet } from '../hooks/useApi'
 import { apiService } from '../services/apiService'
 import { Btn } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
 import { Input } from '../components/ui/Input'
 import { Label } from '../components/ui/Label'
 import { Modal } from '../components/ui/Modal'
 import { Toggle } from '../components/ui/Toggle'
+import { StatCard } from '../components/ui/StatCard'
+import { Spinner } from '../components/ui/Spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { PageTitle } from '../components/ui/PageTitle'
-import { BOT_TYPES, CUSTOM_ICONS, TYPE_BADGE } from '../constants/botConstants'
+import { BOT_TYPES, CUSTOM_ICONS } from '../constants/botConstants'
 import { type InstalledModelsData } from '../services/modelStatusService'
 
 // ---------------------------------------------------------------------------
@@ -274,17 +277,14 @@ function BotModal({
       </div>
 
       <div className="flex items-center gap-2">
-        <input
-          id="bot-active"
-          type="checkbox"
+        <Toggle
           checked={form.active}
           disabled={form.modules.length === 0}
-          onChange={e => setForm(f => ({ ...f, active: e.target.checked }))}
-          className="rounded border-slate-400 disabled:opacity-40"
+          onChange={v => setForm(f => ({ ...f, active: v }))}
         />
-        <label htmlFor="bot-active" className={`text-sm ${form.modules.length === 0 ? 'text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
+        <span className={`text-sm ${form.modules.length === 0 ? 'text-slate-400' : 'text-slate-600 dark:text-slate-300'}`}>
           Active {form.modules.length === 0 && '(requires at least one module)'}
-        </label>
+        </span>
       </div>
 
       <div className="flex justify-end gap-2 pt-2">
@@ -301,19 +301,12 @@ function BotModal({
 
 const PAGE_SIZE = 50
 
-const LEVEL_STYLES: Record<string, string> = {
-  INFO:  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  WARN:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+const LEVEL_VARIANT: Record<string, 'info' | 'warn' | 'error'> = {
+  INFO: 'info', WARN: 'warn', ERROR: 'error',
 }
 
 function LevelBadge({ level }: { level: string }) {
-  const cls = LEVEL_STYLES[level] ?? LEVEL_STYLES.INFO
-  return (
-    <span className={`px-1.5 py-0.5 rounded font-mono font-semibold whitespace-nowrap ${cls}`}>
-      {level || 'INFO'}
-    </span>
-  )
+  return <Badge variant={LEVEL_VARIANT[level] ?? 'info'}>{level || 'INFO'}</Badge>
 }
 
 function BotLogsDrawer({ bot, onClose }: { bot: Bot; onClose: () => void }) {
@@ -376,23 +369,14 @@ function BotLogsDrawer({ bot, onClose }: { bot: Bot; onClose: () => void }) {
         </div>
 
         <div className="px-6 py-3 flex gap-3 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Total events</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{totalEvents}</p>
-          </div>
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Unique users</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{uniqueUsers}</p>
-          </div>
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Total raw</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{total}</p>
-          </div>
+          <StatCard label="Total events" value={totalEvents} className="flex-1" />
+          <StatCard label="Unique users" value={uniqueUsers} className="flex-1" />
+          <StatCard label="Total raw" value={total} className="flex-1" />
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading…</div>
+            <div className="flex items-center justify-center h-32"><Spinner /></div>
           ) : logs.length === 0 ? (
             <p className="text-sm text-slate-500 text-center mt-8">No log entries found for this period.</p>
           ) : (
@@ -503,8 +487,8 @@ export default function BotsAdmin() {
     <div className="max-w-5xl space-y-6">
       <PageTitle>Bots</PageTitle>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
-      {isError && <p className="text-sm text-red-500">Failed to load bots.</p>}
+      {isLoading && <Spinner />}
+      {isError && <ErrorBanner message="Failed to load bots." />}
       {error && <ErrorBanner message={error} />}
 
       {!isLoading && !isError && (
@@ -538,21 +522,14 @@ export default function BotsAdmin() {
                         )}
                       </td>
                       <td className="py-2 pr-4">
-                        <span className={`px-2 py-0.5 rounded-full text-xs font-semibold ${TYPE_BADGE[bot.type] ?? TYPE_BADGE.custom}`}>
+                        <Badge variant={bot.type === 'communicator' ? 'info' : 'neutral'}>
                           {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-2 pr-4 text-xs">
-                        {/* Provider badge — colour-coded by backend type */}
-                        <span className={`px-2 py-0.5 rounded-full font-medium ${
-                          bot.provider === 'anthropic'
-                            ? 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400'
-                            : bot.provider === 'openai'
-                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                            : 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300'
-                        }`}>
+                        <Badge variant={bot.provider === 'anthropic' ? 'warn' : bot.provider === 'openai' ? 'success' : 'neutral'}>
                           {bot.provider ?? 'ollama'}
-                        </span>
+                        </Badge>
                       </td>
                       <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400 text-xs">
                         {bot.model || <span className="italic">default</span>}

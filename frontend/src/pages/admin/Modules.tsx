@@ -9,10 +9,13 @@ import {
 import { useSettings } from '../../context/SettingsContext'
 import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../../components/TimeRangeFilter'
 import { Btn } from '../../components/ui/Button'
+import { Badge } from '../../components/ui/Badge'
 import { Input } from '../../components/ui/Input'
 import { Label } from '../../components/ui/Label'
 import { Modal } from '../../components/ui/Modal'
 import { Toggle } from '../../components/ui/Toggle'
+import { StatCard } from '../../components/ui/StatCard'
+import { Spinner } from '../../components/ui/Spinner'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { PageTitle } from '../../components/ui/PageTitle'
 
@@ -257,19 +260,12 @@ function ModuleModal({
 // Shared log helpers
 // ------------------------------------------------------------------ //
 
-const LEVEL_STYLES: Record<string, string> = {
-  INFO:  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  WARN:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+const LEVEL_VARIANT: Record<string, 'info' | 'warn' | 'error'> = {
+  INFO: 'info', WARN: 'warn', ERROR: 'error',
 }
 
 function LevelBadge({ level }: { level: string }) {
-  const cls = LEVEL_STYLES[level] ?? LEVEL_STYLES.INFO
-  return (
-    <span className={`px-1.5 py-0.5 rounded font-mono font-semibold whitespace-nowrap ${cls}`}>
-      {level || 'INFO'}
-    </span>
-  )
+  return <Badge variant={LEVEL_VARIANT[level] ?? 'info'}>{level || 'INFO'}</Badge>
 }
 
 // ------------------------------------------------------------------ //
@@ -337,23 +333,14 @@ function ModuleLogsDrawer({ module: mod, onClose }: { module: ModuleConfig; onCl
         </div>
 
         <div className="px-6 py-3 flex gap-3 border-b border-slate-200 dark:border-slate-700">
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Total events</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{totalEvents}</p>
-          </div>
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Unique users</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{uniqueUsers}</p>
-          </div>
-          <div className="flex-1 bg-slate-50 dark:bg-slate-800 rounded-lg px-4 py-2">
-            <p className="text-xs text-slate-500">Total raw</p>
-            <p className="text-lg font-semibold text-slate-800 dark:text-white">{total}</p>
-          </div>
+          <StatCard label="Total events" value={totalEvents} className="flex-1" />
+          <StatCard label="Unique users" value={uniqueUsers} className="flex-1" />
+          <StatCard label="Total raw" value={total} className="flex-1" />
         </div>
 
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {loading ? (
-            <div className="flex items-center justify-center h-32 text-slate-400 text-sm">Loading…</div>
+            <div className="flex items-center justify-center h-32"><Spinner /></div>
           ) : logs.length === 0 ? (
             <p className="text-sm text-slate-500 text-center mt-8">No log entries found for this period.</p>
           ) : (
@@ -555,9 +542,7 @@ export default function Modules() {
                     <p className="text-xs font-mono text-slate-400 truncate mt-0.5">{d.remote_url}</p>
                   </div>
                   {d.already_registered && d.enabled ? (
-                    <span className="shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400">
-                      Registered
-                    </span>
+                    <Badge variant="success">Registered</Badge>
                   ) : d.already_registered && !d.enabled ? (
                     // Module is in the DB but disabled — auto-disabled by health checker or inserted
                     // inactive by startup discovery. Let the admin re-enable it directly from the scan.

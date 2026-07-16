@@ -2,6 +2,10 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { i18nService, type TranslationData } from '../services/i18nService'
 import { reloadTranslations } from '../i18n/useI18nSync'
+import { Btn } from '../components/ui/Button'
+import { Input } from '../components/ui/Input'
+import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { PageTitle } from '../components/ui/PageTitle'
 
 const LANGS = ['en', 'ro'] as const
 type Lang = (typeof LANGS)[number]
@@ -119,26 +123,25 @@ export default function Translations() {
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-4 flex-wrap">
-        <h1 className="text-xl font-bold text-slate-800 dark:text-white">{t('translations.title')}</h1>
+        <PageTitle>{t('translations.title')}</PageTitle>
 
         <div className="flex-1 min-w-48">
-          <input
+          <Input
             type="search"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder={t('translations.search')}
-            className="w-full px-3 py-1.5 text-sm rounded-lg bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
           />
         </div>
 
         <div className="flex gap-2 ml-auto">
           {LANGS.map(lang => (
-            <button
+            <Btn
               key={lang}
               type="button"
               onClick={() => handleSave(lang)}
               disabled={saveState[lang] === 'saving' || !isDirty(lang)}
-              className="px-4 py-1.5 rounded-lg text-sm font-medium transition-colors bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              className="flex items-center gap-2"
             >
               {saveState[lang] === 'saving'
                 ? t('translations.saving')
@@ -148,16 +151,12 @@ export default function Translations() {
               {isDirty(lang) && saveState[lang] === 'idle' && (
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 inline-block" />
               )}
-            </button>
+            </Btn>
           ))}
         </div>
       </div>
 
-      {error && (
-        <div className="p-3 rounded-lg bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 text-sm">
-          {error}
-        </div>
-      )}
+      {error && <ErrorBanner message={error} />}
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
         {/* Header */}

@@ -11,6 +11,11 @@ import {
 import { Btn } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
 import { PageTitle } from '../components/ui/PageTitle'
+import { Badge } from '../components/ui/Badge'
+import { Input } from '../components/ui/Input'
+import { StatCard } from '../components/ui/StatCard'
+import { Tabs } from '../components/ui/Tabs'
+import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { formatEventTime } from '../utils/formatters'
 
 const PAGE_SIZE = 50
@@ -24,14 +29,6 @@ function statusColor(code: number) {
   return 'text-red-600 dark:text-red-400'
 }
 
-function StatCard({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 px-4 py-3 flex-1 min-w-[110px]">
-      <p className="text-xs text-slate-500 dark:text-slate-400 mb-0.5">{label}</p>
-      <p className="text-lg font-semibold text-slate-800 dark:text-white">{value}</p>
-    </div>
-  )
-}
 
 function buildPages(current: number, total: number): (number | '…')[] {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
@@ -137,17 +134,12 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
     try { return JSON.parse(raw) } catch { return null }
   }
 
-  const inputCls = 'px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500'
-
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">User email</label>
-          <input value={draftEmail} onChange={e => setDraftEmail(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setEmailFilter(draftEmail) } }}
-            placeholder="user@example.com" className={`${inputCls} w-52`} />
-        </div>
+        <Input label="User email" id="filter-owner-chat" value={draftEmail} onChange={e => setDraftEmail(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setEmailFilter(draftEmail) } }}
+          placeholder="user@example.com" className="w-52" />
         <Btn onClick={() => { setPage(1); setEmailFilter(draftEmail) }}>Filter</Btn>
         <Btn variant="secondary" onClick={() => { setDraftEmail(''); setPage(1); setEmailFilter('') }}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} conversations</span>
@@ -159,7 +151,7 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
             <Spinner size="sm" />Loading…
           </div>
         ) : error ? (
-          <div className="p-6 text-red-500 text-sm">{error}</div>
+          <div className="p-6"><ErrorBanner message={error} /></div>
         ) : entries.length === 0 ? (
           <div className="p-6 text-slate-400 text-sm text-center">No chat logs found for this period.</div>
         ) : (
@@ -230,18 +222,12 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
 
 // ── Level badge (shared) ──────────────────────────────────────────────────────
 
-const LEVEL_STYLES: Record<string, string> = {
-  INFO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
-  WARN: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
-  ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+const LEVEL_VARIANT: Record<string, 'info' | 'warn' | 'error'> = {
+  INFO: 'info', WARN: 'warn', ERROR: 'error',
 }
 
 function LevelBadge({ level }: { level: string }) {
-  return (
-    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${LEVEL_STYLES[level] ?? LEVEL_STYLES.INFO}`}>
-      {level}
-    </span>
-  )
+  return <Badge variant={LEVEL_VARIANT[level] ?? 'info'}>{level || 'INFO'}</Badge>
 }
 
 // ── API logs tab ──────────────────────────────────────────────────────────────
@@ -287,27 +273,19 @@ function ApiLogsTab({ timeRange }: { timeRange: TimeRange }) {
   const avgDuration = summary.length ? (summary.reduce((s, r) => s + r.avg_duration_ms * r.request_count, 0) / Math.max(totalRequests, 1)).toFixed(1) : '—'
   const errorRate = totalRequests ? ((totalErrors / totalRequests) * 100).toFixed(1) + '%' : '—'
 
-  const inputCls = 'px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500'
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
-        <StatCard label="Requests" value={totalRequests.toLocaleString()} />
-        <StatCard label="Errors" value={totalErrors.toLocaleString()} />
-        <StatCard label="Error rate" value={errorRate} />
-        <StatCard label="Avg duration" value={avgDuration === '—' ? '—' : `${avgDuration} ms`} />
-        <StatCard label="Total (filtered)" value={total.toLocaleString()} />
+        <StatCard label="Requests" value={totalRequests.toLocaleString()} className="flex-1 min-w-[110px]" />
+        <StatCard label="Errors" value={totalErrors.toLocaleString()} className="flex-1 min-w-[110px]" />
+        <StatCard label="Error rate" value={errorRate} className="flex-1 min-w-[110px]" />
+        <StatCard label="Avg duration" value={avgDuration === '—' ? '—' : `${avgDuration} ms`} className="flex-1 min-w-[110px]" />
+        <StatCard label="Total (filtered)" value={total.toLocaleString()} className="flex-1 min-w-[110px]" />
       </div>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Event type</label>
-          <input value={draftEvent} onChange={e => setDraftEvent(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="e.g. http.request" className={`${inputCls} w-40`} />
-        </div>
-        <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Owner</label>
-          <input value={draftOwner} onChange={e => setDraftOwner(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="user@example.com" className={`${inputCls} w-44`} />
-        </div>
+        <Input label="Event type" id="filter-event" value={draftEvent} onChange={e => setDraftEvent(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="e.g. http.request" className="w-40" />
+        <Input label="Owner" id="filter-owner-api" value={draftOwner} onChange={e => setDraftOwner(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="user@example.com" className="w-44" />
         <Btn onClick={applyFilters}>Filter</Btn>
         <Btn variant="secondary" onClick={clearFilters}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} rows · {PAGE_SIZE} per page</span>
@@ -317,7 +295,7 @@ function ApiLogsTab({ timeRange }: { timeRange: TimeRange }) {
         {loading ? (
           <div className="flex items-center justify-center h-32 text-slate-400 gap-2"><Spinner size="sm" />Loading…</div>
         ) : error ? (
-          <div className="p-6 text-red-500 text-sm">{error}</div>
+          <div className="p-6"><ErrorBanner message={error} /></div>
         ) : logs.length === 0 ? (
           <div className="p-6 text-slate-400 text-sm text-center">No API logs found.</div>
         ) : (
@@ -387,17 +365,12 @@ function UserLogsTab({ timeRange }: { timeRange: TimeRange }) {
 
   function jumpToPage() { const n = parseInt(jumpInput, 10); if (!isNaN(n) && n >= 1 && n <= totalPages) setPage(n); setJumpInput('') }
 
-  const inputCls = 'px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500'
-
   return (
     <div className="space-y-4">
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3 items-end">
-        <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Owner</label>
-          <input value={draftOwner} onChange={e => setDraftOwner(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setOwnerFilter(draftOwner) } }}
-            placeholder="user@example.com" className={`${inputCls} w-52`} />
-        </div>
+        <Input label="Owner" id="filter-owner-user" value={draftOwner} onChange={e => setDraftOwner(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setOwnerFilter(draftOwner) } }}
+          placeholder="user@example.com" className="w-52" />
         <Btn onClick={() => { setPage(1); setOwnerFilter(draftOwner) }}>Filter</Btn>
         <Btn variant="secondary" onClick={() => { setDraftOwner(''); setPage(1); setOwnerFilter('') }}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} events</span>
@@ -407,7 +380,7 @@ function UserLogsTab({ timeRange }: { timeRange: TimeRange }) {
         {loading ? (
           <div className="flex items-center justify-center h-32 text-slate-400 gap-2"><Spinner size="sm" />Loading…</div>
         ) : error ? (
-          <div className="p-6 text-red-500 text-sm">{error}</div>
+          <div className="p-6"><ErrorBanner message={error} /></div>
         ) : logs.length === 0 ? (
           <div className="p-6 text-slate-400 text-sm text-center">No user events found.</div>
         ) : (
@@ -464,14 +437,6 @@ export default function Logs() {
     }
   }
 
-  const tabCls = (t: Tab) =>
-    `px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
-      tab === t
-        ? 'bg-blue-600 text-white'
-        : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
-    }`
-
-
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -494,11 +459,15 @@ export default function Logs() {
         <TimeRangeFilter value={timeRange} onChange={range => setTimeRange(range)} />
       </div>
 
-      <div className="flex gap-2">
-        <button className={tabCls('api')} onClick={() => setTab('api')}>API Logs</button>
-        <button className={tabCls('user')} onClick={() => setTab('user')}>User Logs</button>
-        <button className={tabCls('chat')} onClick={() => setTab('chat')}>Chat Logs</button>
-      </div>
+      <Tabs
+        tabs={[
+          { key: 'api', label: 'API Logs' },
+          { key: 'user', label: 'User Logs' },
+          { key: 'chat', label: 'Chat Logs' },
+        ]}
+        active={tab}
+        onChange={t => setTab(t as Tab)}
+      />
 
       {tab === 'api' && <ApiLogsTab timeRange={timeRange} />}
       {tab === 'user' && <UserLogsTab timeRange={timeRange} />}

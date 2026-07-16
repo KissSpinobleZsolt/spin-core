@@ -2,9 +2,12 @@ import { useNavigate } from 'react-router-dom'
 import { botsService, type Bot } from '../services/botsService'
 import { useGet } from '../hooks/useApi'
 import { Btn } from '../components/ui/Button'
+import { Badge } from '../components/ui/Badge'
 import { Card } from '../components/ui/Card'
 import { PageTitle } from '../components/ui/PageTitle'
-import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
+import { Spinner } from '../components/ui/Spinner'
+import { ErrorBanner } from '../components/ui/ErrorBanner'
+import { BOT_TYPES } from '../constants/botConstants'
 
 function BotHeader({ bot }: { bot: Bot }) {
   return (
@@ -13,9 +16,9 @@ function BotHeader({ bot }: { bot: Bot }) {
         <span className="text-3xl leading-none shrink-0">{bot.icon}</span>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-slate-800 dark:text-white truncate">{bot.name}</p>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${TYPE_BADGE[bot.type] ?? TYPE_BADGE.custom}`}>
+          <Badge variant={bot.type === 'communicator' ? 'info' : 'neutral'}>
             {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
-          </span>
+          </Badge>
         </div>
       </div>
       {bot.description && (
@@ -53,8 +56,8 @@ export default function Bots() {
     <div className="max-w-5xl space-y-6">
       <PageTitle>Bots</PageTitle>
 
-      {isLoading && <p className="text-sm text-slate-500">Loading…</p>}
-      {isError && <p className="text-sm text-red-500">Failed to load bots.</p>}
+      {isLoading && <Spinner />}
+      {isError && <ErrorBanner message="Failed to load bots." />}
 
       {!isLoading && !isError && bots.length === 0 && (
         <p className="text-sm text-slate-500 dark:text-slate-400">No bots available to you right now.</p>

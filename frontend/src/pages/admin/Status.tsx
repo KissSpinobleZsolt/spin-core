@@ -4,6 +4,7 @@ import { useSettings } from '../../context/SettingsContext'
 import { useGet } from '../../hooks/useApi'
 import { apiService } from '../../services/apiService'
 import { botsService, type Bot } from '../../services/botsService'
+import { Badge } from '../../components/ui/Badge'
 import { PageTitle } from '../../components/ui/PageTitle'
 import { Spinner } from '../../components/ui/Spinner'
 import { fmtBytes } from '../../utils/formatters'
@@ -150,9 +151,9 @@ function ModulesStatusSection() {
               <span className="text-lg w-7 shrink-0">{m.icon}</span>
               <span className="font-medium text-slate-800 dark:text-white flex-1 truncate">{m.name}</span>
               <span className="font-mono text-xs text-slate-400">/modules/{m.id}</span>
-              <span className={`shrink-0 px-2 py-0.5 rounded-full text-xs font-semibold ${m.enabled ? 'bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-500'}`}>
+              <Badge variant={m.enabled ? 'success' : 'neutral'}>
                 {m.enabled ? 'active' : 'disabled'}
-              </span>
+              </Badge>
             </div>
           ))}
         </div>
