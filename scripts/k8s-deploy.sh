@@ -1,30 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "→ Pointing Docker to minikube's daemon..."
-eval $(minikube docker-env)
+NAMESPACE=spin-core
+# Default to the current git SHA; CI can override by setting IMAGE_TAG before calling this script.
+IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 
-echo "→ Building backend image..."
-docker build -t spin-core-backend:latest ./backend
+echo "→ Deploying tag ${IMAGE_TAG} to namespace ${NAMESPACE}..."
 
-echo "→ Building frontend image..."
-docker build -t spin-core-frontend:latest ./frontend
+# Stamp the SHA tag into kustomization.yaml so kubectl apply picks it up.
+# Subshell keeps the cd scoped — kustomize edit must run from the kustomization.yaml directory.
+# git checkout below resets the file so the working tree stays clean.
+(
+  cd k8s
+  kustomize edit set image \
+    "ghcr.io/kissspinoblezsolt/spin-core-backend:${IMAGE_TAG}" \
+    "ghcr.io/kissspinoblezsolt/spin-core-frontend:${IMAGE_TAG}" \
+    "ghcr.io/kissspinoblezsolt/spin-core-hello-world:${IMAGE_TAG}"
+)
 
-echo "→ Building hello-world image..."
-docker build -t spin-core-hello-world:latest ./modules/hello-world
-
-echo "→ Building chatbot image..."
-docker build -t spin-core-chatbot:latest ./modules/chatbot
-
-echo "→ Applying Kubernetes manifests..."
 kubectl apply -k k8s/
 
-echo "→ Waiting for backend rollout..."
-kubectl rollout status deployment/backend -n spin-core --timeout=120s
+# Reset kustomization.yaml so the SHA tag is not left as a local modification.
+git checkout k8s/kustomization.yaml
 
-echo "→ Waiting for frontend rollout..."
-kubectl rollout status deployment/frontend -n spin-core --timeout=60s
+echo "→ Waiting for rollouts..."
+kubectl rollout status deployment/backend    -n "${NAMESPACE}" --timeout=120s
+kubectl rollout status deployment/frontend   -n "${NAMESPACE}" --timeout=60s
+kubectl rollout status deployment/hello-world -n "${NAMESPACE}" --timeout=60s
 
 echo ""
-echo "✓ Deployed. App URL:"
-minikube service frontend -n spin-core --url
+echo "Deploy complete — tag ${IMAGE_TAG} is live in ${NAMESPACE}."

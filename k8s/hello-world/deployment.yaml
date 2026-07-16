@@ -15,8 +15,8 @@ spec:
     spec:
       containers:
         - name: hello-world
-          image: spin-core-hello-world:latest
-          imagePullPolicy: Never
+          image: ghcr.io/kissspinoblezsolt/spin-core-hello-world:latest
+          imagePullPolicy: Always  # Always, not IfNotPresent — manifest defaults to :latest, which nodes cache aggressively; deploy script overrides to SHA at apply time
           ports:
             - containerPort: 80
           readinessProbe:
