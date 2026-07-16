@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from app.database import get_ch, get_pg
+from app.database import get_ch
 from app.deps import admin_dep
 
 router = APIRouter(prefix="/api/logs", tags=["logs"])
@@ -15,16 +15,37 @@ async def get_logs(
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     event_type: Optional[str] = Query(default=None),
-    user_email: Optional[str] = Query(default=None),
+    owner: Optional[str] = Query(default=None),
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
 ):
-    """Return paginated HTTP request logs from ClickHouse filtered by time range, event type, and user."""
-    return get_ch().query_logs(
+    """Return paginated API request logs from ClickHouse filtered by time range, event type, and owner."""
+    return get_ch().query_api_logs(
         limit=limit,
         offset=offset,
         event_type=event_type,
-        user_email=user_email,
+        owner=owner,
+        from_dt=from_dt,
+        to_dt=to_dt,
+    )
+
+
+@router.get("/user")
+async def get_user_logs(
+    _: str = Depends(admin_dep),
+    limit: int = Query(default=100, le=500),
+    offset: int = Query(default=0, ge=0),
+    event_type: Optional[str] = Query(default=None),
+    owner: Optional[str] = Query(default=None),
+    from_dt: Optional[datetime] = Query(default=None, alias="from"),
+    to_dt: Optional[datetime] = Query(default=None, alias="to"),
+):
+    """Return paginated user lifecycle logs from ClickHouse."""
+    return get_ch().query_user_logs(
+        limit=limit,
+        offset=offset,
+        event_type=event_type,
+        owner=owner,
         from_dt=from_dt,
         to_dt=to_dt,
     )
@@ -33,8 +54,7 @@ async def get_logs(
 @router.post("/purge")
 async def purge_expired_logs(_: str = Depends(admin_dep)):
     """Trigger an OPTIMIZE on all ClickHouse log tables to evict expired TTL rows."""
-    scopes = [m["scope"] for m in get_pg().get_modules()]
-    return get_ch().optimize_tables(scopes)
+    return get_ch().optimize_tables()
 
 
 @router.get("/summary")
@@ -47,8 +67,8 @@ async def get_logs_summary(
     limit: int = Query(default=500, le=2000),
     offset: int = Query(default=0, ge=0),
 ):
-    """Return hourly aggregated HTTP log summaries filtered by time range, event type, and path."""
-    return get_ch().query_app_logs_mv(
+    """Return hourly aggregated API log summaries filtered by time range, event type, and path."""
+    return get_ch().query_api_logs_summary(
         from_dt=from_dt,
         to_dt=to_dt,
         event_type=event_type,

@@ -102,7 +102,7 @@ export default function Chat() {
     { enabled: !!botId },
   )
 
-  const { messages, setMessages, input, setInput, loading, sendMessage } = useChatStream(botId, '')
+  const { messages, setMessages, input, setInput, loading, sendMessage, stopStream } = useChatStream(botId, '')
   const bottomRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -191,13 +191,23 @@ export default function Chat() {
           rows={1}
           className="flex-1 resize-none rounded-xl px-3 py-2 text-sm bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500 max-h-32"
         />
-        <button
-          onClick={sendMessage}
-          disabled={loading || !input.trim()}
-          className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition-colors shrink-0"
-        >
-          ↑
-        </button>
+        {loading ? (
+          <button
+            onClick={stopStream}
+            title="Stop generation"
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0"
+          >
+            ■
+          </button>
+        ) : (
+          <button
+            onClick={sendMessage}
+            disabled={!input.trim()}
+            className="w-9 h-9 flex items-center justify-center rounded-full bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white transition-colors shrink-0"
+          >
+            ↑
+          </button>
+        )}
       </div>
     </div>
   )

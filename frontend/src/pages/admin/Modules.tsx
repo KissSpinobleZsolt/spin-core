@@ -254,6 +254,25 @@ function ModuleModal({
 }
 
 // ------------------------------------------------------------------ //
+// Shared log helpers
+// ------------------------------------------------------------------ //
+
+const LEVEL_STYLES: Record<string, string> = {
+  INFO:  'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
+  WARN:  'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
+  ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
+}
+
+function LevelBadge({ level }: { level: string }) {
+  const cls = LEVEL_STYLES[level] ?? LEVEL_STYLES.INFO
+  return (
+    <span className={`px-1.5 py-0.5 rounded font-mono font-semibold whitespace-nowrap ${cls}`}>
+      {level || 'INFO'}
+    </span>
+  )
+}
+
+// ------------------------------------------------------------------ //
 // Module logs drawer
 // ------------------------------------------------------------------ //
 
@@ -342,9 +361,9 @@ function ModuleLogsDrawer({ module: mod, onClose }: { module: ModuleConfig; onCl
               <thead>
                 <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                   <th className="pb-2 pr-3">Time</th>
-                  <th className="pb-2 pr-3">User</th>
-                  <th className="pb-2 pr-3">Event type</th>
-                  <th className="pb-2">Details</th>
+                  <th className="pb-2 pr-3">Level</th>
+                  <th className="pb-2 pr-3">Message</th>
+                  <th className="pb-2">Owner</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -353,16 +372,16 @@ function ModuleLogsDrawer({ module: mod, onClose }: { module: ModuleConfig; onCl
                     <td className="py-1.5 pr-3 text-slate-400 whitespace-nowrap font-mono">
                       {new Date(entry.event_time).toLocaleString()}
                     </td>
-                    <td className="py-1.5 pr-3 text-slate-600 dark:text-slate-300 truncate max-w-[120px]">
-                      {entry.user_email || '—'}
+                    <td className="py-1.5 pr-3">
+                      <LevelBadge level={entry.level} />
                     </td>
                     <td className="py-1.5 pr-3">
-                      <span className="px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-mono">
-                        {entry.event_type}
-                      </span>
+                      <p className="text-slate-700 dark:text-slate-200">{entry.message || entry.event_type}</p>
+                      {entry.name && <p className="text-slate-400 font-mono mt-0.5">{entry.name}</p>}
+                      {entry.message && <p className="text-slate-400 font-mono mt-0.5">{entry.event_type}</p>}
                     </td>
-                    <td className="py-1.5 text-slate-500 dark:text-slate-400 font-mono truncate max-w-[200px]">
-                      {entry.details}
+                    <td className="py-1.5 text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
+                      {entry.owner || '—'}
                     </td>
                   </tr>
                 ))}

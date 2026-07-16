@@ -10,8 +10,7 @@ router = APIRouter(prefix="/api/bot-logs", tags=["bot-logs"])
 
 
 def _get_bot_name(bot_id: str) -> str:
-    """Resolve the bot name (used as ClickHouse table key) from a bot ID, raising 404 if missing."""
-    # ClickHouse tables are named bot_<safe_name>_logs, not bot_<uuid>_logs — name is the key.
+    """Resolve the bot name (used as bot_logs filter key) from a bot ID, raising 404 if missing."""
     bot = get_pg().get_bot_by_id(bot_id)
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
@@ -30,7 +29,7 @@ async def get_bot_logs_summary(
 ):
     """Return hourly aggregated event summaries for a bot log, filtered by time range and event type."""
     bot_name = _get_bot_name(bot_id)
-    return get_ch().query_bot_logs_mv(
+    return get_ch().query_bot_logs_summary(
         bot_name,
         from_dt=from_dt,
         to_dt=to_dt,

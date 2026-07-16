@@ -1,80 +1,159 @@
 import json
-import re
 from datetime import datetime, timezone
 from clickhouse_driver import Client
 
-_DDL_APP_LOGS = """
-CREATE TABLE IF NOT EXISTS app_logs (
+# HTTP request log — renamed from old app_logs at migration time.
+_DDL_API_LOGS = """
+CREATE TABLE IF NOT EXISTS api_logs (
     event_time   DateTime64(3) DEFAULT now64(),
-    level        LowCardinality(String),
+    level        LowCardinality(String) DEFAULT 'INFO',
     event_type   LowCardinality(String),
-    user_email   String,
-    path         String,
-    method       LowCardinality(String),
-    status_code  Int16,
-    duration_ms  Float32,
-    details      String
+    owner        String DEFAULT '',
+    path         String DEFAULT '',
+    method       LowCardinality(String) DEFAULT '',
+    status_code  Int16 DEFAULT 0,
+    duration_ms  Float32 DEFAULT 0,
+    message      String DEFAULT '',
+    name         String DEFAULT '',
+    details      String DEFAULT '{}'
 ) ENGINE = MergeTree()
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 30 DAY
 """
 
-_DDL_APP_LOGS_MV = """
-CREATE MATERIALIZED VIEW IF NOT EXISTS app_logs_mv
-REFRESH EVERY 10 MINUTE
-ENGINE = MergeTree()
-ORDER BY (bucket, event_type, status_code)
-AS
-SELECT
-    toStartOfHour(event_time)       AS bucket,
-    event_type,
-    path,
-    status_code,
-    count()                         AS request_count,
-    round(avg(duration_ms), 2)      AS avg_duration_ms,
-    max(duration_ms)                AS max_duration_ms,
-    countIf(status_code >= 400)     AS error_count
-FROM app_logs
-GROUP BY bucket, event_type, path, status_code
+# Platform / system event log — startup, config changes, health checks.
+_DDL_APP_LOGS = """
+CREATE TABLE IF NOT EXISTS app_logs (
+    event_time  DateTime64(3) DEFAULT now64(),
+    level       LowCardinality(String) DEFAULT 'INFO',
+    event_type  LowCardinality(String),
+    owner       String DEFAULT 'system',
+    message     String DEFAULT '',
+    name        String DEFAULT '',
+    details     String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY event_time
+TTL toDateTime(event_time) + INTERVAL 30 DAY
+"""
+
+# User lifecycle events — login, create, update, delete.
+_DDL_USER_LOGS = """
+CREATE TABLE IF NOT EXISTS user_logs (
+    event_time  DateTime64(3) DEFAULT now64(),
+    level       LowCardinality(String) DEFAULT 'INFO',
+    event_type  LowCardinality(String),
+    owner       String DEFAULT '',
+    message     String DEFAULT '',
+    name        String DEFAULT '',
+    details     String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY event_time
+TTL toDateTime(event_time) + INTERVAL 30 DAY
+"""
+
+# Module lifecycle events — scope column identifies the module.
+_DDL_MODULE_LOGS = """
+CREATE TABLE IF NOT EXISTS module_logs (
+    event_time  DateTime64(3) DEFAULT now64(),
+    scope       LowCardinality(String),
+    level       LowCardinality(String) DEFAULT 'INFO',
+    event_type  LowCardinality(String),
+    owner       String DEFAULT '',
+    message     String DEFAULT '',
+    name        String DEFAULT '',
+    details     String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY (scope, event_time)
+TTL toDateTime(event_time) + INTERVAL 30 DAY
+"""
+
+# Bot lifecycle events — bot_name column identifies the bot.
+_DDL_BOT_LOGS = """
+CREATE TABLE IF NOT EXISTS bot_logs (
+    event_time  DateTime64(3) DEFAULT now64(),
+    bot_name    LowCardinality(String),
+    level       LowCardinality(String) DEFAULT 'INFO',
+    event_type  LowCardinality(String),
+    owner       String DEFAULT '',
+    message     String DEFAULT '',
+    name        String DEFAULT '',
+    details     String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY (bot_name, event_time)
+TTL toDateTime(event_time) + INTERVAL 30 DAY
 """
 
 
 def _month_start() -> datetime:
-    """Return the UTC datetime for midnight on the first day of the current month."""
     now = datetime.now(timezone.utc)
     return now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
 
 
 class ClickHouseLogAdapter:
-    """Manages ClickHouse log tables, materialized views, and all query operations."""
+    """Manages the 5 fixed ClickHouse log tables and all query operations."""
+
     def __init__(self, db_url: str) -> None:
-        """Create the ClickHouse client and ensure the app_logs table exists."""
         self._client = Client.from_url(db_url)
-        self._client.execute(_DDL_APP_LOGS)
 
     def test_connection(self) -> None:
         self._client.execute("SELECT 1")
 
-    def ensure_app_logs_mv(self) -> None:
-        self._client.execute(_DDL_APP_LOGS_MV)
+    # ------------------------------------------------------------------
+    # Migration — run once at startup before DDL provisioning
+    # ------------------------------------------------------------------
 
-    def write_log(
-        self,
-        level: str,
-        event_type: str,
-        user_email: str,
-        path: str,
-        method: str,
-        status_code: int,
-        duration_ms: float,
-        details: dict,
-    ) -> None:
-        """Insert a single HTTP request log entry into the app_logs table."""
-        self._client.execute(
-            "INSERT INTO app_logs "
-            "(level, event_type, user_email, path, method, status_code, duration_ms, details) VALUES",
-            [(level, event_type, user_email, path, method, status_code, duration_ms, json.dumps(details))],
-        )
+    def run_migrations(self) -> None:
+        """Rename legacy tables, drop old MVs, and normalise column names."""
+        existing = {r[0] for r in self._client.execute("SHOW TABLES")}
+
+        # Move old HTTP log data into api_logs (preserves all rows)
+        if "app_logs" in existing and "api_logs" not in existing:
+            self._client.execute("RENAME TABLE app_logs TO api_logs")
+            existing.add("api_logs")
+            existing.discard("app_logs")
+
+        # Rename user_email → owner in the api_logs table (old schema used user_email)
+        if "api_logs" in existing:
+            cols = {r[0] for r in self._client.execute("DESCRIBE TABLE api_logs")}
+            if "user_email" in cols:
+                self._client.execute("ALTER TABLE api_logs RENAME COLUMN user_email TO owner")
+            # Add new columns that old app_logs didn't have
+            for col, typedef in [("message", "String DEFAULT ''"), ("name", "String DEFAULT ''"), ("details", "String DEFAULT '{}'")]:
+                self._client.execute(f"ALTER TABLE api_logs ADD COLUMN IF NOT EXISTS {col} {typedef}")
+
+        # Drop all materialized views — queries go directly to base tables now
+        for mv in ("app_logs_mv", "module_logs_mv", "bot_logs_mv"):
+            self._client.execute(f"DROP TABLE IF EXISTS {mv}")
+
+        # Rename user_email → owner in the shared lifecycle log tables
+        for table in ("module_logs", "bot_logs"):
+            if table in existing:
+                cols = {r[0] for r in self._client.execute(f"DESCRIBE TABLE {table}")}
+                if "user_email" in cols:
+                    self._client.execute(f"ALTER TABLE {table} RENAME COLUMN user_email TO owner")
+
+    # ------------------------------------------------------------------
+    # DDL provisioning
+    # ------------------------------------------------------------------
+
+    def ensure_api_logs(self) -> None:
+        self._client.execute(_DDL_API_LOGS)
+
+    def ensure_app_logs(self) -> None:
+        self._client.execute(_DDL_APP_LOGS)
+
+    def ensure_user_logs(self) -> None:
+        self._client.execute(_DDL_USER_LOGS)
+
+    def ensure_module_logs_table(self) -> None:
+        self._client.execute(_DDL_MODULE_LOGS)
+
+    def ensure_bot_logs_table(self) -> None:
+        self._client.execute(_DDL_BOT_LOGS)
+
+    # ------------------------------------------------------------------
+    # Shared query helpers
+    # ------------------------------------------------------------------
 
     def _paginated_query(
         self,
@@ -89,7 +168,6 @@ class ClickHouseLogAdapter:
         order_col: str = "event_time",
         time_col: str = "event_time",
     ):
-        """Execute a time-bounded, paginated SELECT and return (rows, total_count)."""
         from_dt = from_dt or _month_start()
         to_dt = to_dt or datetime.now(timezone.utc)
         where_parts = [f"{time_col} >= %(from_dt)s", f"{time_col} <= %(to_dt)s"] + extra_filters
@@ -104,34 +182,87 @@ class ClickHouseLogAdapter:
         )
         return rows, total
 
-    def query_logs(
+    def _summary_query(
+        self,
+        table: str,
+        extra_filters: list,
+        extra_params: dict,
+        from_dt,
+        to_dt,
+        limit: int,
+        offset: int,
+    ) -> dict:
+        """Live GROUP BY aggregate — replaces all *_mv reads."""
+        from_dt = from_dt or _month_start()
+        to_dt = to_dt or datetime.now(timezone.utc)
+        where_parts = ["event_time >= %(from_dt)s", "event_time <= %(to_dt)s"] + extra_filters
+        params = {"from_dt": from_dt, "to_dt": to_dt, "limit": limit, "offset": offset, **extra_params}
+        where = "WHERE " + " AND ".join(where_parts)
+        count_rows = self._client.execute(
+            f"SELECT count() FROM (SELECT 1 FROM {table} {where} GROUP BY toStartOfHour(event_time), event_type)",
+            params,
+        )
+        total = count_rows[0][0]
+        rows = self._client.execute(
+            f"""
+            SELECT toStartOfHour(event_time) AS bucket, event_type,
+                   count() AS event_count, uniq(owner) AS unique_users
+            FROM {table} {where}
+            GROUP BY bucket, event_type
+            ORDER BY bucket DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+            """,
+            params,
+        )
+        keys = ["bucket", "event_type", "event_count", "unique_users"]
+        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
+
+    # ------------------------------------------------------------------
+    # API (HTTP request) logs
+    # ------------------------------------------------------------------
+
+    def write_api_log(
+        self,
+        level: str,
+        event_type: str,
+        owner: str,
+        path: str,
+        method: str,
+        status_code: int,
+        duration_ms: float,
+        message: str = "",
+    ) -> None:
+        self._client.execute(
+            "INSERT INTO api_logs (level, event_type, owner, path, method, status_code, duration_ms, message) VALUES",
+            [(level, event_type, owner, path, method, status_code, duration_ms, message)],
+        )
+
+    def query_api_logs(
         self,
         limit: int = 100,
         offset: int = 0,
         event_type: str | None = None,
-        user_email: str | None = None,
+        owner: str | None = None,
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
-        """Query app_logs with optional filters and return paginated items and total count."""
         extra_filters: list = []
         extra_params: dict = {}
         if event_type:
             extra_filters.append("event_type = %(event_type)s")
             extra_params["event_type"] = event_type
-        if user_email:
-            extra_filters.append("user_email = %(user_email)s")
-            extra_params["user_email"] = user_email
+        if owner:
+            extra_filters.append("owner = %(owner)s")
+            extra_params["owner"] = owner
         rows, total = self._paginated_query(
-            "app_logs",
-            "event_time, level, event_type, user_email, path, method, status_code, duration_ms, details",
+            "api_logs",
+            "event_time, level, event_type, owner, path, method, status_code, duration_ms, message",
             from_dt, to_dt, extra_filters, extra_params, limit, offset,
         )
-        keys = ["event_time", "level", "event_type", "user_email", "path",
-                "method", "status_code", "duration_ms", "details"]
+        keys = ["event_time", "level", "event_type", "owner", "path", "method", "status_code", "duration_ms", "message"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
 
-    def query_app_logs_mv(
+    def query_api_logs_summary(
         self,
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
@@ -140,7 +271,8 @@ class ClickHouseLogAdapter:
         limit: int = 500,
         offset: int = 0,
     ) -> dict:
-        """Query the hourly aggregate materialized view and return paginated buckets."""
+        from_dt = from_dt or _month_start()
+        to_dt = to_dt or datetime.now(timezone.utc)
         extra_filters: list = []
         extra_params: dict = {}
         if event_type:
@@ -149,138 +281,164 @@ class ClickHouseLogAdapter:
         if path:
             extra_filters.append("path = %(path)s")
             extra_params["path"] = path
-        rows, total = self._paginated_query(
-            "app_logs_mv",
-            "bucket, event_type, path, status_code, request_count, avg_duration_ms, max_duration_ms, error_count",
-            from_dt, to_dt, extra_filters, extra_params, limit, offset,
-            order_col="bucket", time_col="bucket",
+        where_parts = ["event_time >= %(from_dt)s", "event_time <= %(to_dt)s"] + extra_filters
+        params = {"from_dt": from_dt, "to_dt": to_dt, "limit": limit, "offset": offset, **extra_params}
+        where = "WHERE " + " AND ".join(where_parts)
+        rows = self._client.execute(
+            f"""
+            SELECT toStartOfHour(event_time) AS bucket, event_type, path, status_code,
+                   count() AS request_count,
+                   round(avg(duration_ms), 2) AS avg_duration_ms,
+                   max(duration_ms) AS max_duration_ms,
+                   countIf(status_code >= 400) AS error_count
+            FROM api_logs {where}
+            GROUP BY bucket, event_type, path, status_code
+            ORDER BY bucket DESC
+            LIMIT %(limit)s OFFSET %(offset)s
+            """,
+            params,
         )
         keys = ["bucket", "event_type", "path", "status_code",
                 "request_count", "avg_duration_ms", "max_duration_ms", "error_count"]
+        return {"items": [dict(zip(keys, r)) for r in rows], "total": len(rows)}
+
+    # ------------------------------------------------------------------
+    # App (platform) logs
+    # ------------------------------------------------------------------
+
+    def write_app_log(
+        self,
+        level: str,
+        event_type: str,
+        owner: str,
+        message: str,
+        name: str = "",
+        details: dict | None = None,
+    ) -> None:
+        self._client.execute(
+            "INSERT INTO app_logs (level, event_type, owner, message, name, details) VALUES",
+            [(level, event_type, owner, message, name, json.dumps(details or {}))],
+        )
+
+    # ------------------------------------------------------------------
+    # User logs
+    # ------------------------------------------------------------------
+
+    def write_user_log(
+        self,
+        level: str,
+        event_type: str,
+        owner: str,
+        message: str,
+        name: str = "",
+        details: dict | None = None,
+    ) -> None:
+        self._client.execute(
+            "INSERT INTO user_logs (level, event_type, owner, message, name, details) VALUES",
+            [(level, event_type, owner, message, name, json.dumps(details or {}))],
+        )
+
+    def query_user_logs(
+        self,
+        limit: int = 100,
+        offset: int = 0,
+        event_type: str | None = None,
+        owner: str | None = None,
+        from_dt: datetime | None = None,
+        to_dt: datetime | None = None,
+    ) -> dict:
+        extra_filters: list = []
+        extra_params: dict = {}
+        if event_type:
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        if owner:
+            extra_filters.append("owner = %(owner)s")
+            extra_params["owner"] = owner
+        rows, total = self._paginated_query(
+            "user_logs",
+            "event_time, level, event_type, owner, message, name, details",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+        )
+        keys = ["event_time", "level", "event_type", "owner", "message", "name", "details"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
 
-    # --- per-module log tables ---
-
-    @staticmethod
-    def _module_table(scope: str) -> str:
-        """Return the ClickHouse log table name for the given module scope."""
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", scope).lower()
-        return f"module_{safe}_logs"
-
-    @staticmethod
-    def _module_mv(scope: str) -> str:
-        """Return the ClickHouse materialized view name for the given module scope."""
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", scope).lower()
-        return f"module_{safe}_logs_mv"
-
-    def ensure_module_table(self, scope: str) -> None:
-        """Create the per-module event log table for the given scope if it does not exist."""
-        table = self._module_table(scope)
-        self._client.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table} (
-                event_time  DateTime64(3) DEFAULT now64(),
-                user_email  String,
-                event_type  LowCardinality(String),
-                details     String
-            ) ENGINE = MergeTree()
-            ORDER BY event_time
-            TTL toDateTime(event_time) + INTERVAL 30 DAY
-        """)
-
-    def ensure_module_mv(self, scope: str) -> None:
-        """Create the per-module hourly aggregate materialized view if it does not exist."""
-        table = self._module_table(scope)
-        mv = self._module_mv(scope)
-        self._client.execute(f"""
-            CREATE MATERIALIZED VIEW IF NOT EXISTS {mv}
-            REFRESH EVERY 10 MINUTE
-            ENGINE = MergeTree()
-            ORDER BY (bucket, event_type)
-            AS
-            SELECT
-                toStartOfHour(event_time)   AS bucket,
-                event_type,
-                count()                     AS event_count,
-                uniq(user_email)            AS unique_users
-            FROM {table}
-            GROUP BY bucket, event_type
-        """)
+    # ------------------------------------------------------------------
+    # Module logs
+    # ------------------------------------------------------------------
 
     def write_module_log(
         self,
         scope: str,
-        user_email: str,
+        owner: str,
         event_type: str,
         details: dict,
+        *,
+        level: str = "INFO",
+        name: str = "",
+        message: str = "",
     ) -> None:
-        """Insert a single event row into the per-module log table."""
-        table = self._module_table(scope)
         self._client.execute(
-            f"INSERT INTO {table} (user_email, event_type, details) VALUES",
-            [(user_email, event_type, json.dumps(details))],
+            "INSERT INTO module_logs (scope, owner, event_type, details, level, name, message) VALUES",
+            [(scope, owner, event_type, json.dumps(details), level, name, message)],
         )
 
-    # --- per-bot log tables ---
+    def query_module_logs(
+        self,
+        scope: str,
+        limit: int = 100,
+        offset: int = 0,
+        event_type: str | None = None,
+        from_dt: datetime | None = None,
+        to_dt: datetime | None = None,
+    ) -> dict:
+        extra_filters: list = ["scope = %(scope)s"]
+        extra_params: dict = {"scope": scope}
+        if event_type:
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        rows, total = self._paginated_query(
+            "module_logs",
+            "event_time, level, event_type, owner, message, name, details",
+            from_dt, to_dt, extra_filters, extra_params, limit, offset,
+        )
+        keys = ["event_time", "level", "event_type", "owner", "message", "name", "details"]
+        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
 
-    @staticmethod
-    def _bot_table(bot_name: str) -> str:
-        """Return the ClickHouse log table name for the given bot."""
-        # Keyed by name rather than UUID for human-readable table names;
-        # if a bot is renamed the old table becomes orphaned and a new one is provisioned on next startup.
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", bot_name).lower()
-        return f"bot_{safe}_logs"
+    def query_module_logs_summary(
+        self,
+        scope: str,
+        from_dt: datetime | None = None,
+        to_dt: datetime | None = None,
+        event_type: str | None = None,
+        limit: int = 500,
+        offset: int = 0,
+    ) -> dict:
+        extra_filters: list = ["scope = %(scope)s"]
+        extra_params: dict = {"scope": scope}
+        if event_type:
+            extra_filters.append("event_type = %(event_type)s")
+            extra_params["event_type"] = event_type
+        return self._summary_query("module_logs", extra_filters, extra_params, from_dt, to_dt, limit, offset)
 
-    @staticmethod
-    def _bot_mv(bot_name: str) -> str:
-        """Return the ClickHouse materialized view name for the given bot."""
-        safe = re.sub(r"[^a-zA-Z0-9]", "_", bot_name).lower()
-        return f"bot_{safe}_logs_mv"
-
-    def ensure_bot_table(self, bot_name: str) -> None:
-        """Create the per-bot event log table for the given bot name if it does not exist."""
-        table = self._bot_table(bot_name)
-        self._client.execute(f"""
-            CREATE TABLE IF NOT EXISTS {table} (
-                event_time  DateTime64(3) DEFAULT now64(),
-                user_email  String,
-                event_type  LowCardinality(String),
-                details     String
-            ) ENGINE = MergeTree()
-            ORDER BY event_time
-            TTL toDateTime(event_time) + INTERVAL 30 DAY
-        """)
-
-    def ensure_bot_mv(self, bot_name: str) -> None:
-        """Create the per-bot hourly aggregate materialized view if it does not exist."""
-        table = self._bot_table(bot_name)
-        mv = self._bot_mv(bot_name)
-        self._client.execute(f"""
-            CREATE MATERIALIZED VIEW IF NOT EXISTS {mv}
-            REFRESH EVERY 10 MINUTE
-            ENGINE = MergeTree()
-            ORDER BY (bucket, event_type)
-            AS
-            SELECT
-                toStartOfHour(event_time)   AS bucket,
-                event_type,
-                count()                     AS event_count,
-                uniq(user_email)            AS unique_users
-            FROM {table}
-            GROUP BY bucket, event_type
-        """)
+    # ------------------------------------------------------------------
+    # Bot logs
+    # ------------------------------------------------------------------
 
     def write_bot_log(
         self,
         bot_name: str,
-        user_email: str,
+        owner: str,
         event_type: str,
         details: dict,
+        *,
+        level: str = "INFO",
+        name: str = "",
+        message: str = "",
     ) -> None:
-        """Insert a single event row into the per-bot log table."""
-        table = self._bot_table(bot_name)
         self._client.execute(
-            f"INSERT INTO {table} (user_email, event_type, details) VALUES",
-            [(user_email, event_type, json.dumps(details))],
+            "INSERT INTO bot_logs (bot_name, owner, event_type, details, level, name, message) VALUES",
+            [(bot_name, owner, event_type, json.dumps(details), level, name, message)],
         )
 
     def query_bot_logs(
@@ -292,22 +450,20 @@ class ClickHouseLogAdapter:
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
-        """Query a bot's event log table with optional filters and return paginated results."""
-        table = self._bot_table(bot_name)
-        extra_filters: list = []
-        extra_params: dict = {}
+        extra_filters: list = ["bot_name = %(bot_name)s"]
+        extra_params: dict = {"bot_name": bot_name}
         if event_type:
             extra_filters.append("event_type = %(event_type)s")
             extra_params["event_type"] = event_type
         rows, total = self._paginated_query(
-            table,
-            "event_time, user_email, event_type, details",
+            "bot_logs",
+            "event_time, level, event_type, owner, message, name, details",
             from_dt, to_dt, extra_filters, extra_params, limit, offset,
         )
-        keys = ["event_time", "user_email", "event_type", "details"]
+        keys = ["event_time", "level", "event_type", "owner", "message", "name", "details"]
         return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
 
-    def query_bot_logs_mv(
+    def query_bot_logs_summary(
         self,
         bot_name: str,
         from_dt: datetime | None = None,
@@ -316,49 +472,26 @@ class ClickHouseLogAdapter:
         limit: int = 500,
         offset: int = 0,
     ) -> dict:
-        """Query the hourly aggregate materialized view for a bot and return paginated buckets."""
-        mv = self._bot_mv(bot_name)
-        extra_filters: list = []
-        extra_params: dict = {}
+        extra_filters: list = ["bot_name = %(bot_name)s"]
+        extra_params: dict = {"bot_name": bot_name}
         if event_type:
             extra_filters.append("event_type = %(event_type)s")
             extra_params["event_type"] = event_type
-        rows, total = self._paginated_query(
-            mv,
-            "bucket, event_type, event_count, unique_users",
-            from_dt, to_dt, extra_filters, extra_params, limit, offset,
-            order_col="bucket", time_col="bucket",
-        )
-        keys = ["bucket", "event_type", "event_count", "unique_users"]
-        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
+        return self._summary_query("bot_logs", extra_filters, extra_params, from_dt, to_dt, limit, offset)
 
-    def query_module_logs(
-        self,
-        scope: str,
-        limit: int = 100,
-        offset: int = 0,
-        event_type: str | None = None,
-        from_dt: datetime | None = None,
-        to_dt: datetime | None = None,
-    ) -> dict:
-        """Query a module's event log table with optional filters and return paginated results."""
-        table = self._module_table(scope)
-        extra_filters: list = []
-        extra_params: dict = {}
-        if event_type:
-            extra_filters.append("event_type = %(event_type)s")
-            extra_params["event_type"] = event_type
-        rows, total = self._paginated_query(
-            table,
-            "event_time, user_email, event_type, details",
-            from_dt, to_dt, extra_filters, extra_params, limit, offset,
-        )
-        keys = ["event_time", "user_email", "event_type", "details"]
-        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}
+    def get_bot_names_with_logs(self) -> set[str]:
+        """Return bot_names that already have at least one entry in bot_logs."""
+        rows = self._client.execute("SELECT DISTINCT bot_name FROM bot_logs")
+        return {r[0] for r in rows}
 
-    def optimize_tables(self, module_scopes: list[str]) -> dict:
-        """Run OPTIMIZE TABLE FINAL on app_logs and all per-module log tables."""
-        tables = ["app_logs"] + [self._module_table(s) for s in module_scopes]
+    # ------------------------------------------------------------------
+    # Maintenance
+    # ------------------------------------------------------------------
+
+    def optimize_tables(self, _module_scopes: list[str] = []) -> dict:
+        """Run OPTIMIZE TABLE FINAL on all 5 base log tables."""
+        # _module_scopes kept for callers that still pass scopes; all 5 fixed tables are always optimized
+        tables = ["api_logs", "app_logs", "user_logs", "module_logs", "bot_logs"]
         purged: list[str] = []
         errors: list[str] = []
         for table in tables:
@@ -368,28 +501,3 @@ class ClickHouseLogAdapter:
             except Exception as exc:
                 errors.append(f"{table}: {exc}")
         return {"purged": purged, "errors": errors}
-
-    def query_module_logs_mv(
-        self,
-        scope: str,
-        from_dt: datetime | None = None,
-        to_dt: datetime | None = None,
-        event_type: str | None = None,
-        limit: int = 500,
-        offset: int = 0,
-    ) -> dict:
-        """Query the hourly aggregate materialized view for a module and return paginated buckets."""
-        mv = self._module_mv(scope)
-        extra_filters: list = []
-        extra_params: dict = {}
-        if event_type:
-            extra_filters.append("event_type = %(event_type)s")
-            extra_params["event_type"] = event_type
-        rows, total = self._paginated_query(
-            mv,
-            "bucket, event_type, event_count, unique_users",
-            from_dt, to_dt, extra_filters, extra_params, limit, offset,
-            order_col="bucket", time_col="bucket",
-        )
-        keys = ["bucket", "event_type", "event_count", "unique_users"]
-        return {"items": [dict(zip(keys, r)) for r in rows], "total": total}

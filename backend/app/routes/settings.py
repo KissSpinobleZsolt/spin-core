@@ -8,6 +8,7 @@ from pydantic import BaseModel
 
 from app.database import get_ch, get_pg
 from app.deps import admin_dep
+from app.events import LogLevel, ModuleEvent, lifecycle_message
 from app.schemas import ModuleInput
 from app.settings import write_settings
 from app.state import get_settings
@@ -61,15 +62,13 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
     pg = get_pg()
     module = pg.create_module(payload.model_dump())
     ch = get_ch()
-    ch.ensure_module_table(module["scope"])
-    ch.ensure_module_mv(module["scope"])
-    # Written outside the try/except — the module table is guaranteed to exist at this point;
-    # bot logs are inside the try/except because they depend on a reachable manifest URL.
-    ch.write_module_log(module["scope"], email, "module.registered", {
-        "module_id": module["id"],
-        "name": module["name"],
-        "scope": module["scope"],
-    })
+    ch.write_module_log(
+        module["scope"], email, ModuleEvent.INIT,
+        {"module_id": module["id"], "scope": module["scope"]},
+        level=LogLevel.INFO,
+        name=module["name"],
+        message=lifecycle_message(ModuleEvent.INIT, module["name"]),
+    )
     try:
         manifest_url = payload.remote_url.rsplit("/remoteEntry.js", 1)[0] + "/manifest.json"
         async with httpx.AsyncClient(timeout=5.0) as client:
@@ -79,14 +78,13 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
         bots_data = manifest.get("bots") or []
         new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email) if bots_data else []
         for bot in new_bots:
-            ch.ensure_bot_table(bot.name)
-            ch.ensure_bot_mv(bot.name)
-            ch.write_bot_log(bot.name, email, "bot.registered", {
-                "bot_id": bot.id,
-                "bot_name": bot.name,
-                "module_id": module["id"],
-                "module_scope": module["scope"],
-            })
+            from app.events import BotEvent
+            ch.write_bot_log(
+                bot.name, email, BotEvent.INIT,
+                {"bot_id": bot.id, "module_id": module["id"], "module_scope": module["scope"]},
+                level=LogLevel.INFO, name=bot.name,
+                message=lifecycle_message(BotEvent.INIT, bot.name),
+            )
         if not payload.backend_url and manifest.get("backend_url"):
             module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module
         i18n_data = manifest.get("i18n") or {}
@@ -114,19 +112,46 @@ async def reset_module_i18n(module_id: str, _: str = Depends(admin_dep)):
 
 
 @router.put("/modules/{module_id}")
-async def update_module(module_id: str, payload: ModuleInput, _: str = Depends(admin_dep)):
+async def update_module(module_id: str, payload: ModuleInput, email: str = Depends(admin_dep)):
     """Update the configuration of an existing module by ID (admin only)."""
-    module = get_pg().update_module(module_id, payload.model_dump())
+    pg = get_pg()
+    old = pg.get_module_by_id(module_id)
+    if old is None:
+        raise HTTPException(status_code=404, detail="Module not found")
+    module = pg.update_module(module_id, payload.model_dump())
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")
+    ch = get_ch()
+    if payload.enabled and not old["enabled"]:
+        event = ModuleEvent.ACTIVATE
+    elif not payload.enabled and old["enabled"]:
+        event = ModuleEvent.DEACTIVATE
+    else:
+        event = ModuleEvent.UPDATE
+    ch.write_module_log(
+        module["scope"], email, event,
+        {"module_id": module_id},
+        level=LogLevel.INFO,
+        name=module["name"],
+        message=lifecycle_message(event, module["name"]),
+    )
     return module
 
 
 @router.delete("/modules/{module_id}", status_code=204)
-async def delete_module(module_id: str, _: str = Depends(admin_dep)):
+async def delete_module(module_id: str, email: str = Depends(admin_dep)):
     """Permanently remove a registered module by ID (admin only)."""
-    if not get_pg().delete_module(module_id):
+    pg = get_pg()
+    mod = pg.get_module_by_id(module_id)
+    if not mod or not pg.delete_module(module_id):
         raise HTTPException(status_code=404, detail="Module not found")
+    get_ch().write_module_log(
+        mod["scope"], email, ModuleEvent.DELETE,
+        {"module_id": module_id},
+        level=LogLevel.INFO,
+        name=mod["name"],
+        message=lifecycle_message(ModuleEvent.DELETE, mod["name"]),
+    )
     return Response(status_code=204)
 
 

@@ -277,6 +277,81 @@ export default function Sidebar() {
                   collapsed={collapsed}
                 />
               </div>
+
+              {/* Utils sub-group */}
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600 mt-4 mb-2">
+                  Utils
+                </p>
+              )}
+              {collapsed && <div className="my-2 mx-2 border-t border-slate-700/40" />}
+              <div className={collapsed ? '' : 'pl-2 space-y-1'}>
+                <NavItem
+                  to="/admin/components"
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                        d="M4 5a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1V5zM4 15a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1H5a1 1 0 01-1-1v-4zm10 0a1 1 0 011-1h4a1 1 0 011 1v4a1 1 0 01-1 1h-4a1 1 0 01-1-1v-4z" />
+                    </svg>
+                  }
+                  label="Components"
+                  collapsed={collapsed}
+                />
+                <NavItem
+                  to="/admin/layouts"
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                        d="M4 5a1 1 0 011-1h14a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
+                    </svg>
+                  }
+                  label="Layouts"
+                  collapsed={collapsed}
+                />
+              </div>
+
+              {/* Docs sub-group */}
+              {!collapsed && (
+                <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600 mt-4 mb-2">
+                  Docs
+                </p>
+              )}
+              {collapsed && <div className="my-2 mx-2 border-t border-slate-700/40" />}
+              <div className={collapsed ? '' : 'pl-2 space-y-1'}>
+                <NavItem
+                  to="/admin/docs/ui"
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v10m0 0h10M9 13H5a2 2 0 00-2 2v4a2 2 0 002 2h4a2 2 0 002-2v-4a2 2 0 00-2-2z" />
+                    </svg>
+                  }
+                  label="UI"
+                  collapsed={collapsed}
+                />
+                <NavItem
+                  to="/admin/docs/api"
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                    </svg>
+                  }
+                  label="API"
+                  collapsed={collapsed}
+                />
+                <NavItem
+                  to="/admin/docs/deployment"
+                  icon={
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                    </svg>
+                  }
+                  label="Deployment"
+                  collapsed={collapsed}
+                />
+              </div>
             </div>
           </>
         )}

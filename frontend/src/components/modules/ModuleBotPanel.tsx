@@ -10,7 +10,7 @@ export function ModuleBotPanel({ moduleId }: Props) {
   const [bots, setBots] = useState<Bot[] | null>(null)
   const [open, setOpen] = useState(false)
   const [selectedBotId, setSelectedBotId] = useState<string>('')
-  const { messages, setMessages, input, setInput, loading, sendMessage } = useChatStream(
+  const { messages, setMessages, input, setInput, loading, sendMessage, stopStream } = useChatStream(
     selectedBotId || undefined,
     '',
     moduleId,
@@ -115,13 +115,23 @@ export function ModuleBotPanel({ moduleId }: Props) {
               rows={1}
               className="flex-1 resize-none rounded-xl px-3 py-2 text-sm bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-violet-500 max-h-24"
             />
-            <button
-              onClick={sendMessage}
-              disabled={loading || !input.trim()}
-              className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white transition-colors shrink-0"
-            >
-              ↑
-            </button>
+            {loading ? (
+              <button
+                onClick={stopStream}
+                title="Stop generation"
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-red-500 hover:bg-red-600 text-white transition-colors shrink-0"
+              >
+                ■
+              </button>
+            ) : (
+              <button
+                onClick={sendMessage}
+                disabled={!input.trim()}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-violet-600 hover:bg-violet-700 disabled:opacity-40 text-white transition-colors shrink-0"
+              >
+                ↑
+              </button>
+            )}
           </div>
         </div>
       )}
