@@ -13,15 +13,13 @@ import { Btn } from '../components/ui/Button'
 import { Toggle } from '../components/ui/Toggle'
 import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
 
-// ── Severity colours ──────────────────────────────────────────────────────────
+// ── Severity colour map — class strings must be literals so Tailwind includes them in the bundle ──
 
-const SEVERITY_COLOURS: Record<string, string> = {
+const SEVERITY_COLOUR_MAP: Record<string, string> = {
   INFO: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
   WARNING: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   CRITICAL: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
 }
-
-const RISK_LEVELS = ['Conservative', 'Moderate', 'Aggressive'] as const
 
 // ── Subcomponents ─────────────────────────────────────────────────────────────
 
@@ -206,10 +204,12 @@ function WatchlistSection({
 function RiskProfilesSection({
   teams,
   config,
+  riskLevels,
   onConfigChange,
 }: {
   teams: BotTeam[]
   config: Record<string, unknown>
+  riskLevels: string[]
   onConfigChange: (key: string, v: unknown) => void
 }) {
   const profiles = (config.risk_profiles as Record<string, string>) ?? {}
@@ -219,11 +219,11 @@ function RiskProfilesSection({
         <div key={team.id} className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
           <span className="flex-1 text-sm text-slate-700 dark:text-slate-300">{team.name}</span>
           <select
-            value={profiles[team.id] ?? 'Moderate'}
+            value={profiles[team.id] ?? riskLevels[1] ?? riskLevels[0]}
             onChange={(e) => onConfigChange('risk_profiles', { ...profiles, [team.id]: e.target.value })}
             className="text-sm rounded-md bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600 px-2 py-1 focus:outline-none focus:ring-1 focus:ring-blue-500"
           >
-            {RISK_LEVELS.map((l) => <option key={l} value={l}>{l}</option>)}
+            {riskLevels.map((l) => <option key={l} value={l}>{l}</option>)}
           </select>
         </div>
       ))}
@@ -288,7 +288,7 @@ function ProcessesSection({ scope, botId }: { scope: string; botId: string }) {
       {data.last_signal && (
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
           <span className="text-xs text-slate-500 dark:text-slate-400 flex-1">Last signal</span>
-          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${SEVERITY_COLOURS[data.last_signal.severity] ?? ''}`}>
+          <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${SEVERITY_COLOUR_MAP[data.last_signal.severity] ?? ''}`}>
             {data.last_signal.severity}
           </span>
           <span className="text-xs text-slate-600 dark:text-slate-300 truncate max-w-[200px]">{data.last_signal.title}</span>
@@ -347,6 +347,7 @@ export default function BotConfigPage({ bot, scope }: { bot: Bot; scope: string 
   const schedulerFields = schema.scheduler ?? []
   const principalsType = schema.principals
   const showWatchlist = principalsType === 'watchlist'
+  const riskLevels = (schema.risk_levels as string[] | undefined) ?? ['Conservative', 'Moderate', 'Aggressive']
 
   useEffect(() => {
     setLoadingConfig(true)
@@ -422,7 +423,7 @@ export default function BotConfigPage({ bot, scope }: { bot: Bot; scope: string 
                 ) : showWatchlist ? (
                   <WatchlistSection entities={entities} teams={teams} scope={scope} botId={botId} onEntitiesChange={setEntities} />
                 ) : principalsType === 'risk_profiles' ? (
-                  <RiskProfilesSection teams={teams} config={config} onConfigChange={handleConfigChange} />
+                  <RiskProfilesSection teams={teams} config={config} riskLevels={riskLevels} onConfigChange={handleConfigChange} />
                 ) : (
                   <TeamsSection teams={teams} />
                 )}

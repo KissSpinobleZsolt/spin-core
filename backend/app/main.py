@@ -149,9 +149,17 @@ async def lifespan(app: FastAPI):
                             "scope": scope,
                             "source": "auto-discovery",
                         })
+                        mod = pg.get_module_by_scope(scope)
+                        if mod:
+                            i18n_data = m.get("i18n") or {}
+                            if i18n_data:
+                                pg.update_module(mod["id"], {"presets": {**mod.get("presets", {}), "i18n": i18n_data}})
+                                for lang, translations in i18n_data.items():
+                                    pg.merge_i18n_data(lang, translations)
                         bots_from_manifest = m.get("bots") or []
                         if bots_from_manifest:
-                            mod = pg.get_module_by_scope(scope)
+                            if not mod:
+                                mod = pg.get_module_by_scope(scope)
                             if mod:
                                 new_bots = pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
                                 for bot in new_bots:

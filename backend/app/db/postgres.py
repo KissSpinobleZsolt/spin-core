@@ -554,6 +554,12 @@ class PostgresAdapter:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
             return self._module_row_to_dict(row) if row else None
 
+    def get_module_by_id(self, module_id: str) -> dict | None:
+        """Return the module dict for the given primary-key ID, or None if not found."""
+        with self._session_ctx() as db:
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            return self._module_row_to_dict(row) if row else None
+
     def get_module_by_scope(self, scope: str) -> dict | None:
         """Return the module dict for the given Webpack federation scope, or None if not found."""
         with self._session_ctx() as db:
