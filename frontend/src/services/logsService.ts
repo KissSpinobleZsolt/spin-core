@@ -1,16 +1,16 @@
 import { apiService } from './apiService'
 
-/** Single HTTP request log entry from ClickHouse. */
+/** Single HTTP/API request log entry from ClickHouse api_logs. */
 export interface LogEntry {
   event_time: string
   level: string
   event_type: string
-  user_email: string
+  owner: string
   path: string
   method: string
   status_code: number
   duration_ms: number
-  details: string
+  message: string
 }
 
 /** Paginated list of HTTP log entries. */
@@ -50,10 +50,9 @@ export interface ChatLogDetails {
 /** Single chat completion log entry stored in ClickHouse. */
 export interface ChatLogEntry {
   event_time: string
-  user_email: string
+  owner: string
   event_type: string
-  /** JSON-encoded ChatLogDetails payload. */
-  details: string        // JSON-encoded ChatLogDetails
+  details: string
 }
 
 /** Paginated list of chat log entries. */
@@ -76,12 +75,29 @@ export interface ChatSummaryPage {
   total: number
 }
 
-/** Optional filter and pagination parameters for the HTTP logs endpoint. */
+/** Single user lifecycle log entry from ClickHouse user_logs. */
+export interface UserLogEntry {
+  event_time: string
+  level: string
+  event_type: string
+  owner: string
+  message: string
+  name: string
+  details: string
+}
+
+/** Paginated list of user log entries. */
+export interface UserLogsPage {
+  items: UserLogEntry[]
+  total: number
+}
+
+/** Optional filter and pagination parameters for the API/HTTP logs endpoint. */
 export interface LogsParams {
   limit?: number
   offset?: number
   event_type?: string
-  user_email?: string
+  owner?: string
   from?: string
   to?: string
 }
@@ -100,7 +116,7 @@ export interface SummaryParams {
 export interface ChatLogsParams {
   from?: string
   to?: string
-  user_email?: string
+  owner?: string
   limit?: number
   offset?: number
 }
@@ -108,9 +124,11 @@ export interface ChatLogsParams {
 /** Single event log entry emitted by a module. */
 export interface ModuleLogEntry {
   event_time: string
-  user_email: string
+  level: string
   event_type: string
-  /** JSON-encoded structured event payload. */
+  owner: string
+  message: string
+  name: string
   details: string
 }
 
@@ -146,8 +164,11 @@ export interface ModuleLogsParams {
 /** Single event log entry emitted by a bot. */
 export interface BotLogEntry {
   event_time: string
-  user_email: string
+  level: string
   event_type: string
+  owner: string
+  message: string
+  name: string
   details: string
 }
 
@@ -196,11 +217,23 @@ export const logsService = {
       limit: params.limit,
       offset: params.offset,
       event_type: params.event_type,
-      user_email: params.user_email,
+      owner: params.owner,
       from: params.from,
       to: params.to,
     })
     return apiService.get(`/logs${qs}`)
+  },
+
+  async getUserLogs(params: LogsParams = {}): Promise<UserLogsPage> {
+    const qs = buildQs({
+      limit: params.limit,
+      offset: params.offset,
+      event_type: params.event_type,
+      owner: params.owner,
+      from: params.from,
+      to: params.to,
+    })
+    return apiService.get(`/logs/user${qs}`)
   },
 
   async getSummary(params: SummaryParams = {}): Promise<SummaryPage> {
@@ -219,7 +252,7 @@ export const logsService = {
     const qs = buildQs({
       from: params.from,
       to: params.to,
-      user_email: params.user_email,
+      owner: params.owner,
       limit: params.limit,
       offset: params.offset,
     })

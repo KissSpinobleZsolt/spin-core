@@ -6,6 +6,7 @@ import {
   type ChatLogEntry,
   type LogEntry,
   type SummaryEntry,
+  type UserLogEntry,
 } from '../services/logsService'
 import { Btn } from '../components/ui/Button'
 import { Spinner } from '../components/ui/Spinner'
@@ -14,7 +15,7 @@ import { formatEventTime } from '../utils/formatters'
 
 const PAGE_SIZE = 50
 
-type Tab = 'http' | 'chat'
+type Tab = 'api' | 'user' | 'chat'
 
 function statusColor(code: number) {
   if (code < 300) return 'text-green-600 dark:text-green-400'
@@ -115,7 +116,7 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
         offset: (p - 1) * PAGE_SIZE,
         from: tr.from,
         to: tr.to,
-        user_email: email || undefined,
+        owner: email || undefined,
       })
       setEntries(result.items)
       setTotal(result.total)
@@ -177,7 +178,7 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
                         {formatEventTime(entry.event_time)}
                       </span>
                       <span className="text-slate-600 dark:text-slate-300 truncate max-w-[12rem]">
-                        {entry.user_email || '—'}
+                        {entry.owner || '—'}
                       </span>
                       {d && (
                         <>
@@ -227,9 +228,25 @@ function ChatLogsTab({ timeRange }: { timeRange: TimeRange }) {
   )
 }
 
-// ── HTTP logs tab ─────────────────────────────────────────────────────────────
+// ── Level badge (shared) ──────────────────────────────────────────────────────
 
-function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
+const LEVEL_STYLES: Record<string, string> = {
+  INFO: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
+  WARN: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+  ERROR: 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+}
+
+function LevelBadge({ level }: { level: string }) {
+  return (
+    <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold uppercase ${LEVEL_STYLES[level] ?? LEVEL_STYLES.INFO}`}>
+      {level}
+    </span>
+  )
+}
+
+// ── API logs tab ──────────────────────────────────────────────────────────────
+
+function ApiLogsTab({ timeRange }: { timeRange: TimeRange }) {
   const [logs, setLogs] = useState<LogEntry[]>([])
   const [total, setTotal] = useState(0)
   const [summary, setSummary] = useState<SummaryEntry[]>([])
@@ -238,31 +255,31 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
   const [page, setPage] = useState(1)
   const [jumpInput, setJumpInput] = useState('')
   const [eventTypeFilter, setEventTypeFilter] = useState('')
-  const [userEmailFilter, setUserEmailFilter] = useState('')
+  const [ownerFilter, setOwnerFilter] = useState('')
   const [draftEvent, setDraftEvent] = useState('')
-  const [draftEmail, setDraftEmail] = useState('')
+  const [draftOwner, setDraftOwner] = useState('')
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   useEffect(() => { setPage(1) }, [timeRange])
 
   useEffect(() => {
-    load(page, timeRange, eventTypeFilter, userEmailFilter)
-  }, [page, timeRange, eventTypeFilter, userEmailFilter])
+    load(page, timeRange, eventTypeFilter, ownerFilter)
+  }, [page, timeRange, eventTypeFilter, ownerFilter])
 
-  async function load(p: number, tr: TimeRange, et: string, ue: string) {
+  async function load(p: number, tr: TimeRange, et: string, ow: string) {
     setLoading(true); setError(null)
     try {
       const [logsResult, summaryResult] = await Promise.all([
-        logsService.getLogs({ limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE, event_type: et || undefined, user_email: ue || undefined, from: tr.from, to: tr.to }),
+        logsService.getLogs({ limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE, event_type: et || undefined, owner: ow || undefined, from: tr.from, to: tr.to }),
         logsService.getSummary({ from: tr.from, to: tr.to, event_type: et || undefined, limit: 1000 }),
       ])
       setLogs(logsResult.items); setTotal(logsResult.total); setSummary(summaryResult.items)
-    } catch { setError('Failed to load logs.') }
+    } catch { setError('Failed to load API logs.') }
     finally { setLoading(false) }
   }
 
-  function applyFilters() { setPage(1); setEventTypeFilter(draftEvent); setUserEmailFilter(draftEmail) }
-  function clearFilters() { setDraftEvent(''); setDraftEmail(''); setPage(1); setEventTypeFilter(''); setUserEmailFilter('') }
+  function applyFilters() { setPage(1); setEventTypeFilter(draftEvent); setOwnerFilter(draftOwner) }
+  function clearFilters() { setDraftEvent(''); setDraftOwner(''); setPage(1); setEventTypeFilter(''); setOwnerFilter('') }
   function jumpToPage() { const n = parseInt(jumpInput, 10); if (!isNaN(n) && n >= 1 && n <= totalPages) setPage(n); setJumpInput('') }
 
   const totalRequests = summary.reduce((s, r) => s + r.request_count, 0)
@@ -288,8 +305,8 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
           <input value={draftEvent} onChange={e => setDraftEvent(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="e.g. http.request" className={`${inputCls} w-40`} />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">User email</label>
-          <input value={draftEmail} onChange={e => setDraftEmail(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="user@example.com" className={`${inputCls} w-44`} />
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Owner</label>
+          <input value={draftOwner} onChange={e => setDraftOwner(e.target.value)} onKeyDown={e => e.key === 'Enter' && applyFilters()} placeholder="user@example.com" className={`${inputCls} w-44`} />
         </div>
         <Btn onClick={applyFilters}>Filter</Btn>
         <Btn variant="secondary" onClick={clearFilters}>Clear</Btn>
@@ -302,7 +319,7 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
         ) : error ? (
           <div className="p-6 text-red-500 text-sm">{error}</div>
         ) : logs.length === 0 ? (
-          <div className="p-6 text-slate-400 text-sm text-center">No logs found.</div>
+          <div className="p-6 text-slate-400 text-sm text-center">No API logs found.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
@@ -311,7 +328,7 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
                   <th className="px-4 py-2 font-medium">Time</th>
                   <th className="px-4 py-2 font-medium">Level</th>
                   <th className="px-4 py-2 font-medium">Event</th>
-                  <th className="px-4 py-2 font-medium">User</th>
+                  <th className="px-4 py-2 font-medium">Owner</th>
                   <th className="px-4 py-2 font-medium">Method</th>
                   <th className="px-4 py-2 font-medium">Path</th>
                   <th className="px-4 py-2 font-medium">Status</th>
@@ -322,9 +339,9 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
                 {logs.map((log, i) => (
                   <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
                     <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatEventTime(log.event_time)}</td>
-                    <td className="px-4 py-2"><span className={`font-semibold ${log.level === 'ERROR' ? 'text-red-500' : 'text-slate-600 dark:text-slate-300'}`}>{log.level}</span></td>
+                    <td className="px-4 py-2"><LevelBadge level={log.level} /></td>
                     <td className="px-4 py-2 font-mono text-slate-700 dark:text-slate-300">{log.event_type}</td>
-                    <td className="px-4 py-2 text-slate-500 dark:text-slate-400 truncate max-w-[10rem]">{log.user_email || '—'}</td>
+                    <td className="px-4 py-2 text-slate-500 dark:text-slate-400 truncate max-w-[10rem]">{log.owner || '—'}</td>
                     <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400">{log.method}</td>
                     <td className="px-4 py-2 font-mono text-slate-600 dark:text-slate-300 truncate max-w-[12rem]">{log.path}</td>
                     <td className={`px-4 py-2 font-mono font-semibold ${statusColor(log.status_code)}`}>{log.status_code}</td>
@@ -343,10 +360,95 @@ function HttpLogsTab({ timeRange }: { timeRange: TimeRange }) {
   )
 }
 
+// ── User logs tab ─────────────────────────────────────────────────────────────
+
+function UserLogsTab({ timeRange }: { timeRange: TimeRange }) {
+  const [logs, setLogs] = useState<UserLogEntry[]>([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [page, setPage] = useState(1)
+  const [jumpInput, setJumpInput] = useState('')
+  const [ownerFilter, setOwnerFilter] = useState('')
+  const [draftOwner, setDraftOwner] = useState('')
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+
+  useEffect(() => { setPage(1) }, [timeRange])
+  useEffect(() => { load(page, timeRange, ownerFilter) }, [page, timeRange, ownerFilter])
+
+  async function load(p: number, tr: TimeRange, ow: string) {
+    setLoading(true); setError(null)
+    try {
+      const result = await logsService.getUserLogs({ limit: PAGE_SIZE, offset: (p - 1) * PAGE_SIZE, owner: ow || undefined, from: tr.from, to: tr.to })
+      setLogs(result.items); setTotal(result.total)
+    } catch { setError('Failed to load user logs.') }
+    finally { setLoading(false) }
+  }
+
+  function jumpToPage() { const n = parseInt(jumpInput, 10); if (!isNaN(n) && n >= 1 && n <= totalPages) setPage(n); setJumpInput('') }
+
+  const inputCls = 'px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-sm text-slate-800 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-blue-500'
+
+  return (
+    <div className="space-y-4">
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-4 flex flex-wrap gap-3 items-end">
+        <div>
+          <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">Owner</label>
+          <input value={draftOwner} onChange={e => setDraftOwner(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') { setPage(1); setOwnerFilter(draftOwner) } }}
+            placeholder="user@example.com" className={`${inputCls} w-52`} />
+        </div>
+        <Btn onClick={() => { setPage(1); setOwnerFilter(draftOwner) }}>Filter</Btn>
+        <Btn variant="secondary" onClick={() => { setDraftOwner(''); setPage(1); setOwnerFilter('') }}>Clear</Btn>
+        <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} events</span>
+      </div>
+
+      <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+        {loading ? (
+          <div className="flex items-center justify-center h-32 text-slate-400 gap-2"><Spinner size="sm" />Loading…</div>
+        ) : error ? (
+          <div className="p-6 text-red-500 text-sm">{error}</div>
+        ) : logs.length === 0 ? (
+          <div className="p-6 text-slate-400 text-sm text-center">No user events found.</div>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40">
+                  <th className="px-4 py-2 font-medium">Time</th>
+                  <th className="px-4 py-2 font-medium">Level</th>
+                  <th className="px-4 py-2 font-medium">Message</th>
+                  <th className="px-4 py-2 font-medium">Owner</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
+                {logs.map((log, i) => (
+                  <tr key={i} className="hover:bg-slate-50 dark:hover:bg-slate-700/30">
+                    <td className="px-4 py-2 font-mono text-slate-500 dark:text-slate-400 whitespace-nowrap">{formatEventTime(log.event_time)}</td>
+                    <td className="px-4 py-2"><LevelBadge level={log.level} /></td>
+                    <td className="px-4 py-2 text-slate-700 dark:text-slate-200">
+                      <span>{log.message || log.event_type}</span>
+                      {log.name && <span className="ml-2 font-mono text-slate-400 text-[10px]">{log.name}</span>}
+                    </td>
+                    <td className="px-4 py-2 text-slate-500 dark:text-slate-400">{log.owner || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
+      <Pagination page={page} totalPages={totalPages} onPage={setPage}
+        jumpInput={jumpInput} setJumpInput={setJumpInput} jumpToPage={jumpToPage} />
+    </div>
+  )
+}
+
 // ── Page root ────────────────────────────────────────────────────────────────
 
 export default function Logs() {
-  const [tab, setTab] = useState<Tab>('http')
+  const [tab, setTab] = useState<Tab>('api')
   const [timeRange, setTimeRange] = useState<TimeRange>(defaultTimeRange())
   const [purging, setPurging] = useState(false)
   const [purgeResult, setPurgeResult] = useState<{ purged: string[]; errors: string[] } | null>(null)
@@ -368,6 +470,7 @@ export default function Logs() {
         ? 'bg-blue-600 text-white'
         : 'text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
     }`
+
 
   return (
     <div className="space-y-4">
@@ -392,11 +495,13 @@ export default function Logs() {
       </div>
 
       <div className="flex gap-2">
-        <button className={tabCls('http')} onClick={() => setTab('http')}>HTTP Logs</button>
-        <button className={tabCls('chat')} onClick={() => setTab('chat')}>💬 Chat Logs</button>
+        <button className={tabCls('api')} onClick={() => setTab('api')}>API Logs</button>
+        <button className={tabCls('user')} onClick={() => setTab('user')}>User Logs</button>
+        <button className={tabCls('chat')} onClick={() => setTab('chat')}>Chat Logs</button>
       </div>
 
-      {tab === 'http' && <HttpLogsTab timeRange={timeRange} />}
+      {tab === 'api' && <ApiLogsTab timeRange={timeRange} />}
+      {tab === 'user' && <UserLogsTab timeRange={timeRange} />}
       {tab === 'chat' && <ChatLogsTab timeRange={timeRange} />}
     </div>
   )
