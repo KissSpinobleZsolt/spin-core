@@ -814,6 +814,12 @@ class PostgresAdapter:
             "enabled": row.enabled,
         }
 
+    def list_pages(self) -> list[dict]:
+        """Return all page_registry rows ordered by route."""
+        with self._session_ctx() as db:
+            rows = db.query(PageRegistryRow).order_by(PageRegistryRow.route).all()  # alphabetical route order for stable UI display
+            return [self._page_registry_row_to_dict(row) for row in rows]  # normalise ORM rows to plain dicts before returning
+
     def get_page_config(self, route: str) -> dict | None:
         """Return the page registry config for the given route, or None if absent."""
         with self._session_ctx() as db:

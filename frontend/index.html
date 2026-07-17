@@ -3,15 +3,57 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <link rel="manifest" href="/manifest.json" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#863bff" />
     <meta name="description" content="Full-stack micro-frontend platform" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta name="apple-mobile-web-app-title" content="Spin Core" />
     <title>Spin Core</title>
+    <!-- Splash screen styles — loaded synchronously so the splash is visible before any JS parses -->
+    <style>
+      #splash {
+        position: fixed;
+        inset: 0;
+        background: #0f172a;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 9999;
+        opacity: 1;
+        transition: opacity 0.35s ease;
+      }
+      #splash.fade-out { opacity: 0; }
+      #splash-logo { width: 64px; height: 62px; margin-bottom: 18px; }
+      #splash-name {
+        color: #ffffff;
+        font-size: 22px;
+        font-weight: 700;
+        font-family: system-ui, -apple-system, sans-serif;
+        letter-spacing: -0.3px;
+        margin-bottom: 28px;
+      }
+      #splash-ring {
+        width: 30px;
+        height: 30px;
+        border: 3px solid rgba(134, 59, 255, 0.25);
+        border-top-color: #863bff;
+        border-radius: 50%;
+        animation: splash-spin 0.75s linear infinite;
+      }
+      @keyframes splash-spin { to { transform: rotate(360deg); } }
+    </style>
   </head>
   <body>
+    <!-- Splash screen — shown before JavaScript loads; removed by main.tsx after first React render -->
+    <div id="splash">
+      <img id="splash-logo" src="/favicon.svg" alt="" />
+      <div id="splash-name">Spin Core</div>
+      <div id="splash-ring"></div>
+    </div>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

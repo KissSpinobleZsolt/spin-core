@@ -311,6 +311,7 @@ Per-bot event log stored in the `bot_logs` ClickHouse table (single table; `bot_
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
+| `GET` | `/api/pages` | Admin | Return all `page_registry` rows ordered by route. |
 | `GET` | `/api/pages/config?route=…` | Bearer | Return the `page_registry` entry for the given route (title, roles, skeleton, enabled). |
 | `PATCH` | `/api/pages/config?route=…` | Admin | Update title, roles, skeleton, or enabled flag for the given route. |
 

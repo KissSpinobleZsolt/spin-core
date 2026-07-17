@@ -35,18 +35,30 @@ React 19 SPA for the spin-core platform.
 
 All authenticated routes redirect to `/login` if no token is present. The admin user is seeded by the backend from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars — there is no setup wizard.
 
+## Zustand stores
+
+Global state that must outlive individual components (and needs no provider wrapper) lives in `src/store/`:
+
+| Store | File | State |
+|-------|------|-------|
+| `useThemeStore` | `theme.store.ts` | `theme`, `setTheme`, `applyTheme`, `initFromUser` — reads `localStorage` and sets the `dark` class on mount; cross-tab synced via a `storage` event listener |
+| `useI18nStore` | `i18n.store.ts` | `ready: boolean` — set to `true` by `useI18nSync` once the initial translation bundle loads |
+
+Import via `@store` alias: `import { useThemeStore } from '@store'`.
+
 ## Context providers
 
 | Provider | Key stored | Purpose |
 |----------|-----------|---------|
 | `AuthContext` | `token` (localStorage) | JWT + user object |
-| `ThemeContext` | `theme` (localStorage) | Dark / light, cross-tab sync |
 | `SettingsContext` | — | Polls `GET /api/settings/modules` |
 | `UIPrefsContext` | `ui_prefs` (localStorage) | Sidebar collapsed state, cross-tab sync |
 | `HealthContext` | — | Receives DB liveness updates from the health Web Worker |
 | `ModelStatusContext` | — | Provides Ollama model readiness state — consumed by `ChatBubble` to decide visibility |
 | `NotificationContext` | — | Streams platform notifications via WebSocket (`/api/notifications/ws`) |
 | `PageLoaderContext` | — | Controls the full-page skeleton loader shown during server-driven page transitions |
+
+> `ThemeContext` / `ThemeProvider` were removed — theme state is now `useThemeStore` (Zustand). `useTheme()` is kept as a thin adapter in `context/theme/` so existing consumers are unchanged.
 
 ## Health monitoring
 
@@ -59,7 +71,7 @@ The health payload includes a `translations` map (`lang → ISO timestamp`) alon
 
 ## i18n
 
-Translations are fetched from `GET /api/i18n/{lang}` (PostgreSQL-backed) — there are no bundled locale files. On first render `App` shows a full-screen spinner while the initial fetch completes, then unmounts it. Subsequent reloads happen automatically when the health worker detects a `translations` timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.
+Translations are fetched from `GET /api/i18n/{lang}` (PostgreSQL-backed) — there are no bundled locale files. `useI18nSync` runs inside `Layout` (the authenticated shell) so it only fires after login. `Layout` shows a full-page spinner until `useI18nStore(s => s.ready)` becomes `true`. Subsequent reloads happen automatically when the health worker detects a `translations` timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.
 
 ## Ollama model status banner
 
