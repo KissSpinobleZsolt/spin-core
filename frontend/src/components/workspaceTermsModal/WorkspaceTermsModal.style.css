@@ -1,0 +1,10 @@
+.workspace-terms-modal__overlay { @apply fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm; }
+.workspace-terms-modal__card { @apply w-full max-w-lg mx-4 bg-white dark:bg-slate-800 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-700 p-8; }
+.workspace-terms-modal__title { @apply text-xl font-bold text-slate-800 dark:text-white mb-1; }
+.workspace-terms-modal__subtitle { @apply text-sm text-slate-500 dark:text-slate-400 mb-6; }
+.workspace-terms-modal__terms { @apply h-52 overflow-y-auto rounded-xl bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 text-sm text-slate-600 dark:text-slate-300 space-y-4 mb-6; }
+.workspace-terms-modal__section-title { @apply font-semibold text-slate-700 dark:text-slate-200 mb-1; }
+.workspace-terms-modal__accept-label { @apply flex items-start gap-3 cursor-pointer mb-6 select-none; }
+.workspace-terms-modal__checkbox { @apply mt-0.5 h-4 w-4 rounded border-slate-400 accent-blue-600 cursor-pointer; }
+.workspace-terms-modal__accept-text { @apply text-sm text-slate-600 dark:text-slate-300; }
+.workspace-terms-modal__submit { @apply w-full py-2.5 rounded-xl text-sm font-semibold; }

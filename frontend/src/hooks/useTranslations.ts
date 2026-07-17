@@ -3,7 +3,7 @@ import { useState, useMemo, createContext, useContext, type ReactNode, createEle
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { i18nService } from '@services'
 import { reloadTranslations } from '../i18n/useI18nSync'
-import { flatten, unflatten } from '../utils/flatten'
+import { flatten, unflatten } from '@utils'
 
 export const LANGS = ['en', 'ro'] as const
 export type Lang = (typeof LANGS)[number]

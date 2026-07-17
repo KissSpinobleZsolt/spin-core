@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
-import { useHealth } from '../../context/HealthContext'
+import { useAuth, useTheme, useHealth } from '@context'
 
 const ROUTE_KEYS: Record<string, string> = {
   '/': 'nav.dashboard',

@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { logsService, type ChatLogEntry } from '@services'
-import type { TimeRange } from '../components/TimeRangeFilter'
+import type { TimeRange } from '@components/timeRangeFilter'
 
 const PAGE_SIZE = 50
 

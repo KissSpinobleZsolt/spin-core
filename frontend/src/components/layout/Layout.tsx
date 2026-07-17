@@ -5,9 +5,9 @@ import Sidebar from './Sidebar';
 import Footer from './Footer';
 import { ChatBubble } from '../chat/ChatBubble';
 import { ModelStatusBanner } from './ModelStatusBanner';
-import { WorkspaceTermsModal } from '../WorkspaceTermsModal';
-import { Spinner } from '../ui/Spinner';
-import { PageLoaderProvider } from '../../context/PageLoaderContext';
+import { WorkspaceTermsModal } from '../workspaceTermsModal'
+import { Spinner } from '../ui/spinner';
+import { PageLoaderProvider } from '@context'
 
 export default function Layout() {
   return (

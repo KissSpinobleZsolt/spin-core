@@ -1,0 +1,16 @@
+export const WORKSPACE_TERMS_MODAL_TEXT = {
+  TITLE:            'Welcome to spin-core',
+  SUBTITLE:         'Please read and accept the usage terms before continuing.',
+  PURPOSE_HEADING:  '1. Purpose',
+  PURPOSE_BODY:     'spin-core is an open platform shell provided for educational, research, and development use. You may build and deploy your own modules within the scope of your assigned role.',
+  WARRANTY_HEADING: '2. No Warranty',
+  WARRANTY_BODY:    'This software is provided "as is", without warranty of any kind. The author accepts no liability for outcomes arising from its use. See the MIT License for the full disclaimer.',
+  PRIVACY_HEADING:  '3. Data & Privacy',
+  PRIVACY_BODY:     "Session data (login token, preferences) is stored only in your browser's local storage. No personal data is sent to third parties.",
+  USE_HEADING:      '4. Acceptable Use',
+  USE_BODY:         'You agree not to use this platform in ways that violate applicable law, harm other users, or compromise system security.',
+  LICENSE_HEADING:  '5. License',
+  LICENSE_BODY:     'spin-core is released under the MIT License. You are free to use, modify, and distribute it in accordance with those terms.',
+  ACCEPT_LABEL:     'I have read and agree to the terms above.',
+  SUBMIT_LABEL:     'Continue to spin-core',
+} as const

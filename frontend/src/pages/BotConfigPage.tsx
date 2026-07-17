@@ -8,10 +8,10 @@ import {
   type BotTeam,
   type BotProcesses,
 } from '@services'
-import { Spinner } from '../components/ui/Spinner'
+import { Spinner } from '../components/ui/spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { Btn } from '../components/ui/Button'
-import { Toggle } from '../components/ui/Toggle'
+import { Toggle } from '../components/ui/toggle'
 import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
 
 // ── Severity colour map — class strings must be literals so Tailwind includes them in the bundle ──

@@ -8,8 +8,14 @@
       // bare entry needed: @services/* only matches sub-paths; from '@services' falls through without it
       "@services":     ["./src/services/index.ts"],
       "@services/*":   ["./src/services/*"],
+      // bare entry needed: @hooks/* only matches sub-paths; from '@hooks' falls through without it
+      "@hooks":        ["./src/hooks/index.ts"],
       "@hooks/*":      ["./src/hooks/*"],
+      // bare entry needed: @context/* only matches sub-paths; from '@context' falls through without it
+      "@context":      ["./src/context/index.ts"],
       "@context/*":    ["./src/context/*"],
+      // bare entry needed: @utils/* only matches sub-paths; from '@utils' falls through without it
+      "@utils":        ["./src/utils/index.ts"],
       "@utils/*":      ["./src/utils/*"],
       "@constants/*":  ["./src/constants/*"],
       "@i18n/*":       ["./src/i18n/*"]

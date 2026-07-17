@@ -3,7 +3,7 @@ import { ErrorBanner } from '../ui/ErrorBanner'
 import { FederatedPage } from '../modules/FederatedPage'
 import { PageSkeletonLoader } from './PageSkeletonLoader'
 import { PAGE_REGISTRY } from '../../pages/registry'
-import { usePageConfig } from '../../context/PageLoaderContext'
+import { usePageConfig } from '@context'
 
 /** Pure renderer — reads current-route page config from PageLoaderProvider and mounts the right component. */
 export function PageLoader() {

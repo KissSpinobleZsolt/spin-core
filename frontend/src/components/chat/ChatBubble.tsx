@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
-import { useModelStatusContext } from '../../context/ModelStatusContext'
+import { useModelStatusContext } from '@context'
 import { botsService, type Bot, apiService, type InstalledModelsData } from '@services'
-import { useChatStream, type Message } from '../../hooks/useChatStream'
+import { useChatStream, type Message } from '@hooks'
 
 const STORAGE_KEY = 'spin_core_chat_history'
 const STORAGE_BOT_KEY = 'spin_core_selected_bot'

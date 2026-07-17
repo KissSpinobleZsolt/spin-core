@@ -5,7 +5,7 @@ import { lazy, type LazyExoticComponent, type ComponentType } from 'react'
 export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType<object>>> = {
   Dashboard:       lazy(() => import('./Dashboard')),
   Logs:            lazy(() => import('./Logs')),
-  Translations:    lazy(() => import('./Translations')),
+  Translations:    lazy(() => import('./translations')),
   Bots:            lazy(() => import('./Bots')),
   BotsAdmin:       lazy(() => import('./BotsAdmin')),
   LLMs:            lazy(() => import('./admin/LLMs')),

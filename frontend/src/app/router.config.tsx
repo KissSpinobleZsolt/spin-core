@@ -1,45 +1,36 @@
 import { lazy, Suspense } from 'react'
-import { createBrowserRouter, RouterProvider } from 'react-router-dom'
-import Layout from './components/layout/Layout'
-import { AuthGuard } from './components/guards/AuthGuard'
-import { RoleGuard } from './components/guards/RoleGuard'
-import { FederatedPage } from './components/modules/FederatedPage'
-import { PageLoader } from './components/layout/PageLoader'
-import { useI18nSync } from './i18n/useI18nSync'
-import { CookieConsentModal } from './components/CookieConsentModal'
-import { Spinner } from './components/ui/Spinner'
-import { UIComponentsProvider } from './context/UIComponentsContext'
+import { createBrowserRouter } from 'react-router-dom'
+import Layout from '../components/layout/Layout'
+import { AuthGuard } from '../components/guards/AuthGuard'
+import { RoleGuard } from '../components/guards/RoleGuard'
+import { FederatedPage } from '../components/modules/FederatedPage'
+import { PageLoader } from '../components/layout/PageLoader'
+import { UIComponentsProvider } from '@context'
+import { loginFallback } from './loginFallback.constant'
 
-const Dashboard      = lazy(() => import('./pages/Dashboard'))
-const Login          = lazy(() => import('./pages/Login'))
-const Translations   = lazy(() => import('./pages/Translations'))
-const Bots           = lazy(() => import('./pages/Bots'))
-const Chat           = lazy(() => import('./pages/Chat'))
-const LLMs           = lazy(() => import('./pages/admin/LLMs'))
-const Users          = lazy(() => import('./pages/admin/Users'))
-const Modules        = lazy(() => import('./pages/admin/Modules'))
-const Status         = lazy(() => import('./pages/admin/Status'))
-const Layouts        = lazy(() => import('./pages/admin/Layouts'))
-const DocsUI         = lazy(() => import('./pages/admin/docs/UI'))
-const DocsApi        = lazy(() => import('./pages/admin/docs/Api'))
-const DocsDeployment = lazy(() => import('./pages/admin/docs/Deployment'))
-const NotFound       = lazy(() => import('./pages/NotFound'))
+const Dashboard      = lazy(() => import('../pages/Dashboard')) // code-split per route
+const Login          = lazy(() => import('../pages/Login'))
+const Translations   = lazy(() => import('../pages/translations'))
+const Bots           = lazy(() => import('../pages/Bots'))
+const Chat           = lazy(() => import('../pages/Chat'))
+const LLMs           = lazy(() => import('../pages/admin/LLMs'))
+const Users          = lazy(() => import('../pages/admin/Users'))
+const Modules        = lazy(() => import('../pages/admin/Modules'))
+const Status         = lazy(() => import('../pages/admin/Status'))
+const Layouts        = lazy(() => import('../pages/admin/Layouts'))
+const DocsUI         = lazy(() => import('../pages/admin/docs/UI'))
+const DocsApi        = lazy(() => import('../pages/admin/docs/Api'))
+const DocsDeployment = lazy(() => import('../pages/admin/docs/Deployment'))
+const NotFound       = lazy(() => import('../pages/NotFound'))
 
-// Defined outside the router so the JSX object is stable across re-renders
-const loginFallback = (
-  <div className="min-h-screen flex items-center justify-center bg-slate-900">
-    <Spinner size="lg" />
-  </div>
-)
-
-const router = createBrowserRouter([
+export const router = createBrowserRouter([
   {
     path: '/login',
     // Login is outside <Layout>, so it has no access to Layout's Outlet Suspense boundary
     element: <Suspense fallback={loginFallback}><Login /></Suspense>,
   },
   {
-    element: <AuthGuard />,
+    element: <AuthGuard />, // redirects to /login when unauthenticated
     children: [
       {
         path: '/',
@@ -118,7 +109,7 @@ const router = createBrowserRouter([
             path: 'admin/docs/ui',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <UIComponentsProvider>
+                <UIComponentsProvider> {/* docs page needs the component catalogue context */}
                   <DocsUI />
                 </UIComponentsProvider>
               </RoleGuard>
@@ -145,22 +136,3 @@ const router = createBrowserRouter([
     ],
   },
 ])
-
-function App() {
-  const i18nReady = useI18nSync()
-  if (!i18nReady) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-slate-900">
-        <Spinner size="lg" />
-      </div>
-    )
-  }
-  return (
-    <>
-      <RouterProvider router={router} />
-      <CookieConsentModal />
-    </>
-  )
-}
-
-export default App

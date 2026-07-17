@@ -1,5 +1,5 @@
 import { createContext, useContext, type ReactNode } from 'react'
-import { useModelStatus, type ModelStatusPayload } from '../hooks/useModelStatus'
+import { useModelStatus, type ModelStatusPayload } from '@hooks'
 
 interface ModelStatusContextValue {
   status: ModelStatusPayload | null

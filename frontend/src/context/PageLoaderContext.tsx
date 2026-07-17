@@ -2,7 +2,7 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { useLocation } from 'react-router-dom'
 import { pagesService, type PageConfig } from '@services'
-import { useGet } from '../hooks/useApi'
+import { useGet } from '@hooks'
 
 interface PageLoaderContextValue {
   config: PageConfig | null

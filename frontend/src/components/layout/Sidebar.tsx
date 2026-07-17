@@ -1,8 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { useAuth } from '../../context/AuthContext'
-import { useSettings } from '../../context/SettingsContext'
-import { useUIPrefs } from '../../context/UIPrefsContext'
+import { useAuth, useSettings, useUIPrefs } from '@context'
 
 function ChevronLeftIcon() {
   return (

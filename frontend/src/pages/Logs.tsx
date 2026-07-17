@@ -1,6 +1,6 @@
 import { useState, useEffect, createContext, useContext, type ReactNode, createElement } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../components/TimeRangeFilter'
+import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '@components/timeRangeFilter'
 import {
   logsService,
   type ChatLogDetails,
@@ -8,19 +8,17 @@ import {
   type UserLogEntry,
 } from '@services'
 import { Btn } from '../components/ui/Button'
-import { Spinner } from '../components/ui/Spinner'
+import { Spinner } from '../components/ui/spinner'
 import { PageTitle } from '../components/ui/PageTitle'
 import { Badge } from '../components/ui/Badge'
 import { Input } from '../components/ui/Input'
-import { StatCard } from '../components/ui/StatCard'
-import { Tabs } from '../components/ui/Tabs'
+import { StatCard } from '../components/ui/statCard'
+import { Tabs } from '../components/ui/tabs'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { Table, type TableColumn } from '../components/ui/Table'
 import { Pagination } from '../components/ui/Pagination'
-import { formatEventTime } from '../utils/formatters'
-import { useApiLogs } from '../hooks/useApiLogs'
-import { useUserLogs } from '../hooks/useUserLogs'
-import { useChatLogs } from '../hooks/useChatLogs'
+import { formatEventTime } from '@utils'
+import { useApiLogs, useUserLogs, useChatLogs } from '@hooks'
 
 const PAGE_SIZE = 50
 type Tab = 'api' | 'user' | 'chat'

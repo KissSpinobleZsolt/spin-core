@@ -1,11 +1,10 @@
 import { useEffect, useRef } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { botsService, type Bot } from '@services'
-import { useGet } from '../hooks/useApi'
-import { useChatStream } from '../hooks/useChatStream'
+import { useGet, useChatStream } from '@hooks'
 import { Btn } from '../components/ui/Button'
 import { BOT_TYPES, TYPE_BADGE } from '../constants/botConstants'
-import { useSettings } from '../context/SettingsContext'
+import { useSettings } from '@context'
 import BotConfigPage from './BotConfigPage'
 
 // ---------------------------------------------------------------------------

@@ -1,0 +1,18 @@
+.time-range-filter__label {
+  @apply block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1;
+}
+
+.time-range-filter__input {
+  @apply px-2 py-1.5 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300
+         dark:border-slate-600 text-sm text-slate-800 dark:text-white
+         focus:outline-none focus:ring-1 focus:ring-blue-500;
+  color-scheme: light; /* force light chrome on the native datetime picker */
+}
+
+.dark .time-range-filter__input {
+  color-scheme: dark; /* switch native datetime picker chrome to dark mode */
+}
+
+.time-range-filter__preset-btn {
+  @apply px-2.5 py-1 rounded-md text-xs; /* compact size for quick-pick preset buttons */
+}

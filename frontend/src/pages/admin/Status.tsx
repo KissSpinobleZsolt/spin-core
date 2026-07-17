@@ -1,13 +1,12 @@
 import { useNavigate } from 'react-router-dom'
-import { useHealth } from '@context/HealthContext'
-import { useSettings } from '@context/SettingsContext'
-import { useGet } from '@hooks/useApi'
+import { useHealth, useSettings } from '@context'
+import { useGet } from '@hooks'
 import { apiService, botsService, type Bot, type InstalledModelsData } from '@services'
 import { Badge } from '@components/ui/Badge'
 import { PageTitle } from '@components/ui/PageTitle'
 import { AdminPageShell } from '@components/layout/AdminPageShell'
-import { Spinner } from '@components/ui/Spinner'
-import { fmtBytes } from '@utils/formatters'
+import { Spinner } from '@components/ui/spinner'
+import { fmtBytes } from '@utils'
 
 function SectionCard({
   title,

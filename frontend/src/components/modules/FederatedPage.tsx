@@ -1,8 +1,8 @@
 import { Component, type ReactNode, Suspense, useEffect, useState, type ComponentType } from 'react'
 import { useParams } from 'react-router-dom'
-import { useSettings } from '../../context/SettingsContext'
-import { loadFederatedModule } from '../../utils/federationLoader'
-import { Spinner } from '../ui/Spinner'
+import { useSettings } from '@context'
+import { loadFederatedModule } from '@utils'
+import { Spinner } from '../ui/spinner'
 import { ModuleBotPanel } from './ModuleBotPanel'
 
 class ErrorBoundary extends Component<

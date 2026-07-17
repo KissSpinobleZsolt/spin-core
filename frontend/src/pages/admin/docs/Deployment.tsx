@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
 import { DocPageShell } from '../../../components/layout/DocPageShell'
-import { Tabs } from '../../../components/ui/Tabs'
+import { Tabs } from '../../../components/ui/tabs'
 import { Card } from '../../../components/ui/Card'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

@@ -1,5 +1,5 @@
 import { apiService } from '../api'
-import { safeJsonParse } from '../../utils/safeJsonParse'
+import { safeJsonParse } from '@utils'
 import type { AuthCredentials, AuthUser } from './types'
 
 const IS_MOCK = import.meta.env.VITE_USE_MOCK === 'true'

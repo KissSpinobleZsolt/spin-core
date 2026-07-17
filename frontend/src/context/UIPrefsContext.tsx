@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react'
-import { safeJsonParse } from '../utils/safeJsonParse'
+import { safeJsonParse } from '@utils'
 
 interface UIPrefs {
   sidebarCollapsed: boolean

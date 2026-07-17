@@ -128,7 +128,7 @@ const DOCS: ComponentDoc[] = [
   {
     name: 'StatCard',
     export: 'StatCard',
-    file: 'components/ui/StatCard.tsx',
+    file: 'components/ui/statCard/StatCard.tsx',
     description: 'KPI tile displaying a large metric value, a label, and an optional sub-text. Use in a grid row.',
     props: [
       { name: 'value', type: 'string | number', required: true, description: 'Primary metric value displayed large.' },

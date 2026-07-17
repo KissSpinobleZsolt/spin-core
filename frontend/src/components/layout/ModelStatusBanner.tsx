@@ -1,5 +1,5 @@
-import { type ModelInfo } from '../../hooks/useModelStatus'
-import { useModelStatusContext } from '../../context/ModelStatusContext'
+import { type ModelInfo } from '@hooks'
+import { useModelStatusContext } from '@context'
 
 function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`

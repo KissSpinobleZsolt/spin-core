@@ -1,0 +1,12 @@
+.translations-grid__header { @apply grid grid-cols-[2fr_3fr_3fr] gap-0 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50; }
+.translations-grid__header-cell { @apply px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500; }
+.translations-grid__header-cell--lang { @apply px-4 py-2.5 text-xs font-semibold uppercase tracking-wider text-slate-500 border-l border-slate-200 dark:border-slate-700; }
+.translations-grid__empty { @apply px-4 py-8 text-center text-sm text-slate-400; }
+.translations-grid__body { @apply divide-y divide-slate-100 dark:divide-slate-700/60 max-h-[calc(100vh-240px)] overflow-y-auto; }
+.translations-grid__row { @apply grid grid-cols-[2fr_3fr_3fr] gap-0 group hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors; }
+.translations-grid__key { @apply text-xs font-mono text-slate-500 dark:text-slate-400 break-all leading-tight; }
+.translations-grid__cell { @apply px-2 py-1.5 border-l border-slate-100 dark:border-slate-700/60; }
+.translations-grid__textarea {
+  @apply w-full px-2 py-1 text-sm rounded bg-transparent border border-transparent hover:border-slate-300 dark:hover:border-slate-600 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-slate-800 dark:text-white resize-none leading-snug focus:outline-none transition-colors;
+  field-sizing: content;
+}

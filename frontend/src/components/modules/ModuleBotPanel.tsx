@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { botsService, type Bot } from '@services'
-import { useChatStream } from '../../hooks/useChatStream'
+import { useChatStream } from '@hooks'
 
 interface Props {
   moduleId: string

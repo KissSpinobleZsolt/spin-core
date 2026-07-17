@@ -1,8 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import i18n from './index'
 import { i18nService } from '@services'
-import { useHealth } from '../context/HealthContext'
-import { useAuth } from '../context/AuthContext'
+import { useHealth, useAuth } from '@context'
 
 // Only fetches and adds bundle — does NOT call changeLanguage (that fires languageChanged → loop)
 export async function reloadTranslations(lang: string): Promise<void> {
