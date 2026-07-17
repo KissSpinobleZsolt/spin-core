@@ -1,6 +1,6 @@
 import { Card } from '../../components/ui/Card'
 import { PageTitle } from '../../components/ui/PageTitle'
-import { AdminPageShell } from '../../components/layout/AdminPageShell'
+import { AdminPageShell } from '../../components/layout/adminPageShell'
 
 export default function Users() {
   return (

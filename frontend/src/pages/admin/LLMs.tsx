@@ -1,12 +1,12 @@
 import { useState } from 'react'
-import { useGet } from '../../hooks/useApi'
+import { useGet } from '@hooks'
 import { apiService, type InstalledModelsData } from '@services'
-import { Btn } from '../../components/ui/Button'
-import { Spinner } from '../../components/ui/Spinner'
+import { Btn } from '../../components/ui/button'
+import { Spinner } from '../../components/ui/spinner'
 import { ErrorBanner } from '../../components/ui/ErrorBanner'
 import { PageTitle } from '../../components/ui/PageTitle'
-import { AdminPageShell } from '../../components/layout/AdminPageShell'
-import { fmtBytes } from '../../utils/formatters'
+import { AdminPageShell } from '../../components/layout/adminPageShell'
+import { fmtBytes } from '@utils'
 
 export default function LLMs() {
   const { data, isLoading, isError, refetch } = useGet<InstalledModelsData>(

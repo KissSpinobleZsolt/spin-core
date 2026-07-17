@@ -1,0 +1,1 @@
+export { FederatedPage } from './FederatedPage'

@@ -63,7 +63,7 @@ Translations are fetched from `GET /api/i18n/{lang}` (PostgreSQL-backed) — the
 
 ## Ollama model status banner
 
-`src/components/layout/ModelStatusBanner.tsx` is a persistent banner rendered in `Layout` between the header and the page content. It connects to `GET /api/model-status/stream` via the browser-native `EventSource` API and shows live download progress for required Ollama models.
+`src/components/layout/modelStatusBanner/` is a persistent banner rendered in `Layout` between the header and the page content. It connects to `GET /api/model-status/stream` via the browser-native `EventSource` API and shows live download progress for required Ollama models.
 
 ### Behaviour
 
@@ -81,7 +81,7 @@ The banner is always dismissible via the `✕` button. The backend pushes a Serv
 
 ### Hook
 
-`src/hooks/useModelStatus.ts` wraps the `EventSource` lifecycle:
+`src/hooks/modelStatus/` wraps the `EventSource` lifecycle:
 
 ```ts
 const { status, dismissed, dismiss } = useModelStatus()
@@ -96,7 +96,7 @@ const { status, dismissed, dismiss } = useModelStatus()
 
 ## Module federation loader
 
-`src/utils/federationLoader.ts` implements the webpack container protocol for a **Vite host**.
+`src/utils/federationLoader/` implements the webpack container protocol for a **Vite host**.
 
 ### How it works
 
@@ -125,15 +125,15 @@ For standalone testing of a remote at its own port, add the React 18 UMD scripts
 
 The platform ships with a built-in bot system — no Module Federation required.
 
-**`ChatBubble`** (`src/components/chat/ChatBubble.tsx`) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to `localStorage`; the selected bot/model are also persisted.
+**`ChatBubble`** (`src/components/chat/chatBubble/`) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to `localStorage`; the selected bot/model are also persisted.
 
-**`/bots`** (`src/pages/Bots.tsx`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
+**`/bots`** (`src/pages/bots/`) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking **Launch** opens a full-page chat at `/bots/:botId`.
 
-**`/bots/:botId`** (`src/pages/Chat.tsx`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots with a module backend render `BotConfigPage` (manifest-driven config UI with teams, risk profiles, and process monitoring); others render a `BotConfigSkeleton` placeholder.
+**`/bots/:botId`** (`src/pages/chat/`) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends `bot_id` with every request to `POST /api/chat`. The backend injects the bot's system prompt and model. Non-communicator bots with a module backend render `BotConfigPage` (manifest-driven config UI with teams, risk profiles, and process monitoring); others render a `BotConfigSkeleton` placeholder.
 
-**`ModuleBotPanel`** (`src/components/modules/ModuleBotPanel.tsx`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
+**`ModuleBotPanel`** (`src/components/modules/moduleBotPanel/`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
 
-**`/bots-admin`** (`src/pages/BotsAdmin.tsx`) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
+**`/bots-admin`** (`src/pages/botsAdmin/`) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
 
 ### Module presets
 
@@ -171,21 +171,21 @@ All reusable primitives live in `src/components/ui/`. Always import from there �
 
 | Component | File | Props |
 |-----------|------|-------|
-| `Btn` | `Button.tsx` | `variant?: 'primary' \| 'secondary' \| 'danger'`, all `<button>` attrs |
-| `Input` | `Input.tsx` | `label?: string`, all `<input>` attrs |
+| `Btn` | `button/` | `variant?: 'primary' \| 'secondary' \| 'danger'`, all `<button>` attrs |
+| `Input` | `input/` | `label?: string`, all `<input>` attrs |
 | `Label` | `Label.tsx` | all `<label>` attrs |
-| `Modal` | `Modal.tsx` | `title`, `onClose?`, `maxWidth?`, `children` |
+| `Modal` | `modal/` | `title`, `onClose?`, `maxWidth?`, `children` |
 | `Card` | `Card.tsx` | `className?`, `children` |
-| `Spinner` | `Spinner.tsx` | `size?: 'sm' \| 'md' \| 'lg'` |
-| `Toggle` | `Toggle.tsx` | `checked`, `onChange`, `disabled?` |
+| `Spinner` | `spinner/` | `size?: 'sm' \| 'md' \| 'lg'` |
+| `Toggle` | `toggle/` | `checked`, `onChange`, `disabled?` |
 | `ErrorBanner` | `ErrorBanner.tsx` | `message: string` |
 | `PageTitle` | `PageTitle.tsx` | `children` |
-| `Badge` | `Badge.tsx` | `variant?: 'info' \| 'success' \| 'warn' \| 'error' \| 'neutral'`, `dot?`, `children` |
-| `StatCard` | `StatCard.tsx` | `value`, `label`, `sub?` |
-| `Tabs` | `Tabs.tsx` | `tabs`, `active`, `onChange` |
-| `ProgressBar` | `ProgressBar.tsx` | `value`, `label?`, `color?: 'blue' \| 'green' \| 'amber' \| 'red'` |
-| `Chip` | `Chip.tsx` | `children`, `onRemove?` |
-| `DropZone` | `DropZone.tsx` | `onFiles?`, `accept?`, `hint?`, `file?` |
+| `Badge` | `badge/` | `variant?: 'info' \| 'success' \| 'warn' \| 'error' \| 'neutral'`, `dot?`, `children` |
+| `StatCard` | `statCard/` | `value`, `label`, `sub?` |
+| `Tabs` | `tabs/` | `tabs`, `active`, `onChange` |
+| `ProgressBar` | `progressBar/` | `value`, `label?`, `color?: 'blue' \| 'green' \| 'amber' \| 'red'` |
+| `Chip` | `chip/` | `children`, `onRemove?` |
+| `DropZone` | `dropZone/` | `onFiles?`, `accept?`, `hint?`, `file?` |
 | `Pagination` | `Pagination/` | `page`, `total`, `pageSize`, `onChange` |
 | `Table` | `Table/` | `columns`, `rows`, `keyFn` |
 
@@ -193,26 +193,26 @@ All reusable primitives live in `src/components/ui/`. Always import from there �
 
 | File | Exports |
 |------|---------|
-| `src/utils/formatters.ts` | `fmtBytes(n)`, `formatEventTime(ts)` |
+| `src/utils/formatters/` | `fmtBytes(n)`, `formatEventTime(ts)` |
 | `src/utils/safeJsonParse.ts` | `safeJsonParse<T>(raw, fallback)` |
-| `src/utils/flatten.ts` | `flatten(obj)` — flattens nested object to dot-notation keys |
-| `src/constants/botConstants.ts` | `BOT_TYPES`, `TYPE_BADGE` |
+| `src/utils/flatten/` | `flatten(obj)` — flattens nested object to dot-notation keys |
+| `src/constants/botConstants/` | `BOT_TYPES`, `TYPE_BADGE` |
 | `src/services/modelStatus/` | `InstalledModel`, `InstalledModelsData` types |
-| `src/hooks/useChatStream.ts` | `useChatStream(botId, model, moduleId?)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
-| `src/hooks/useModelStatus.ts` | `useModelStatus()` → `{ status, dismissed, dismiss }` |
+| `src/hooks/chatStream/` | `useChatStream(botId, model, moduleId?)` → `{ messages, setMessages, input, setInput, loading, sendMessage }` |
+| `src/hooks/modelStatus/` | `useModelStatus()` → `{ status, dismissed, dismiss }` |
 | `src/hooks/useApi.ts` | `useGet<T>(url, options?)` — thin React Query wrapper for GET requests |
-| `src/hooks/useApiLogs.ts` | `useApiLogs(timeRange)` → `{ logs, summary, … }` |
-| `src/hooks/useChatLogs.ts` | `useChatLogs(timeRange)` → `{ logs, … }` |
-| `src/hooks/useUserLogs.ts` | `useUserLogs(timeRange)` → `{ logs, … }` |
-| `src/hooks/useTranslations.ts` | `TranslationsProvider`, `useTranslationsContext()`, `LANGS`, `Lang` |
+| `src/hooks/apiLogs/` | `useApiLogs(timeRange)` → `{ logs, summary, … }` |
+| `src/hooks/chatLogs/` | `useChatLogs(timeRange)` → `{ logs, … }` |
+| `src/hooks/userLogs/` | `useUserLogs(timeRange)` → `{ logs, … }` |
+| `src/hooks/translations/` | `TranslationsProvider`, `useTranslationsContext()`, `LANGS`, `Lang` |
 
 ## First-visit modals
 
 Two modals fire automatically — no configuration needed.
 
-**`CookieConsentModal`** (`src/components/CookieConsentModal.tsx`) — fixed bottom banner shown to every visitor before login. Offers "Essential only" and "Accept all". Choice stored in `localStorage` under `spin_cookie_consent`. Disappears permanently once accepted.
+**`CookieConsentModal`** (`src/components/cookieConsent/`) — fixed bottom banner shown to every visitor before login. Offers "Essential only" and "Accept all". Choice stored in `localStorage` under `spin_cookie_consent`. Disappears permanently once accepted.
 
-**`WorkspaceTermsModal`** (`src/components/WorkspaceTermsModal.tsx`) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click "Continue to spin-core". Acceptance stored in `localStorage` under `spin_workspace_accepted_v1` keyed by username. Cannot be dismissed without accepting.
+**`WorkspaceTermsModal`** (`src/components/workspaceTermsModal/`) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click "Continue to spin-core". Acceptance stored in `localStorage` under `spin_workspace_accepted_v1` keyed by username. Cannot be dismissed without accepting.
 
 ## Local development (without Docker)
 

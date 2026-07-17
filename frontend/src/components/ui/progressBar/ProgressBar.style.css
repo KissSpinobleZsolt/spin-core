@@ -1,0 +1,5 @@
+@reference "../../../index.css";
+.progress-bar__label { @apply text-xs text-slate-500; }
+.progress-bar__pct { @apply text-xs font-mono text-slate-400; }
+.progress-bar__track { @apply h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden; }
+.progress-bar__fill { @apply h-full rounded-full transition-all duration-300; }

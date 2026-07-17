@@ -1,13 +1,13 @@
 import { Suspense } from 'react';
 import { Outlet } from 'react-router-dom';
-import Header from './Header';
-import Sidebar from './Sidebar';
+import Header from './header';
+import Sidebar from './sidebar';
 import Footer from './Footer';
-import { ChatBubble } from '../chat/ChatBubble';
-import { ModelStatusBanner } from './ModelStatusBanner';
-import { WorkspaceTermsModal } from '../WorkspaceTermsModal';
-import { Spinner } from '../ui/Spinner';
-import { PageLoaderProvider } from '../../context/PageLoaderContext';
+import { ChatBubble } from '../chat/chatBubble';
+import { ModelStatusBanner } from './modelStatusBanner';
+import { WorkspaceTermsModal } from '../workspaceTermsModal'
+import { Spinner } from '../ui/spinner';
+import { PageLoaderProvider } from '@context'
 
 export default function Layout() {
   return (

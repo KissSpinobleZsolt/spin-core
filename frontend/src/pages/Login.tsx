@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useAuth } from '@context/AuthContext'
-import { Btn } from '@components/ui/Button'
-import { Input } from '@components/ui/Input'
+import { useAuth } from '@context'
+import { Btn } from '@components/ui/button'
+import { Input } from '@components/ui/input'
 import { ErrorBanner } from '@components/ui/ErrorBanner'
 
 export default function Login() {
