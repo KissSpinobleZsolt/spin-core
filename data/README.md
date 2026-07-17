@@ -30,9 +30,9 @@ Fields:
 | `id` | UUID string | No | Stable primary key. If omitted, a random UUID is generated. |
 | `name` | string | Yes | Display name shown in the sidebar |
 | `description` | string | No | Short description shown in the discovery panel and admin list |
-| `scope` | string | Yes | Webpack container scope — must match `name` in `webpack.config.js` |
-| `component` | string | Yes | Exposed component path, e.g. `./App` |
-| `route` | string | Yes | URL slug under `/modules/` |
+| `scope` | string | Yes | Webpack container scope — must match `name` in `webpack.config.js`. The value `system` is reserved for the built-in dashboard module (no remote entry; always routes to `/`). |
+| `component` | string | Yes | Exposed component path, e.g. `./App`. Leave empty for the `system` scope. |
+| `route` | string | Yes | URL slug under `/modules/`. Leave empty for the `system` scope. |
 | `icon` | string | No | Emoji (default `🧩`) |
 | `enabled` | bool | No | Sidebar visibility (default `true`) |
 | `roles` | string[] | No | RBAC roles that can access the module (default `["user", "admin"]`) |

@@ -206,10 +206,10 @@ Translations are stored in PostgreSQL (`translations` table) and deep-merged fro
 
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
-| `GET` | `/api/i18n/{lang}` | No | Return full translation object for `lang` (e.g. `en`, `ro`) |
+| `GET` | `/api/i18n/{lang}` | Any user | Return full translation object for `lang` (e.g. `en`, `ro`) |
 | `PUT` | `/api/i18n/{lang}` | Admin | Replace translation object for `lang` |
 
-`GET /api/i18n/{lang}` is intentionally public so the frontend can fetch translations before the user logs in.
+Both endpoints require a valid JWT. The frontend retries `GET /api/i18n/{lang}` immediately after login if the pre-login fetch was rejected (401), so the bundle is loaded from the DB on first render after authentication.
 
 ### Module data (any authenticated user)
 
