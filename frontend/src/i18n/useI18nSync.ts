@@ -15,6 +15,8 @@ export function useI18nSync(): boolean {
   const health = useHealth()
   const lastVersionRef = useRef<string | undefined>(undefined)
   const { user } = useAuth()
+  // Captures the previous user value so the login-transition effect can detect null→non-null
+  // without firing on every render; initialized to the current user to skip the mount trigger
   const prevUserRef = useRef(user)
 
   // Initial load + language-switch handler

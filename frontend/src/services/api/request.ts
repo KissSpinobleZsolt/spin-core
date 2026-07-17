@@ -50,6 +50,8 @@ export async function request<T>(
       // Token was present but rejected — session expired or revoked
       window.location.href = '/login'
     } else {
+      // No token was sent — throw instead of redirecting; a hard redirect here would loop
+      // because the login page itself triggers requests to now-protected endpoints (e.g. i18n)
       throw new Error(`${method} ${url} → 401 Unauthorized`)
     }
   }

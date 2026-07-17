@@ -108,6 +108,8 @@ export default function Sidebar() {
     },
   ]
 
+  // system scope is excluded here — it is rendered as the fixed dashboard nav item above,
+  // not as a dynamic module entry, so showing it twice would be wrong
   const visibleModules = modules.filter(
     m => m.enabled && m.scope !== 'system' && (!m.roles.length || m.roles.some(r => user?.roles.includes(r))),
   )
