@@ -1,0 +1,16 @@
+{
+  "name": "Spin Core",
+  "short_name": "Spin",
+  "description": "Full-stack micro-frontend platform",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0d0d1a",
+  "theme_color": "#863bff",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    }
+  ]
+}
