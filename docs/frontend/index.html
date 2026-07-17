@@ -98,6 +98,30 @@
 <td>Bot CRUD — create, edit, delete, enable/disable</td>
 </tr>
 <tr>
+<td><code>/admin/layouts</code></td>
+<td>Layouts</td>
+<td>Admin</td>
+<td>Page layout management</td>
+</tr>
+<tr>
+<td><code>/admin/docs/ui</code></td>
+<td>UI docs</td>
+<td>Admin</td>
+<td>Component reference with props tables, import paths, and a sticky scroll-tracked sidebar</td>
+</tr>
+<tr>
+<td><code>/admin/docs/api</code></td>
+<td>API docs</td>
+<td>Admin</td>
+<td>Full API endpoint reference with method/auth legend, search, and sticky scroll-tracked sidebar</td>
+</tr>
+<tr>
+<td><code>/admin/docs/deployment</code></td>
+<td>Deployment docs</td>
+<td>Admin</td>
+<td>Docker Compose and Kubernetes deployment guide</td>
+</tr>
+<tr>
 <td><code>/modules/:id</code></td>
 <td>Federated module</td>
 <td>Yes</td>
@@ -106,6 +130,30 @@
 </tbody>
 </table>
 <p>All authenticated routes redirect to <code>/login</code> if no token is present. The admin user is seeded by the backend from <code>ADMIN_EMAIL</code> / <code>ADMIN_PASSWORD</code> env vars — there is no setup wizard.</p>
+<h2 id="zustand-stores" class="tsd-anchor-link">Zustand stores<a href="#zustand-stores" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
+<p>Global state that must outlive individual components (and needs no provider wrapper) lives in <code>src/store/</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Store</th>
+<th>File</th>
+<th>State</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>useThemeStore</code></td>
+<td><code>theme.store.ts</code></td>
+<td><code>theme</code>, <code>setTheme</code>, <code>applyTheme</code>, <code>initFromUser</code> — reads <code>localStorage</code> and sets the <code>dark</code> class on mount; cross-tab synced via a <code>storage</code> event listener</td>
+</tr>
+<tr>
+<td><code>useI18nStore</code></td>
+<td><code>i18n.store.ts</code></td>
+<td><code>ready: boolean</code> — set to <code>true</code> by <code>useI18nSync</code> once the initial translation bundle loads</td>
+</tr>
+</tbody>
+</table>
+<p>Import via <code>@store</code> alias: <code>import { useThemeStore } from '@store'</code>.</p>
 <h2 id="context-providers" class="tsd-anchor-link">Context providers<a href="#context-providers" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <table>
 <thead>
@@ -122,14 +170,9 @@
 <td>JWT + user object</td>
 </tr>
 <tr>
-<td><code>ThemeContext</code></td>
-<td><code>theme</code> (localStorage)</td>
-<td>Dark / light, cross-tab sync</td>
-</tr>
-<tr>
 <td><code>SettingsContext</code></td>
 <td>—</td>
-<td>Polls <code>GET /api/settings</code></td>
+<td>Polls <code>GET /api/settings/modules</code></td>
 </tr>
 <tr>
 <td><code>UIPrefsContext</code></td>
@@ -141,19 +184,37 @@
 <td>—</td>
 <td>Receives DB liveness updates from the health Web Worker</td>
 </tr>
+<tr>
+<td><code>ModelStatusContext</code></td>
+<td>—</td>
+<td>Provides Ollama model readiness state — consumed by <code>ChatBubble</code> to decide visibility</td>
+</tr>
+<tr>
+<td><code>NotificationContext</code></td>
+<td>—</td>
+<td>Streams platform notifications via WebSocket (<code>/api/notifications/ws</code>)</td>
+</tr>
+<tr>
+<td><code>PageLoaderContext</code></td>
+<td>—</td>
+<td>Controls the full-page skeleton loader shown during server-driven page transitions</td>
+</tr>
 </tbody>
 </table>
+<blockquote>
+<p><code>ThemeContext</code> / <code>ThemeProvider</code> were removed — theme state is now <code>useThemeStore</code> (Zustand). <code>useTheme()</code> is kept as a thin adapter in <code>context/theme/</code> so existing consumers are unchanged.</p>
+</blockquote>
 <h2 id="health-monitoring" class="tsd-anchor-link">Health monitoring<a href="#health-monitoring" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p><code>src/workers/healthWorker.ts</code> is a <strong>Web Worker</strong> that runs off the main thread. It pings <code>GET /api/health</code> immediately on startup, then every 30 s (5 s timeout). Results are sent back via <code>postMessage</code> and consumed by <code>HealthContext</code>.</p>
+<p><code>src/services/health/healthWorker.ts</code> is a <strong>Web Worker</strong> that runs off the main thread. It pings <code>GET /api/health</code> immediately on startup, then every 30 s (5 s timeout). Results are sent back via <code>postMessage</code> and consumed by <code>HealthContext</code>.</p>
 <p>The health payload includes a <code>translations</code> map (<code>lang → ISO timestamp</code>) alongside the DB liveness flags. <code>useI18nSync</code> watches this map and reloads the active language's bundle only when its timestamp changes — no polling, no unnecessary fetches.</p>
 <ul>
 <li><strong>Header</strong>: shows a red &quot;API offline&quot; or &quot;DB degraded&quot; pill when any service is down; invisible when everything is healthy.</li>
 <li><strong>Admin → Status</strong>: live system overview with per-service health badges and a &quot;Last checked&quot; timestamp.</li>
 </ul>
 <h2 id="i18n" class="tsd-anchor-link">i18n<a href="#i18n" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p>Translations are fetched from <code>GET /api/i18n/{lang}</code> (PostgreSQL-backed) — there are no bundled locale files. On first render <code>App</code> shows a full-screen spinner while the initial fetch completes, then unmounts it. Subsequent reloads happen automatically when the health worker detects a <code>translations</code> timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.</p>
+<p>Translations are fetched from <code>GET /api/i18n/{lang}</code> (PostgreSQL-backed) — there are no bundled locale files. <code>useI18nSync</code> runs inside <code>Layout</code> (the authenticated shell) so it only fires after login. <code>Layout</code> shows a full-page spinner until <code>useI18nStore(s =&gt; s.ready)</code> becomes <code>true</code>. Subsequent reloads happen automatically when the health worker detects a <code>translations</code> timestamp bump (i.e. an admin saved changes in the Translations page). Language switches trigger an immediate fetch for the new language.</p>
 <h2 id="ollama-model-status-banner" class="tsd-anchor-link">Ollama model status banner<a href="#ollama-model-status-banner" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p><code>src/components/layout/ModelStatusBanner.tsx</code> is a persistent banner rendered in <code>Layout</code> between the header and the page content. It connects to <code>GET /api/model-status/stream</code> via the browser-native <code>EventSource</code> API and shows live download progress for required Ollama models.</p>
+<p><code>src/components/layout/modelStatusBanner/</code> is a persistent banner rendered in <code>Layout</code> between the header and the page content. It connects to <code>GET /api/model-status/stream</code> via the browser-native <code>EventSource</code> API and shows live download progress for required Ollama models.</p>
 <h3 id="behaviour" class="tsd-anchor-link">Behaviour<a href="#behaviour" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <table>
 <thead>
@@ -188,14 +249,14 @@
 <li>ETA (e.g. <code>10m 7s</code>), hidden until enough speed samples are collected</li>
 </ul>
 <h3 id="hook" class="tsd-anchor-link">Hook<a href="#hook" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p><code>src/hooks/useModelStatus.ts</code> wraps the <code>EventSource</code> lifecycle:</p>
+<p><code>src/hooks/modelStatus/</code> wraps the <code>EventSource</code> lifecycle:</p>
 <pre><code class="ts"><span class="hl-0">const</span><span class="hl-1"> { </span><span class="hl-2">status</span><span class="hl-1">, </span><span class="hl-2">dismissed</span><span class="hl-1">, </span><span class="hl-2">dismiss</span><span class="hl-1"> } = </span><span class="hl-3">useModelStatus</span><span class="hl-1">()</span><br/><span class="hl-4">// status: ModelStatusPayload | null</span><br/><span class="hl-4">// dismissed: boolean — true once all ready (or manually closed)</span><br/><span class="hl-4">// dismiss(): () =&gt; void — manual close</span>
 </code><button type="button">Copy</button></pre>
 
 <p><code>ModelInfo.progress</code> is <code>null</code> when a model is ready or the tracker hasn't started yet; otherwise it carries <code>{ percent, speed_str, eta_str, total_bytes, completed_bytes }</code>.</p>
 <p><code>EventSource</code> auto-reconnects on network drops without any manual retry logic.</p>
 <h2 id="module-federation-loader" class="tsd-anchor-link">Module federation loader<a href="#module-federation-loader" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
-<p><code>src/utils/federationLoader.ts</code> implements the webpack container protocol for a <strong>Vite host</strong>.</p>
+<p><code>src/utils/federationLoader/</code> implements the webpack container protocol for a <strong>Vite host</strong>.</p>
 <h3 id="how-it-works" class="tsd-anchor-link">How it works<a href="#how-it-works" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <ol>
 <li>Sets <code>window.React</code> and <code>window.ReactDOM</code> to the host's running instances.</li>
@@ -211,25 +272,22 @@
 <p>For standalone testing of a remote at its own port, add the React 18 UMD scripts to the remote's <code>public/index.html</code> — they set <code>window.React</code> and <code>window.ReactDOM</code> automatically. See <code>modules/hello-world/</code> for a working example.</p>
 <h3 id="native-bot-system" class="tsd-anchor-link">Native bot system<a href="#native-bot-system" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>The platform ships with a built-in bot system — no Module Federation required.</p>
-<p><strong><code>ChatBubble</code></strong> (<code>src/components/chat/ChatBubble.tsx</code>) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to <code>localStorage</code>; the selected bot/model are also persisted.</p>
-<p><strong><code>/bots</code></strong> (<code>src/pages/Bots.tsx</code>) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking <strong>Launch</strong> opens a full-page chat at <code>/bots/:botId</code>.</p>
-<p><strong><code>/bots/:botId</code></strong> (<code>src/pages/Chat.tsx</code>) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends <code>bot_id</code> with every request to <code>POST /api/chat</code>. The backend injects the bot's system prompt and model. Non-communicator bots render a <code>BotConfigSkeleton</code> placeholder instead of the chat UI.</p>
-<p><strong><code>ModuleBotPanel</code></strong> (<code>src/components/modules/ModuleBotPanel.tsx</code>) — a floating violet panel (<code>fixed bottom-6 left-6</code>) rendered inside every <code>FederatedPage</code>. On mount it fetches <code>GET /api/bots?module_id=&lt;id&gt;</code> and renders a bot selector + streaming chat scoped to that module. Passes <code>module_id</code> to <code>POST /api/chat</code> so the backend injects the module's name and description into the bot's system prompt. Returns <code>null</code> and is invisible when no active bots are assigned to the module.</p>
-<p><strong><code>/bots-admin</code></strong> (<code>src/pages/BotsAdmin.tsx</code>) — admin-only CRUD page. Fields per bot: name, icon, description, type (chatbot / watchbot / tradebot / custom), model (selected from installed Ollama models), system prompt, enabled toggle, and role access. A default &quot;AI Assistant&quot; bot is seeded on first backend startup.</p>
+<p><strong><code>ChatBubble</code></strong> (<code>src/components/chat/chatBubble/</code>) — a floating bubble rendered on every authenticated page. It auto-selects the first available bot on first open. A ⚙ settings row lets users switch bots or (when no bot is selected) override the Ollama model for a free-form session. History is persisted to <code>localStorage</code>; the selected bot/model are also persisted.</p>
+<p><strong><code>/bots</code></strong> (<code>src/pages/bots/</code>) — a card grid showing all enabled bots the current user has access to. Each card shows the bot's icon, name, type badge, and description. Clicking <strong>Launch</strong> opens a full-page chat at <code>/bots/:botId</code>.</p>
+<p><strong><code>/bots/:botId</code></strong> (<code>src/pages/chat/</code>) — full-page streaming chat for a single bot. Fetches the bot metadata on mount and sends <code>bot_id</code> with every request to <code>POST /api/chat</code>. The backend injects the bot's system prompt and model. Non-communicator bots with a module backend render <code>BotConfigPage</code> (manifest-driven config UI with teams, risk profiles, and process monitoring); others render a <code>BotConfigSkeleton</code> placeholder.</p>
+<p><strong><code>ModuleBotPanel</code></strong> (<code>src/components/modules/moduleBotPanel/</code>) — a floating violet panel (<code>fixed bottom-6 left-6</code>) rendered inside every <code>FederatedPage</code>. On mount it fetches <code>GET /api/bots?module_id=&lt;id&gt;</code> and renders a bot selector + streaming chat scoped to that module. Passes <code>module_id</code> to <code>POST /api/chat</code> so the backend injects the module's name and description into the bot's system prompt. Returns <code>null</code> and is invisible when no active bots are assigned to the module.</p>
+<p><strong><code>/bots-admin</code></strong> (<code>src/pages/botsAdmin/</code>) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), <strong>provider</strong> (<code>ollama</code> / <code>anthropic</code> / <code>openai</code> — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default &quot;AI Assistant&quot; bot (provider: <code>ollama</code>) is seeded on first backend startup.</p>
 <h3 id="module-presets" class="tsd-anchor-link">Module presets<a href="#module-presets" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p>Each registered module stores a <code>presets</code> JSON blob (<code>{ i18n, layout, settings }</code>) in PostgreSQL. When a federated module is loaded, <code>FederatedPage</code> passes the presets as a prop:</p>
 <pre><code class="tsx"><span class="hl-7">&lt;</span><span class="hl-8">RemoteComponent</span><span class="hl-1"> </span><span class="hl-9">presets</span><span class="hl-1">=</span><span class="hl-0">{</span><span class="hl-10">mod</span><span class="hl-11">.</span><span class="hl-10">presets</span><span class="hl-0">}</span><span class="hl-1"> </span><span class="hl-7">/&gt;</span>
 </code><button type="button">Copy</button></pre>
 
 <p>Remote components can read <code>props.presets</code> to receive platform configuration without any additional API calls.</p>
+<p><code>presets.i18n</code> is auto-populated from the module's <code>manifest.json</code> at registration time (both via auto-discovery and manual <strong>Admin → Modules</strong> create). The stored snapshot is the source of truth for translation resets.</p>
 <h3 id="add-edit-module-form" class="tsd-anchor-link">Add / Edit module form<a href="#add-edit-module-form" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
-<p>The <strong>Admin → Modules</strong> add/edit modal exposes two additional actions beyond the basic fields:</p>
-<p><strong>Load manifest</strong> — button next to the Remote entry URL field. The browser fetches <code>manifest.json</code> from the module's base URL directly (no backend proxy — nginx serves it with <code>Access-Control-Allow-Origin: *</code>). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots will be provisioned on save.</p>
-<p><strong>i18n translations</strong> — a JSON textarea that accepts a multi-language object:</p>
-<pre><code class="json"><span class="hl-1">{ </span><span class="hl-12">&quot;en&quot;</span><span class="hl-1">: { </span><span class="hl-12">&quot;key&quot;</span><span class="hl-1">: </span><span class="hl-6">&quot;value&quot;</span><span class="hl-1"> }, </span><span class="hl-12">&quot;ro&quot;</span><span class="hl-1">: { </span><span class="hl-12">&quot;cheie&quot;</span><span class="hl-1">: </span><span class="hl-6">&quot;valoare&quot;</span><span class="hl-1"> } }</span>
-</code><button type="button">Copy</button></pre>
-
-<p>When the form is saved, each language key is posted to <code>PUT /api/i18n/{lang}</code> before the module record is persisted, merging the translations into the database.</p>
+<p>The <strong>Admin → Modules</strong> add/edit modal exposes two additional sections beyond the basic fields:</p>
+<p><strong>Load manifest</strong> — button next to the Remote entry URL field. The browser fetches <code>manifest.json</code> from the module's base URL directly (no backend proxy — nginx serves it with <code>Access-Control-Allow-Origin: *</code>). On success, all empty form fields (name, description, scope, component, route, icon, roles, remote_url) are filled from the manifest, and the status line shows how many bots and how many i18n languages will be loaded on save.</p>
+<p><strong>i18n snapshot</strong> (edit mode only) — a collapsible read-only viewer showing the <code>presets.i18n</code> snapshot stored in the database. Includes a <strong>↺ Reset i18n to defaults</strong> button that calls <code>POST /api/settings/modules/{id}/reset-i18n</code>, re-merging the stored snapshot into the translations table. The button is disabled when the snapshot is empty (module was registered before manifest-driven i18n was wired up — re-saving the module repopulates it).</p>
 <h3 id="module-discovery" class="tsd-anchor-link">Module discovery<a href="#module-discovery" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h3>
 <p><code>src/services/settingsService.ts</code> exposes <code>discoverModules()</code> which calls <code>GET /api/settings/modules/discover</code>. The backend concurrently fetches <code>manifest.json</code> from every URL in <code>MODULE_REGISTRY_URLS</code> and returns a <code>DiscoveredModule[]</code> with an <code>already_registered</code> flag per entry.</p>
 <p><strong>Admin → Modules</strong> (<code>/admin/modules</code>) surfaces this via a <strong>🔍 Scan for modules</strong> button. After a scan:</p>
@@ -251,12 +309,12 @@
 <tbody>
 <tr>
 <td><code>Btn</code></td>
-<td><code>Button.tsx</code></td>
+<td><code>button/</code></td>
 <td><code>variant?: 'primary' | 'secondary' | 'danger'</code>, all <code>&lt;button&gt;</code> attrs</td>
 </tr>
 <tr>
 <td><code>Input</code></td>
-<td><code>Input.tsx</code></td>
+<td><code>input/</code></td>
 <td><code>label?: string</code>, all <code>&lt;input&gt;</code> attrs</td>
 </tr>
 <tr>
@@ -266,7 +324,7 @@
 </tr>
 <tr>
 <td><code>Modal</code></td>
-<td><code>Modal.tsx</code></td>
+<td><code>modal/</code></td>
 <td><code>title</code>, <code>onClose?</code>, <code>maxWidth?</code>, <code>children</code></td>
 </tr>
 <tr>
@@ -276,12 +334,12 @@
 </tr>
 <tr>
 <td><code>Spinner</code></td>
-<td><code>Spinner.tsx</code></td>
+<td><code>spinner/</code></td>
 <td><code>size?: 'sm' | 'md' | 'lg'</code></td>
 </tr>
 <tr>
 <td><code>Toggle</code></td>
-<td><code>Toggle.tsx</code></td>
+<td><code>toggle/</code></td>
 <td><code>checked</code>, <code>onChange</code>, <code>disabled?</code></td>
 </tr>
 <tr>
@@ -293,6 +351,46 @@
 <td><code>PageTitle</code></td>
 <td><code>PageTitle.tsx</code></td>
 <td><code>children</code></td>
+</tr>
+<tr>
+<td><code>Badge</code></td>
+<td><code>badge/</code></td>
+<td><code>variant?: 'info' | 'success' | 'warn' | 'error' | 'neutral'</code>, <code>dot?</code>, <code>children</code></td>
+</tr>
+<tr>
+<td><code>StatCard</code></td>
+<td><code>statCard/</code></td>
+<td><code>value</code>, <code>label</code>, <code>sub?</code></td>
+</tr>
+<tr>
+<td><code>Tabs</code></td>
+<td><code>tabs/</code></td>
+<td><code>tabs</code>, <code>active</code>, <code>onChange</code></td>
+</tr>
+<tr>
+<td><code>ProgressBar</code></td>
+<td><code>progressBar/</code></td>
+<td><code>value</code>, <code>label?</code>, <code>color?: 'blue' | 'green' | 'amber' | 'red'</code></td>
+</tr>
+<tr>
+<td><code>Chip</code></td>
+<td><code>chip/</code></td>
+<td><code>children</code>, <code>onRemove?</code></td>
+</tr>
+<tr>
+<td><code>DropZone</code></td>
+<td><code>dropZone/</code></td>
+<td><code>onFiles?</code>, <code>accept?</code>, <code>hint?</code>, <code>file?</code></td>
+</tr>
+<tr>
+<td><code>Pagination</code></td>
+<td><code>Pagination/</code></td>
+<td><code>page</code>, <code>total</code>, <code>pageSize</code>, <code>onChange</code></td>
+</tr>
+<tr>
+<td><code>Table</code></td>
+<td><code>Table/</code></td>
+<td><code>columns</code>, <code>rows</code>, <code>keyFn</code></td>
 </tr>
 </tbody>
 </table>
@@ -306,7 +404,7 @@
 </thead>
 <tbody>
 <tr>
-<td><code>src/utils/formatters.ts</code></td>
+<td><code>src/utils/formatters/</code></td>
 <td><code>fmtBytes(n)</code>, <code>formatEventTime(ts)</code></td>
 </tr>
 <tr>
@@ -314,27 +412,51 @@
 <td><code>safeJsonParse&lt;T&gt;(raw, fallback)</code></td>
 </tr>
 <tr>
-<td><code>src/constants/botConstants.ts</code></td>
+<td><code>src/utils/flatten/</code></td>
+<td><code>flatten(obj)</code> — flattens nested object to dot-notation keys</td>
+</tr>
+<tr>
+<td><code>src/constants/botConstants/</code></td>
 <td><code>BOT_TYPES</code>, <code>TYPE_BADGE</code></td>
 </tr>
 <tr>
-<td><code>src/services/modelStatusService.ts</code></td>
+<td><code>src/services/modelStatus/</code></td>
 <td><code>InstalledModel</code>, <code>InstalledModelsData</code> types</td>
 </tr>
 <tr>
-<td><code>src/hooks/useChatStream.ts</code></td>
+<td><code>src/hooks/chatStream/</code></td>
 <td><code>useChatStream(botId, model, moduleId?)</code> → <code>{ messages, setMessages, input, setInput, loading, sendMessage }</code></td>
 </tr>
 <tr>
-<td><code>src/hooks/useModelStatus.ts</code></td>
+<td><code>src/hooks/modelStatus/</code></td>
 <td><code>useModelStatus()</code> → <code>{ status, dismissed, dismiss }</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/useApi.ts</code></td>
+<td><code>useGet&lt;T&gt;(url, options?)</code> — thin React Query wrapper for GET requests</td>
+</tr>
+<tr>
+<td><code>src/hooks/apiLogs/</code></td>
+<td><code>useApiLogs(timeRange)</code> → <code>{ logs, summary, … }</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/chatLogs/</code></td>
+<td><code>useChatLogs(timeRange)</code> → <code>{ logs, … }</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/userLogs/</code></td>
+<td><code>useUserLogs(timeRange)</code> → <code>{ logs, … }</code></td>
+</tr>
+<tr>
+<td><code>src/hooks/translations/</code></td>
+<td><code>TranslationsProvider</code>, <code>useTranslationsContext()</code>, <code>LANGS</code>, <code>Lang</code></td>
 </tr>
 </tbody>
 </table>
 <h2 id="first-visit-modals" class="tsd-anchor-link">First-visit modals<a href="#first-visit-modals" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <p>Two modals fire automatically — no configuration needed.</p>
-<p><strong><code>CookieConsentModal</code></strong> (<code>src/components/CookieConsentModal.tsx</code>) — fixed bottom banner shown to every visitor before login. Offers &quot;Essential only&quot; and &quot;Accept all&quot;. Choice stored in <code>localStorage</code> under <code>spin_cookie_consent</code>. Disappears permanently once accepted.</p>
-<p><strong><code>WorkspaceTermsModal</code></strong> (<code>src/components/WorkspaceTermsModal.tsx</code>) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click &quot;Continue to spin-core&quot;. Acceptance stored in <code>localStorage</code> under <code>spin_workspace_accepted_v1</code> keyed by username. Cannot be dismissed without accepting.</p>
+<p><strong><code>CookieConsentModal</code></strong> (<code>src/components/cookieConsent/</code>) — fixed bottom banner shown to every visitor before login. Offers &quot;Essential only&quot; and &quot;Accept all&quot;. Choice stored in <code>localStorage</code> under <code>spin_cookie_consent</code>. Disappears permanently once accepted.</p>
+<p><strong><code>WorkspaceTermsModal</code></strong> (<code>src/components/workspaceTermsModal/</code>) — full-screen blocking overlay shown on first login per user. The user must tick a checkbox and click &quot;Continue to spin-core&quot;. Acceptance stored in <code>localStorage</code> under <code>spin_workspace_accepted_v1</code> keyed by username. Cannot be dismissed without accepting.</p>
 <h2 id="local-development-without-docker" class="tsd-anchor-link">Local development (without Docker)<a href="#local-development-without-docker" aria-label="Permalink" class="tsd-anchor-icon"><svg viewBox="0 0 24 24" aria-hidden="true"><use href="assets/icons.svg#icon-anchor"></use></svg></a></h2>
 <pre><code class="bash"><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">install</span><br/><span class="hl-3">pnpm</span><span class="hl-1"> </span><span class="hl-6">dev</span>
 </code><button type="button">Copy</button></pre>
@@ -396,6 +518,7 @@
 <ul>
 <li><a href="#tech"><span>Tech</span></a></li>
 <li><a href="#pages-routes"><span>Pages &amp; routes</span></a></li>
+<li><a href="#zustand-stores"><span>Zustand stores</span></a></li>
 <li><a href="#context-providers"><span>Context providers</span></a></li>
 <li><a href="#health-monitoring"><span>Health monitoring</span></a></li>
 <li><a href="#i18n"><span>i18n</span></a></li>
