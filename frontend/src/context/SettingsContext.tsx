@@ -14,6 +14,7 @@ interface SettingsContextValue {
 const SettingsContext = createContext<SettingsContextValue | null>(null)
 
 async function probeModule(m: ModuleConfig): Promise<boolean> {
+  if (!m.remote_url) return true  // built-in modules (e.g. system/dashboard) are always reachable
   try {
     const base = m.remote_url.replace(/\/remoteEntry\.js$/, '').replace(/\/$/, '')
     const resp = await fetch(`${base}/manifest.json`, {

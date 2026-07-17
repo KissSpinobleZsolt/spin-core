@@ -77,17 +77,23 @@ export default function Sidebar() {
 
   const collapsed = sidebarCollapsed
 
+  const systemModule = modules.find(m => m.scope === 'system')
+
+  const dashboardIcon = systemModule ? (
+    <span className="text-base leading-none">{systemModule.icon}</span>
+  ) : (
+    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
+        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+    </svg>
+  )
+
   const NAV_ITEMS = [
     {
-      label: t('nav.dashboard'),
+      label: systemModule?.name ?? t('nav.dashboard'),
       to: '/',
       end: true,
-      icon: (
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-        </svg>
-      ),
+      icon: dashboardIcon,
     },
     {
       label: 'Bots',
@@ -103,7 +109,7 @@ export default function Sidebar() {
   ]
 
   const visibleModules = modules.filter(
-    m => m.enabled && (!m.roles.length || m.roles.some(r => user?.roles.includes(r))),
+    m => m.enabled && m.scope !== 'system' && (!m.roles.length || m.roles.some(r => user?.roles.includes(r))),
   )
 
   const isAdmin = user?.roles.includes('admin')
