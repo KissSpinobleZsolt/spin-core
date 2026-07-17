@@ -1,3 +1,4 @@
+@reference "../../index.css";
 .time-range-filter__label {
   @apply block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1;
 }

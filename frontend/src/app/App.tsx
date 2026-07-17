@@ -1,7 +1,7 @@
 import { RouterProvider } from 'react-router-dom'
-import { router } from './router.config'
-import { CookieConsentModal } from '../components/CookieConsentModal'
-import { useI18nSync } from '../i18n/useI18nSync'
+import { router } from './router'
+import { CookieConsentModal } from '../components/cookieConsent'
+import { useI18nSync } from '../i18n/i18nSync'
 import { loginFallback } from './loginFallback.constant'
 
 export default function App() {

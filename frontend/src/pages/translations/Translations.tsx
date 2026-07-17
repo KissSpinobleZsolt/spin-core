@@ -1,6 +1,6 @@
 import { Suspense } from 'react'
 import { TranslationsProvider } from '@hooks'
-import { PageSkeletonLoader } from '@components/layout/PageSkeletonLoader'
+import { PageSkeletonLoader } from '@components/layout/pageSkeletonLoader'
 import { TranslationsContent } from './TranslationsContent'
 import { TRANSLATIONS_SKELETON_CONFIG } from './Translations.constant'
 

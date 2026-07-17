@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useAuth } from '@context'
-import { Btn } from '../ui/Button'
+import { Btn } from '../ui/button'
 import { STORAGE_KEY } from './STORAGE_KEY.constant'
 import { WORKSPACE_TERMS_MODAL_TEXT as TEXT } from './WorkspaceTermsModal.constant'
 import './WorkspaceTermsModal.style.css'

@@ -1,1 +1,2 @@
+@reference "../../../index.css";
 .spinner { @apply rounded-full border-blue-500 border-t-transparent animate-spin inline-block; }

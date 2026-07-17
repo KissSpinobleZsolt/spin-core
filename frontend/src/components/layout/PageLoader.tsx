@@ -1,7 +1,7 @@
 import { Suspense } from 'react'
 import { ErrorBanner } from '../ui/ErrorBanner'
-import { FederatedPage } from '../modules/FederatedPage'
-import { PageSkeletonLoader } from './PageSkeletonLoader'
+import { FederatedPage } from '../modules/federatedPage'
+import { PageSkeletonLoader } from './pageSkeletonLoader'
 import { PAGE_REGISTRY } from '../../pages/registry'
 import { usePageConfig } from '@context'
 
