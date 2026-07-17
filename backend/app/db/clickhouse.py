@@ -2,101 +2,22 @@ import json
 from datetime import datetime, timezone
 from clickhouse_driver import Client
 
-# HTTP request log — renamed from old app_logs at migration time.
-_DDL_API_LOGS = """
-CREATE TABLE IF NOT EXISTS api_logs (
-    event_time   DateTime64(3) DEFAULT now64(),
-    level        LowCardinality(String) DEFAULT 'INFO',
-    event_type   LowCardinality(String),
-    owner        String DEFAULT '',
-    path         String DEFAULT '',
-    method       LowCardinality(String) DEFAULT '',
-    status_code  Int16 DEFAULT 0,
-    duration_ms  Float32 DEFAULT 0,
-    message      String DEFAULT '',
-    name         String DEFAULT '',
-    details      String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY event_time
-TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
-
-# Platform / system event log — startup, config changes, health checks.
-_DDL_APP_LOGS = """
-CREATE TABLE IF NOT EXISTS app_logs (
-    event_time  DateTime64(3) DEFAULT now64(),
-    level       LowCardinality(String) DEFAULT 'INFO',
-    event_type  LowCardinality(String),
-    owner       String DEFAULT 'system',
-    message     String DEFAULT '',
-    name        String DEFAULT '',
-    details     String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY event_time
-TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
-
-# User lifecycle events — login, create, update, delete.
-_DDL_USER_LOGS = """
-CREATE TABLE IF NOT EXISTS user_logs (
-    event_time  DateTime64(3) DEFAULT now64(),
-    level       LowCardinality(String) DEFAULT 'INFO',
-    event_type  LowCardinality(String),
-    owner       String DEFAULT '',
-    message     String DEFAULT '',
-    name        String DEFAULT '',
-    details     String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY event_time
-TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
-
-# Module lifecycle events — scope column identifies the module.
-_DDL_MODULE_LOGS = """
-CREATE TABLE IF NOT EXISTS module_logs (
-    event_time  DateTime64(3) DEFAULT now64(),
-    scope       LowCardinality(String),
-    level       LowCardinality(String) DEFAULT 'INFO',
-    event_type  LowCardinality(String),
-    owner       String DEFAULT '',
-    message     String DEFAULT '',
-    name        String DEFAULT '',
-    details     String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY (scope, event_time)
-TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
-
-# Platform notifications — owner = user email or 'broadcast' for all users.
-_DDL_NOTIFICATIONS = """
-CREATE TABLE IF NOT EXISTS notifications (
-    id          UUID DEFAULT generateUUIDv4(),
-    event_time  DateTime64(3) DEFAULT now64(),
-    level       LowCardinality(String) DEFAULT 'INFO',
-    title       String DEFAULT '',
-    message     String DEFAULT '',
-    owner       String DEFAULT 'broadcast',
-    details     String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY event_time
-TTL toDateTime(event_time) + INTERVAL 7 DAY
-"""
-
-# Bot lifecycle events — bot_name column identifies the bot.
-_DDL_BOT_LOGS = """
-CREATE TABLE IF NOT EXISTS bot_logs (
-    event_time  DateTime64(3) DEFAULT now64(),
-    bot_name    LowCardinality(String),
-    level       LowCardinality(String) DEFAULT 'INFO',
-    event_type  LowCardinality(String),
-    owner       String DEFAULT '',
-    message     String DEFAULT '',
-    name        String DEFAULT '',
-    details     String DEFAULT '{}'
-) ENGINE = MergeTree()
-ORDER BY (bot_name, event_time)
-TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+from app.queries.ch_ddl import (
+    CH_DDL_API_LOGS, CH_DDL_APP_LOGS, CH_DDL_USER_LOGS,
+    CH_DDL_MODULE_LOGS, CH_DDL_NOTIFICATIONS, CH_DDL_BOT_LOGS,
+)
+from app.queries.ch_inserts import (
+    CH_INSERT_API_LOGS, CH_INSERT_APP_LOGS, CH_INSERT_USER_LOGS,
+    CH_INSERT_MODULE_LOGS, CH_INSERT_BOT_LOGS, CH_INSERT_NOTIFICATIONS,
+)
+from app.queries.ch_selects import (
+    CH_TEST_CONNECTION,
+    CH_BOT_NAMES_WITH_LOGS, CH_COMPONENT_NAMES_WITH_LOGS, CH_PAGE_ROUTES_WITH_LOGS,
+    CH_NOTIFICATIONS_SINCE,
+    CH_PAGINATED_COUNT, CH_PAGINATED_ROWS,
+    CH_SUMMARY_COUNT, CH_SUMMARY_ROWS,
+    CH_API_LOGS_SUMMARY,
+)
 
 
 def _month_start() -> datetime:
@@ -111,7 +32,7 @@ class ClickHouseLogAdapter:
         self._client = Client.from_url(db_url)
 
     def test_connection(self) -> None:
-        self._client.execute("SELECT 1")
+        self._client.execute(CH_TEST_CONNECTION)
 
     # ------------------------------------------------------------------
     # Migration — run once at startup before DDL provisioning
@@ -152,22 +73,22 @@ class ClickHouseLogAdapter:
     # ------------------------------------------------------------------
 
     def ensure_api_logs(self) -> None:
-        self._client.execute(_DDL_API_LOGS)
+        self._client.execute(CH_DDL_API_LOGS)
 
     def ensure_app_logs(self) -> None:
-        self._client.execute(_DDL_APP_LOGS)
+        self._client.execute(CH_DDL_APP_LOGS)
 
     def ensure_user_logs(self) -> None:
-        self._client.execute(_DDL_USER_LOGS)
+        self._client.execute(CH_DDL_USER_LOGS)
 
     def ensure_module_logs_table(self) -> None:
-        self._client.execute(_DDL_MODULE_LOGS)
+        self._client.execute(CH_DDL_MODULE_LOGS)
 
     def ensure_bot_logs_table(self) -> None:
-        self._client.execute(_DDL_BOT_LOGS)
+        self._client.execute(CH_DDL_BOT_LOGS)
 
     def ensure_notifications_table(self) -> None:
-        self._client.execute(_DDL_NOTIFICATIONS)
+        self._client.execute(CH_DDL_NOTIFICATIONS)
 
     # ------------------------------------------------------------------
     # Shared query helpers
@@ -191,11 +112,11 @@ class ClickHouseLogAdapter:
         where_parts = [f"{time_col} >= %(from_dt)s", f"{time_col} <= %(to_dt)s"] + extra_filters
         params = {"from_dt": from_dt, "to_dt": to_dt, **extra_params}
         where = "WHERE " + " AND ".join(where_parts)
-        total = self._client.execute(f"SELECT count() FROM {table} {where}", params)[0][0]
+        total = self._client.execute(CH_PAGINATED_COUNT.format(table=table, where=where), params)[0][0]
         params["limit"] = limit
         params["offset"] = offset
         rows = self._client.execute(
-            f"SELECT {select_cols} FROM {table} {where} ORDER BY {order_col} DESC LIMIT %(limit)s OFFSET %(offset)s",
+            CH_PAGINATED_ROWS.format(select_cols=select_cols, table=table, where=where, order_col=order_col),
             params,
         )
         return rows, total
@@ -217,19 +138,12 @@ class ClickHouseLogAdapter:
         params = {"from_dt": from_dt, "to_dt": to_dt, "limit": limit, "offset": offset, **extra_params}
         where = "WHERE " + " AND ".join(where_parts)
         count_rows = self._client.execute(
-            f"SELECT count() FROM (SELECT 1 FROM {table} {where} GROUP BY toStartOfHour(event_time), event_type)",
+            CH_SUMMARY_COUNT.format(table=table, where=where),
             params,
         )
         total = count_rows[0][0]
         rows = self._client.execute(
-            f"""
-            SELECT toStartOfHour(event_time) AS bucket, event_type,
-                   count() AS event_count, uniq(owner) AS unique_users
-            FROM {table} {where}
-            GROUP BY bucket, event_type
-            ORDER BY bucket DESC
-            LIMIT %(limit)s OFFSET %(offset)s
-            """,
+            CH_SUMMARY_ROWS.format(table=table, where=where),
             params,
         )
         keys = ["bucket", "event_type", "event_count", "unique_users"]
@@ -251,7 +165,7 @@ class ClickHouseLogAdapter:
         message: str = "",
     ) -> None:
         self._client.execute(
-            "INSERT INTO api_logs (level, event_type, owner, path, method, status_code, duration_ms, message) VALUES",
+            CH_INSERT_API_LOGS,
             [(level, event_type, owner, path, method, status_code, duration_ms, message)],
         )
 
@@ -303,17 +217,7 @@ class ClickHouseLogAdapter:
         params = {"from_dt": from_dt, "to_dt": to_dt, "limit": limit, "offset": offset, **extra_params}
         where = "WHERE " + " AND ".join(where_parts)
         rows = self._client.execute(
-            f"""
-            SELECT toStartOfHour(event_time) AS bucket, event_type, path, status_code,
-                   count() AS request_count,
-                   round(avg(duration_ms), 2) AS avg_duration_ms,
-                   max(duration_ms) AS max_duration_ms,
-                   countIf(status_code >= 400) AS error_count
-            FROM api_logs {where}
-            GROUP BY bucket, event_type, path, status_code
-            ORDER BY bucket DESC
-            LIMIT %(limit)s OFFSET %(offset)s
-            """,
+            CH_API_LOGS_SUMMARY.format(where=where),
             params,
         )
         keys = ["bucket", "event_type", "path", "status_code",
@@ -334,7 +238,7 @@ class ClickHouseLogAdapter:
         details: dict | None = None,
     ) -> None:
         self._client.execute(
-            "INSERT INTO app_logs (level, event_type, owner, message, name, details) VALUES",
+            CH_INSERT_APP_LOGS,
             [(level, event_type, owner, message, name, json.dumps(details or {}))],
         )
 
@@ -352,7 +256,7 @@ class ClickHouseLogAdapter:
         details: dict | None = None,
     ) -> None:
         self._client.execute(
-            "INSERT INTO user_logs (level, event_type, owner, message, name, details) VALUES",
+            CH_INSERT_USER_LOGS,
             [(level, event_type, owner, message, name, json.dumps(details or {}))],
         )
 
@@ -397,7 +301,7 @@ class ClickHouseLogAdapter:
         message: str = "",
     ) -> None:
         self._client.execute(
-            "INSERT INTO module_logs (scope, owner, event_type, details, level, name, message) VALUES",
+            CH_INSERT_MODULE_LOGS,
             [(scope, owner, event_type, json.dumps(details), level, name, message)],
         )
 
@@ -455,7 +359,7 @@ class ClickHouseLogAdapter:
         message: str = "",
     ) -> None:
         self._client.execute(
-            "INSERT INTO bot_logs (bot_name, owner, event_type, details, level, name, message) VALUES",
+            CH_INSERT_BOT_LOGS,
             [(bot_name, owner, event_type, json.dumps(details), level, name, message)],
         )
 
@@ -499,21 +403,17 @@ class ClickHouseLogAdapter:
 
     def get_bot_names_with_logs(self) -> set[str]:
         """Return bot_names that already have at least one entry in bot_logs."""
-        rows = self._client.execute("SELECT DISTINCT bot_name FROM bot_logs")
+        rows = self._client.execute(CH_BOT_NAMES_WITH_LOGS)
         return {r[0] for r in rows}
 
     def get_component_names_with_logs(self) -> set[str]:
         """Return component names that already have a component.init entry in module_logs (scope='system')."""
-        rows = self._client.execute(
-            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'component.init'"
-        )
+        rows = self._client.execute(CH_COMPONENT_NAMES_WITH_LOGS)
         return {r[0] for r in rows}
 
     def get_page_routes_with_logs(self) -> set[str]:
         """Return page routes that already have a page.init entry in module_logs (scope='system')."""
-        rows = self._client.execute(
-            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'page.init'"
-        )
+        rows = self._client.execute(CH_PAGE_ROUTES_WITH_LOGS)
         return {r[0] for r in rows}
 
     # ------------------------------------------------------------------
@@ -530,20 +430,14 @@ class ClickHouseLogAdapter:
         details: dict | None = None,
     ) -> None:
         self._client.execute(
-            "INSERT INTO notifications (level, title, message, owner, details) VALUES",
+            CH_INSERT_NOTIFICATIONS,
             [(level, title, message, owner, json.dumps(details or {}))],
         )
 
     def query_notifications_since(self, owner: str, since: datetime) -> list:
         """Return notifications for owner (or broadcast) inserted after since, oldest-first."""
         rows = self._client.execute(
-            """
-            SELECT toString(id), event_time, level, title, message, owner, details
-            FROM notifications
-            WHERE event_time > %(since)s
-              AND (owner = %(owner)s OR owner = 'broadcast')
-            ORDER BY event_time ASC
-            """,
+            CH_NOTIFICATIONS_SINCE,
             {"since": since, "owner": owner},
         )
         keys = ["id", "event_time", "level", "title", "message", "owner", "details"]

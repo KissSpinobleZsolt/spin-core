@@ -340,6 +340,11 @@ backend/
 │   │   ├── interface.py  # UserRecord + BotRecord dataclasses
 │   │   ├── postgres.py   # PostgresAdapter — users, pages, bots, modules, i18n, module data via SQLAlchemy
 │   │   └── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
+│   ├── queries/          # Raw SQL constants imported by db/ adapters
+│   │   ├── ch_ddl.py     # CREATE TABLE statements for all ClickHouse tables
+│   │   ├── ch_inserts.py # INSERT INTO statements
+│   │   ├── ch_selects.py # SELECT constants + str.format() query templates
+│   │   └── pg_migrations.py # Idempotent ALTER TABLE migration list
 │   └── routes/
 │       ├── auth.py           # /api/auth/login
 │       ├── dashboard.py      # /api/dashboard, /api/user/theme
