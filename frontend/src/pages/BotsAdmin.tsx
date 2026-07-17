@@ -93,7 +93,7 @@ function BotModal({
       type: newType,
       // For communicator, adopt its icon; for custom, keep current icon (user picks via picker)
       ...(newType !== 'custom' && bt ? { icon: bt.icon } : {}),
-      modules: clearCore ? f.modules.filter(m => m !== 'core') : f.modules,
+      modules: clearCore ? f.modules.filter(m => m !== 'system') : f.modules,
       ...(isNew && bt ? {
         system_prompt: f.system_prompt || bt.preprompt,
         model: f.model || bt.default_model,
@@ -242,16 +242,16 @@ function BotModal({
       <div>
         <Label>Modules</Label>
         <div className="mt-1 max-h-36 overflow-y-auto space-y-1 rounded-lg border border-slate-300 dark:border-slate-600 bg-slate-100 dark:bg-slate-700 p-2">
-          {/* Platform core — communicator only */}
+          {/* System subscription — communicator only */}
           <label className={`flex items-center gap-2 px-1 py-0.5 rounded ${form.type === 'communicator' ? 'cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-600' : 'cursor-not-allowed opacity-40'}`}>
             <input
               type="checkbox"
-              checked={form.modules.includes('core')}
+              checked={form.modules.includes('system')}
               disabled={form.type !== 'communicator'}
-              onChange={() => toggleModule('core')}
+              onChange={() => toggleModule('system')}
               className="rounded border-slate-400 disabled:cursor-not-allowed"
             />
-            <span className="text-sm text-slate-700 dark:text-slate-200">🧩 Platform (core)</span>
+            <span className="text-sm text-slate-700 dark:text-slate-200">🖥️ Platform (system)</span>
             {form.type !== 'communicator' && (
               <span className="ml-auto text-xs text-slate-400 italic">Communicator only</span>
             )}
@@ -272,7 +272,7 @@ function BotModal({
           )}
         </div>
         <p className="mt-1 text-xs text-slate-400">
-          Select <code>core</code> to show in ChatBubble. Bots with only core are hidden from /bots.
+          Select <code>system</code> to show in ChatBubble. Bots with only system are hidden from /bots.
         </p>
       </div>
 

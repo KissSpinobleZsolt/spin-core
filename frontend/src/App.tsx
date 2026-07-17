@@ -8,6 +8,7 @@ import { PageLoader } from './components/layout/PageLoader'
 import { useI18nSync } from './i18n/useI18nSync'
 import { CookieConsentModal } from './components/CookieConsentModal'
 import { Spinner } from './components/ui/Spinner'
+import { UIComponentsProvider } from './context/UIComponentsContext'
 
 const Dashboard      = lazy(() => import('./pages/Dashboard'))
 const Login          = lazy(() => import('./pages/Login'))
@@ -117,7 +118,9 @@ const router = createBrowserRouter([
             path: 'admin/docs/ui',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <DocsUI />
+                <UIComponentsProvider>
+                  <DocsUI />
+                </UIComponentsProvider>
               </RoleGuard>
             ),
           },

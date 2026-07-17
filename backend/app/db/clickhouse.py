@@ -502,6 +502,20 @@ class ClickHouseLogAdapter:
         rows = self._client.execute("SELECT DISTINCT bot_name FROM bot_logs")
         return {r[0] for r in rows}
 
+    def get_component_names_with_logs(self) -> set[str]:
+        """Return component names that already have a component.init entry in module_logs (scope='system')."""
+        rows = self._client.execute(
+            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'component.init'"
+        )
+        return {r[0] for r in rows}
+
+    def get_page_routes_with_logs(self) -> set[str]:
+        """Return page routes that already have a page.init entry in module_logs (scope='system')."""
+        rows = self._client.execute(
+            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'page.init'"
+        )
+        return {r[0] for r in rows}
+
     # ------------------------------------------------------------------
     # Notifications
     # ------------------------------------------------------------------

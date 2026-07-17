@@ -26,6 +26,17 @@ class ModuleEvent:
     INFO       = "module.info"
 
 
+class ComponentEvent:
+    INIT   = "component.init"
+    UPDATE = "component.update"
+    DELETE = "component.delete"
+
+
+class PageEvent:
+    INIT   = "page.init"
+    UPDATE = "page.update"
+
+
 class BotEvent:
     INIT       = "bot.init"
     UPDATE     = "bot.update"

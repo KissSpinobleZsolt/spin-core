@@ -51,7 +51,7 @@ export default function Bots() {
     ['bots'],
     () => botsService.getBots(),
   )
-  const bots = allBots.filter(b => !b.modules.includes('core'))
+  const bots = allBots.filter(b => !b.modules.includes('system'))
 
   return (
     <AdminPageShell maxWidth="max-w-5xl">
