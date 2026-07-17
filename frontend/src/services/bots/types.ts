@@ -1,5 +1,3 @@
-import { apiService } from './apiService'
-
 /** Static capability profile that classifies a bot's behaviour, skills, and output style. */
 export interface BotType {
   id: string
@@ -24,34 +22,6 @@ export interface BotType {
  * - `"openai"` — OpenAI or any OpenAI-compatible endpoint; requires `OPENAI_API_KEY`.
  */
 export type LLMProvider = 'ollama' | 'anthropic' | 'openai'
-
-/** Human-readable label shown in the provider selector drop-down. */
-export const PROVIDER_LABELS: Record<LLMProvider, string> = {
-  ollama: 'Ollama (self-hosted)',
-  anthropic: 'Anthropic (Claude)',
-  openai: 'OpenAI / compatible',
-}
-
-/**
- * Suggested model identifiers shown as autocomplete hints per provider.
- * Users can type any valid model string; these are just starting points.
- */
-export const PROVIDER_MODEL_HINTS: Record<LLMProvider, string[]> = {
-  ollama: [],  // populated at runtime from /api/model-status/installed
-  anthropic: [
-    'claude-sonnet-5',
-    'claude-opus-4-8',
-    'claude-haiku-4-5-20251001',
-  ],
-  openai: [
-    'gpt-4o',
-    'gpt-4o-mini',
-    'gpt-4-turbo',
-    // Groq — set OPENAI_BASE_URL=https://api.groq.com/openai/v1
-    'llama-3.3-70b-versatile',
-    'mixtral-8x7b-32768',
-  ],
-}
 
 /** A single field in a bot's declarative config schema, sourced from the module manifest. */
 export interface BotConfigSchemaField {
@@ -78,6 +48,7 @@ export interface BotConfigSchema {
   principals?: 'watchlist' | 'teams' | 'risk_profiles'
   configurations?: BotConfigSchemaField[]
   scheduler?: BotConfigSchemaField[]
+  risk_levels?: string[]
 }
 
 /** Persisted bot configuration record including model, system prompt, and RBAC settings. */
@@ -104,34 +75,3 @@ export interface Bot {
 
 /** Fields required to create or update a bot, excluding server-generated metadata. */
 export type BotPayload = Omit<Bot, 'id' | 'created_by' | 'created_at'>
-
-/** CRUD and query operations for bots and bot types. */
-export const botsService = {
-  async getBots(): Promise<Bot[]> {
-    return apiService.get('/bots')
-  },
-
-  async getBot(id: string): Promise<Bot> {
-    return apiService.get(`/bots/${id}`)
-  },
-
-  async getBotTypes(): Promise<BotType[]> {
-    return apiService.get('/bots/types')
-  },
-
-  async createBot(payload: BotPayload): Promise<Bot> {
-    return apiService.post('/bots', payload)
-  },
-
-  async updateBot(id: string, payload: BotPayload): Promise<Bot> {
-    return apiService.put(`/bots/${id}`, payload)
-  },
-
-  async deleteBot(id: string): Promise<void> {
-    await apiService.delete(`/bots/${id}`)
-  },
-
-  async getBotsForModule(moduleId: string): Promise<Bot[]> {
-    return apiService.get(`/bots?module_id=${encodeURIComponent(moduleId)}`)
-  },
-}

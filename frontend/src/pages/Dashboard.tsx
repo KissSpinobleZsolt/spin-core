@@ -1,6 +1,6 @@
 import { useTranslation } from 'react-i18next'
 import { useGet } from '../hooks/useApi'
-import { dashboardService } from '../services/dashboardService'
+import { dashboardService } from '@services'
 
 export default function Dashboard() {
   const { t } = useTranslation()

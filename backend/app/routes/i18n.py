@@ -1,13 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.database import get_pg
-from app.deps import admin_dep
+from app.deps import admin_dep, token_dep
 
 router = APIRouter(prefix="/api/i18n", tags=["i18n"])
 
 
 @router.get("/{lang}")
-async def get_translations(lang: str):
+async def get_translations(lang: str, _: str = Depends(token_dep)):
     """Return all translation strings for the requested language."""
     data = get_pg().get_i18n_data(lang)
     if data is None:

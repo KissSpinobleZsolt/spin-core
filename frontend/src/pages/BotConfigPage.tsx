@@ -1,12 +1,13 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { type Bot, type BotConfigSchemaField } from '../services/botsService'
 import {
+  type Bot,
+  type BotConfigSchemaField,
   botConfigService,
   type BotEntity,
   type BotTeam,
   type BotProcesses,
-} from '../services/botConfigService'
+} from '@services'
 import { Spinner } from '../components/ui/Spinner'
 import { ErrorBanner } from '../components/ui/ErrorBanner'
 import { Btn } from '../components/ui/Button'
@@ -348,7 +349,7 @@ export default function BotConfigPage({ bot, scope }: { bot: Bot; scope: string 
   const schedulerFields = schema.scheduler ?? []
   const principalsType = schema.principals
   const showWatchlist = principalsType === 'watchlist'
-  const riskLevels = (schema.risk_levels as string[] | undefined) ?? ['Conservative', 'Moderate', 'Aggressive']
+  const riskLevels = schema.risk_levels ?? ['Conservative', 'Moderate', 'Aggressive']
 
   useEffect(() => {
     setLoadingConfig(true)

@@ -95,6 +95,8 @@ class ModuleRow(Base):
     roles = Column(ARRAY(String), nullable=False, default=list)
     presets = Column(JSON, nullable=False, default=dict)
     backend_url = Column(String, nullable=True)
+    # groups bots/modules into a subscription tier; "system" means native platform scope
+    subscription = Column(String, nullable=False, default="")
 
 
 class ModuleDocumentRow(Base):
@@ -108,6 +110,35 @@ class ModuleDocumentRow(Base):
     __table_args__ = (
         Index("ix_module_documents_module_collection", "module_id", "collection"),
     )
+
+
+class PageRegistryRow(Base):
+    """SQLAlchemy ORM model for the page_registry table."""
+    __tablename__ = "page_registry"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    route = Column(String, nullable=False, unique=True, index=True)
+    title = Column(String, nullable=False, default="")
+    type = Column(String, nullable=False, default="native")
+    component_key = Column(String, nullable=True)
+    remote_url = Column(String, nullable=True)
+    scope = Column(String, nullable=True)
+    component = Column(String, nullable=True)
+    roles = Column(ARRAY(String), nullable=False, default=list)
+    skeleton = Column(JSON, nullable=False, default=dict)
+    enabled = Column(Boolean, nullable=False, default=True)
+
+
+class UIComponentRow(Base):
+    """SQLAlchemy ORM model for the ui_components table."""
+    __tablename__ = "ui_components"
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    name = Column(String, nullable=False, unique=True)
+    export = Column(String, nullable=False)
+    file = Column(String, nullable=False)
+    description = Column(Text, nullable=False, default="")
+    props = Column(JSON, nullable=False, default=list)
+    notes = Column(Text, nullable=True)
+    sort_order = Column(Integer, nullable=False, default=0)
 
 
 def _deep_merge(base: dict, override: dict) -> dict:
@@ -143,6 +174,7 @@ class PostgresAdapter:
             # without any manual data migration.
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS provider VARCHAR NOT NULL DEFAULT 'ollama'",
             "ALTER TABLE modules ADD COLUMN IF NOT EXISTS backend_url VARCHAR",
+            "ALTER TABLE modules ADD COLUMN IF NOT EXISTS subscription VARCHAR NOT NULL DEFAULT ''",
             "ALTER TABLE bots ADD COLUMN IF NOT EXISTS config_schema JSONB NOT NULL DEFAULT '{}'",
         ]
         with self._engine.connect() as conn:
@@ -530,6 +562,7 @@ class PostgresAdapter:
             "roles": list(row.roles or []),
             "presets": row.presets or {"i18n": {}, "layout": {}, "settings": {}},
             "backend_url": row.backend_url or None,
+            "subscription": row.subscription or "",
         }
 
     def get_modules(self, enabled_only: bool = False, user_roles: list[str] | None = None) -> list[dict]:
@@ -582,20 +615,24 @@ class PostgresAdapter:
                 row.presets = data.get("presets", row.presets)
                 if "backend_url" in data:
                     row.backend_url = data["backend_url"] or None
+                if "subscription" in data:
+                    row.subscription = data["subscription"]
             else:
                 row = ModuleRow(
                     id=data.get("id") or str(uuid.uuid4()),
                     name=data["name"],
                     description=data.get("description", ""),
-                    remote_url=data["remote_url"],
+                    # empty string allowed for built-in modules (scope='system') that have no federation remote
+                    remote_url=data.get("remote_url", ""),
                     scope=data["scope"],
                     component=data.get("component", "./App"),
-                    route=data["route"],
+                    route=data.get("route", ""),
                     icon=data.get("icon", "🧩"),
                     enabled=data.get("enabled", True),
                     roles=data.get("roles", ["user", "admin"]),
                     presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
                     backend_url=data.get("backend_url") or None,
+                    subscription=data.get("subscription", ""),
                 )
                 db.add(row)
             db.commit()
@@ -618,6 +655,7 @@ class PostgresAdapter:
                 roles=data.get("roles", ["user", "admin"]),
                 presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
                 backend_url=data.get("backend_url") or None,
+                subscription=data.get("subscription", ""),
             )
             db.add(row)
             db.commit()
@@ -773,3 +811,107 @@ class PostgresAdapter:
             db.delete(row)
             db.commit()
             return True
+
+    def _page_registry_row_to_dict(self, row: "PageRegistryRow") -> dict:
+        return {
+            "id": row.id,
+            "route": row.route,
+            "title": row.title,
+            "type": row.type,
+            "component_key": row.component_key,
+            "remote_url": row.remote_url,
+            "scope": row.scope,
+            "component": row.component,
+            "roles": list(row.roles or []),
+            "skeleton": dict(row.skeleton) if row.skeleton else {},
+            "enabled": row.enabled,
+        }
+
+    def get_page_config(self, route: str) -> dict | None:
+        """Return the page registry config for the given route, or None if absent."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            return self._page_registry_row_to_dict(row) if row else None
+
+    def update_page_config(self, route: str, data: dict) -> dict | None:
+        """Update mutable page registry fields for the given route and return the updated dict."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not row:
+                return None
+            for field in ("title", "roles", "skeleton", "enabled"):
+                if field in data:
+                    setattr(row, field, data[field])
+            db.commit()
+            db.refresh(row)
+            return self._page_registry_row_to_dict(row)
+
+    def seed_page_registry(self, route: str, data: dict) -> None:
+        """Insert a page_registry entry only if the route does not already exist.
+
+        Skips existing rows to preserve any admin edits to title/roles/skeleton made after initial seed.
+        """
+        with self._session_ctx() as db:
+            existing = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not existing:
+                row = PageRegistryRow(
+                    route=route,
+                    title=data.get("title", ""),
+                    type=data.get("type", "native"),
+                    component_key=data.get("component_key"),
+                    remote_url=data.get("remote_url"),
+                    scope=data.get("scope"),
+                    component=data.get("component"),
+                    roles=data.get("roles", []),
+                    skeleton=data.get("skeleton", {}),
+                    enabled=data.get("enabled", True),
+                )
+                db.add(row)
+                db.commit()
+
+    # ── UI Components ────────────────────────────────────────────────────────
+
+    def _ui_component_row_to_dict(self, row: UIComponentRow) -> dict:
+        return {
+            "id": row.id,
+            "name": row.name,
+            "export": row.export,
+            "file": row.file,
+            "description": row.description,
+            "props": row.props or [],
+            "notes": row.notes,
+            "sort_order": row.sort_order,
+        }
+
+    def get_ui_components(self) -> list[dict]:
+        """Return all UI component docs ordered by sort_order then name."""
+        with self._session_ctx() as db:
+            rows = db.query(UIComponentRow).order_by(UIComponentRow.sort_order, UIComponentRow.name).all()
+            return [self._ui_component_row_to_dict(r) for r in rows]
+
+    def upsert_ui_component(self, data: dict) -> dict:
+        """Insert or update a UI component entry by name and return the resulting dict."""
+        with self._session_ctx() as db:
+            row = db.query(UIComponentRow).filter(UIComponentRow.name == data["name"]).first()
+            if not row:
+                row = UIComponentRow(
+                    id=str(uuid.uuid4()),
+                    name=data["name"],
+                    export=data.get("export", data["name"]),
+                    file=data.get("file", ""),
+                    description=data.get("description", ""),
+                    props=data.get("props", []),
+                    notes=data.get("notes"),
+                    sort_order=data.get("sort_order", 0),
+                )
+                db.add(row)
+            else:
+                row.export = data.get("export", row.export)
+                row.file = data.get("file", row.file)
+                row.description = data.get("description", row.description)
+                row.props = data.get("props", row.props)
+                row.notes = data.get("notes", row.notes)
+                row.sort_order = data.get("sort_order", row.sort_order)
+            db.commit()
+            db.refresh(row)
+            return self._ui_component_row_to_dict(row)

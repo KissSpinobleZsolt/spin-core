@@ -1,9 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useModelStatusContext } from '../../context/ModelStatusContext'
-import { botsService, type Bot } from '../../services/botsService'
-import { apiService } from '../../services/apiService'
+import { botsService, type Bot, apiService, type InstalledModelsData } from '@services'
 import { useChatStream, type Message } from '../../hooks/useChatStream'
-import { type InstalledModelsData } from '../../services/modelStatusService'
 
 const STORAGE_KEY = 'spin_core_chat_history'
 const STORAGE_BOT_KEY = 'spin_core_selected_bot'
@@ -46,7 +44,7 @@ export function ChatBubble() {
     if (!open) return
     botsService.getBots()
       .then(allBots => {
-        const list = allBots.filter(b => b.modules.includes('core'))
+        const list = allBots.filter(b => b.modules.includes('system'))
         setBots(list)
         const savedId = localStorage.getItem(STORAGE_BOT_KEY) ?? ''
         if (savedId && !list.find(b => b.id === savedId)) {

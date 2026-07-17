@@ -1,11 +1,13 @@
 const BASE_URL = (import.meta.env.VITE_API_BASE_URL ?? '/api').replace(/\/$/, '')
 
-type RequestOptions = {
+/** Options forwarded to the underlying fetch call. */
+export type RequestOptions = {
   signal?: AbortSignal
   headers?: Record<string, string>
 }
 
-async function request<T>(
+/** Core fetch wrapper: attaches auth token, enforces a 15-second timeout, and handles 401 redirects. */
+export async function request<T>(
   method: string,
   url: string,
   body?: unknown,
@@ -19,6 +21,8 @@ async function request<T>(
   }
   if (token) headers['Authorization'] = `Bearer ${token}`
 
+  // Own controller drives the timeout; external signal is bridged in rather than passed directly
+  // because AbortSignal.any() lacks broad browser support and fetch only accepts one signal
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 15_000)
 
@@ -42,7 +46,14 @@ async function request<T>(
   if (res.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('auth_user')
-    window.location.href = '/login'
+    if (token) {
+      // Token was present but rejected — session expired or revoked
+      window.location.href = '/login'
+    } else {
+      // No token was sent — throw instead of redirecting; a hard redirect here would loop
+      // because the login page itself triggers requests to now-protected endpoints (e.g. i18n)
+      throw new Error(`${method} ${url} → 401 Unauthorized`)
+    }
   }
 
   if (!res.ok) {
@@ -54,23 +65,4 @@ async function request<T>(
   }
 
   return res.json() as Promise<T>
-}
-
-/** Typed HTTP client for the spin-core API, attaching auth tokens and enforcing a 15-second timeout. */
-export const apiService = {
-  get<T>(url: string, options?: RequestOptions) {
-    return request<T>('GET', url, undefined, options)
-  },
-  post<T>(url: string, data?: unknown, options?: RequestOptions) {
-    return request<T>('POST', url, data, options)
-  },
-  put<T>(url: string, data?: unknown, options?: RequestOptions) {
-    return request<T>('PUT', url, data, options)
-  },
-  patch<T>(url: string, data?: unknown, options?: RequestOptions) {
-    return request<T>('PATCH', url, data, options)
-  },
-  delete<T>(url: string, options?: RequestOptions) {
-    return request<T>('DELETE', url, undefined, options)
-  },
 }

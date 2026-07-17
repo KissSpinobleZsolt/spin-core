@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import { useAuth } from './AuthContext'
-import { themeService } from '../services/themeService'
+import { themeService } from '@services'
 
 type Theme = 'dark' | 'light'
 

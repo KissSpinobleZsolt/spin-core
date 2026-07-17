@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import { Navigate, useNavigate } from 'react-router-dom'
-import { useAuth } from '../context/AuthContext'
+import { useAuth } from '@context/AuthContext'
+import { Btn } from '@components/ui/Button'
+import { Input } from '@components/ui/Input'
+import { ErrorBanner } from '@components/ui/ErrorBanner'
 
 export default function Login() {
   const { user, login } = useAuth()
@@ -43,43 +46,30 @@ export default function Login() {
         </div>
 
         <form onSubmit={handleSubmit} className="w-full flex flex-col gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Email</label>
-            <input
-              type="email"
-              required
-              autoComplete="email"
-              value={email}
-              onChange={e => setEmail(e.target.value)}
-              placeholder="you@example.com"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
-          </div>
-
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-medium text-slate-600">Password</label>
-            <input
-              type="password"
-              required
-              autoComplete="current-password"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              placeholder="••••••••"
-              className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm text-slate-800 outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition"
-            />
-          </div>
-
-          {error && (
-            <p className="text-xs text-red-500 text-center">{error}</p>
-          )}
-
-          <button
-            type="submit"
-            disabled={loading}
-            className="w-full py-2.5 rounded-lg bg-blue-600 hover:bg-blue-700 disabled:opacity-50 text-white text-sm font-semibold transition-colors"
-          >
+          <Input
+            label="Email"
+            id="login-email"
+            type="email"
+            required
+            autoComplete="email"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            placeholder="you@example.com"
+          />
+          <Input
+            label="Password"
+            id="login-password"
+            type="password"
+            required
+            autoComplete="current-password"
+            value={password}
+            onChange={e => setPassword(e.target.value)}
+            placeholder="••••••••"
+          />
+          {error && <ErrorBanner message={error} />}
+          <Btn type="submit" disabled={loading} className="w-full py-2.5">
             {loading ? '…' : 'Sign in'}
-          </button>
+          </Btn>
         </form>
       </div>
     </div>

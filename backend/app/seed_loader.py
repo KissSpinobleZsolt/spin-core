@@ -17,7 +17,7 @@ _FALLBACK_BOT = {
     "icon": "💬",
     "active": True,
     "restricted": "user",
-    "modules": ["core"],
+    "modules": ["system"],
 }
 
 
@@ -44,6 +44,7 @@ class SeedData:
     bots: list[BotSeed] = field(default_factory=lambda: [BotSeed(**_FALLBACK_BOT)])
     default_theme: Literal["dark", "light"] = "dark"
     modules: list[dict] = field(default_factory=list)
+    ui_components: list[dict] = field(default_factory=list)
 
 
 def load_seed() -> SeedData:
@@ -85,10 +86,13 @@ def load_seed() -> SeedData:
     default_theme: Literal["dark", "light"] = "light" if theme_raw == "light" else "dark"
     modules: list[dict] = settings.get("modules", [])
 
+    ui_components: list[dict] = raw.get("ui_components", [])
+
     return SeedData(
         dashboard_content=dashboard_content,
         bot_types=bot_types,
         bots=bots,
         default_theme=default_theme,
         modules=modules,
+        ui_components=ui_components,
     )

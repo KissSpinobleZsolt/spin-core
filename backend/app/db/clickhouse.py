@@ -67,6 +67,21 @@ ORDER BY (scope, event_time)
 TTL toDateTime(event_time) + INTERVAL 30 DAY
 """
 
+# Platform notifications — owner = user email or 'broadcast' for all users.
+_DDL_NOTIFICATIONS = """
+CREATE TABLE IF NOT EXISTS notifications (
+    id          UUID DEFAULT generateUUIDv4(),
+    event_time  DateTime64(3) DEFAULT now64(),
+    level       LowCardinality(String) DEFAULT 'INFO',
+    title       String DEFAULT '',
+    message     String DEFAULT '',
+    owner       String DEFAULT 'broadcast',
+    details     String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY event_time
+TTL toDateTime(event_time) + INTERVAL 7 DAY
+"""
+
 # Bot lifecycle events — bot_name column identifies the bot.
 _DDL_BOT_LOGS = """
 CREATE TABLE IF NOT EXISTS bot_logs (
@@ -150,6 +165,9 @@ class ClickHouseLogAdapter:
 
     def ensure_bot_logs_table(self) -> None:
         self._client.execute(_DDL_BOT_LOGS)
+
+    def ensure_notifications_table(self) -> None:
+        self._client.execute(_DDL_NOTIFICATIONS)
 
     # ------------------------------------------------------------------
     # Shared query helpers
@@ -483,6 +501,53 @@ class ClickHouseLogAdapter:
         """Return bot_names that already have at least one entry in bot_logs."""
         rows = self._client.execute("SELECT DISTINCT bot_name FROM bot_logs")
         return {r[0] for r in rows}
+
+    def get_component_names_with_logs(self) -> set[str]:
+        """Return component names that already have a component.init entry in module_logs (scope='system')."""
+        rows = self._client.execute(
+            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'component.init'"
+        )
+        return {r[0] for r in rows}
+
+    def get_page_routes_with_logs(self) -> set[str]:
+        """Return page routes that already have a page.init entry in module_logs (scope='system')."""
+        rows = self._client.execute(
+            "SELECT DISTINCT name FROM module_logs WHERE scope = 'system' AND event_type = 'page.init'"
+        )
+        return {r[0] for r in rows}
+
+    # ------------------------------------------------------------------
+    # Notifications
+    # ------------------------------------------------------------------
+
+    def write_notification(
+        self,
+        title: str,
+        message: str,
+        *,
+        level: str = "INFO",
+        owner: str = "broadcast",
+        details: dict | None = None,
+    ) -> None:
+        self._client.execute(
+            "INSERT INTO notifications (level, title, message, owner, details) VALUES",
+            [(level, title, message, owner, json.dumps(details or {}))],
+        )
+
+    def query_notifications_since(self, owner: str, since: datetime) -> list:
+        """Return notifications for owner (or broadcast) inserted after since, oldest-first."""
+        rows = self._client.execute(
+            """
+            SELECT toString(id), event_time, level, title, message, owner, details
+            FROM notifications
+            WHERE event_time > %(since)s
+              AND (owner = %(owner)s OR owner = 'broadcast')
+            ORDER BY event_time ASC
+            """,
+            {"since": since, "owner": owner},
+        )
+        keys = ["id", "event_time", "level", "title", "message", "owner", "details"]
+        return [dict(zip(keys, r)) for r in rows]
 
     # ------------------------------------------------------------------
     # Maintenance

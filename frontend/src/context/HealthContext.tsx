@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import type { HealthPayload } from '../workers/healthWorker'
+import { healthService, type HealthPayload } from '@services'
 
 /** HealthPayload extended with the timestamp of the most recent check. */
 export type HealthState = HealthPayload & { checkedAt: Date | null }
@@ -18,16 +18,9 @@ export function HealthProvider({ children }: { children: ReactNode }) {
   const [health, setHealth] = useState<HealthState>(DEFAULT)
 
   useEffect(() => {
-    const worker = new Worker(
-      new URL('../workers/healthWorker.ts', import.meta.url),
-      { type: 'module' },
-    )
-
-    worker.onmessage = (e: MessageEvent<HealthPayload>) => {
-      setHealth({ ...e.data, checkedAt: new Date() })
-    }
-
-    return () => worker.terminate()
+    return healthService.startWorker(payload => {
+      setHealth({ ...payload, checkedAt: new Date() })
+    })
   }, [])
 
   return <HealthContext.Provider value={health}>{children}</HealthContext.Provider>

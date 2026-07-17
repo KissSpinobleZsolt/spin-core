@@ -1,7 +1,5 @@
-import { apiService } from './apiService'
-
-/** Arbitrary key-value translation map for a given locale. */
-export type TranslationData = Record<string, unknown>
+import { apiService } from '../api'
+import type { TranslationData } from './types'
 
 /** Load and persist translations for a given language code. */
 export const i18nService = {

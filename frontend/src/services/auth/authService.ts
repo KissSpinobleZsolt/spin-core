@@ -1,18 +1,6 @@
-import { apiService } from './apiService'
-import { safeJsonParse } from '../utils/safeJsonParse'
-
-/** Shape of an authenticated user as returned by the login endpoint. */
-export type AuthUser = {
-  name: string
-  roles: string[]
-  defaultTheme: 'dark' | 'light'
-}
-
-/** Credentials payload for email/password login. */
-export type AuthCredentials = {
-  email: string
-  password: string
-}
+import { apiService } from '../api'
+import { safeJsonParse } from '../../utils/safeJsonParse'
+import type { AuthCredentials, AuthUser } from './types'
 
 const IS_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
 const USER_KEY = 'auth_user'

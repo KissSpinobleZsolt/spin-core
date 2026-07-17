@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { botsService, type Bot } from '../../services/botsService'
+import { botsService, type Bot } from '@services'
 import { useChatStream } from '../../hooks/useChatStream'
 
 interface Props {

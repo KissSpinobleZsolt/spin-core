@@ -1,9 +1,10 @@
 import { Card } from '../../components/ui/Card'
 import { PageTitle } from '../../components/ui/PageTitle'
+import { AdminPageShell } from '../../components/layout/AdminPageShell'
 
 export default function Users() {
   return (
-    <div className="max-w-4xl space-y-6">
+    <AdminPageShell>
       <PageTitle>Users</PageTitle>
       <Card>
         <div className="overflow-x-auto">
@@ -26,6 +27,6 @@ export default function Users() {
           </table>
         </div>
       </Card>
-    </div>
+    </AdminPageShell>
   )
 }
