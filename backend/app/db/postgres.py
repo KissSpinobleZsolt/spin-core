@@ -7,6 +7,7 @@ from sqlalchemy.orm import sessionmaker, declarative_base
 from sqlalchemy.sql import func
 
 from app.db.interface import UserRecord, BotRecord
+from app.queries.pg_migrations import PG_MIGRATION_STMTS
 
 Base = declarative_base()
 
@@ -163,22 +164,8 @@ class PostgresAdapter:
 
     def _run_migrations(self) -> None:
         """Apply idempotent ALTER TABLE migrations to bring the schema up to date."""
-        stmts = [
-            "ALTER TABLE translations ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT now()",
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS active BOOLEAN NOT NULL DEFAULT FALSE",
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS restricted VARCHAR NOT NULL DEFAULT 'user'",
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS modules VARCHAR[] NOT NULL DEFAULT '{}'",
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS created_by VARCHAR DEFAULT ''",
-            "ALTER TABLE bots DROP COLUMN IF EXISTS roles",
-            # provider column: existing bots default to "ollama" so they keep working
-            # without any manual data migration.
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS provider VARCHAR NOT NULL DEFAULT 'ollama'",
-            "ALTER TABLE modules ADD COLUMN IF NOT EXISTS backend_url VARCHAR",
-            "ALTER TABLE modules ADD COLUMN IF NOT EXISTS subscription VARCHAR NOT NULL DEFAULT ''",
-            "ALTER TABLE bots ADD COLUMN IF NOT EXISTS config_schema JSONB NOT NULL DEFAULT '{}'",
-        ]
         with self._engine.connect() as conn:
-            for stmt in stmts:
+            for stmt in PG_MIGRATION_STMTS:
                 conn.execute(text(stmt))
             conn.commit()
 
