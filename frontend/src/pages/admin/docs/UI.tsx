@@ -2,423 +2,15 @@ import { useState, useEffect } from 'react'
 import { PageTitle } from '../../../components/ui/PageTitle'
 import { DocPageShell } from '../../../components/layout/DocPageShell'
 import { Input } from '../../../components/ui/Input'
-import { Btn } from '../../../components/ui/Button'
-import { Card } from '../../../components/ui/Card'
-import { ErrorBanner } from '../../../components/ui/ErrorBanner'
-import { Label } from '../../../components/ui/Label'
-import { Modal } from '../../../components/ui/Modal'
 import { Spinner } from '../../../components/ui/Spinner'
-import { Toggle } from '../../../components/ui/Toggle'
-import { Badge } from '../../../components/ui/Badge'
-import { StatCard } from '../../../components/ui/StatCard'
-import { Tabs } from '../../../components/ui/Tabs'
-import { ProgressBar } from '../../../components/ui/ProgressBar'
-import { Chip } from '../../../components/ui/Chip'
-import { DropZone } from '../../../components/ui/DropZone'
-
-// ─── Types ────────────────────────────────────────────────────────────────────
-
-interface Prop {
-  name: string
-  type: string
-  default?: string
-  required?: true
-  description: string
-}
-
-interface ComponentDoc {
-  name: string
-  export: string
-  file: string
-  description: string
-  props: Prop[]
-  notes?: string
-  // factory so each card gets its own isolated state
-  preview?: React.FC
-}
-
-// ─── Preview components ───────────────────────────────────────────────────────
-
-function PreviewButton() {
-  return (
-    <div className="flex flex-wrap gap-3">
-      <Btn variant="primary">Primary</Btn>
-      <Btn variant="secondary">Secondary</Btn>
-      <Btn variant="danger">Danger</Btn>
-      <Btn variant="primary" disabled>Disabled</Btn>
-    </div>
-  )
-}
-
-function PreviewCard() {
-  return (
-    <Card>
-      <p className="text-sm text-slate-600 dark:text-slate-300">White / dark rounded container with p-6 padding and a border.</p>
-    </Card>
-  )
-}
-
-function PreviewErrorBanner() {
-  return <ErrorBanner message="Something went wrong. Please try again." />
-}
-
-function PreviewInput() {
-  const [v, setV] = useState('')
-  return (
-    <div className="space-y-3 max-w-xs">
-      <Input label="With label" placeholder="Type something…" value={v} onChange={e => setV(e.target.value)} />
-      <Input placeholder="Without label" />
-      <Input placeholder="Disabled" disabled />
-    </div>
-  )
-}
-
-function PreviewLabel() {
-  return <Label>Standalone Label element</Label>
-}
-
-function PreviewModal() {
-  const [open, setOpen] = useState(false)
-  return (
-    <>
-      <Btn variant="secondary" onClick={() => setOpen(true)}>Open Modal</Btn>
-      {open && (
-        <Modal title="Example Modal" onClose={() => setOpen(false)}>
-          <p className="text-sm text-slate-600 dark:text-slate-300">Modal body content. Click × or the buttons below to close.</p>
-          <div className="mt-4 flex gap-2 justify-end">
-            <Btn variant="secondary" onClick={() => setOpen(false)}>Cancel</Btn>
-            <Btn variant="primary" onClick={() => setOpen(false)}>Confirm</Btn>
-          </div>
-        </Modal>
-      )}
-    </>
-  )
-}
-
-function PreviewPageTitle() {
-  return <PageTitle>Page Title</PageTitle>
-}
-
-function PreviewSpinner() {
-  return (
-    <div className="flex items-center gap-8">
-      {(['sm', 'md', 'lg'] as const).map(size => (
-        <div key={size} className="flex flex-col items-center gap-2">
-          <Spinner size={size} />
-          <span className="text-xs text-slate-500">{size}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
-function PreviewToggle() {
-  const [a, setA] = useState(true)
-  const [b, setB] = useState(false)
-  return (
-    <div className="space-y-3">
-      <div className="flex items-center gap-3">
-        <Toggle checked={a} onChange={setA} />
-        <span className="text-sm text-slate-600 dark:text-slate-300">{a ? 'On' : 'Off'}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <Toggle checked={b} onChange={setB} />
-        <span className="text-sm text-slate-600 dark:text-slate-300">{b ? 'On' : 'Off'}</span>
-      </div>
-      <div className="flex items-center gap-3">
-        <Toggle checked disabled onChange={() => {}} />
-        <span className="text-sm text-slate-400">Disabled (on)</span>
-      </div>
-    </div>
-  )
-}
-
-function PreviewBadge() {
-  return (
-    <div className="flex flex-wrap gap-2">
-      <Badge variant="info">Info</Badge>
-      <Badge variant="success">Success</Badge>
-      <Badge variant="warn">Warning</Badge>
-      <Badge variant="error">Error</Badge>
-      <Badge variant="neutral">Neutral</Badge>
-      <Badge variant="success" dot>With dot</Badge>
-      <Badge variant="error" dot>Critical</Badge>
-    </div>
-  )
-}
-
-function PreviewStatCard() {
-  return (
-    <div className="grid grid-cols-2 gap-3">
-      <StatCard value="1,284" label="Total Records" sub="across all sources" />
-      <StatCard value="99.8%" label="Uptime" sub="last 30 days" />
-    </div>
-  )
-}
-
-function PreviewTabs() {
-  const [active, setActive] = useState('one')
-  return (
-    <div className="space-y-3">
-      <Tabs
-        tabs={[{ key: 'one', label: 'Overview' }, { key: 'two', label: 'Details' }, { key: 'three', label: 'Logs' }]}
-        active={active}
-        onChange={setActive}
-      />
-      <p className="text-sm text-slate-500">Active: <strong className="text-slate-700 dark:text-slate-300">{active}</strong></p>
-    </div>
-  )
-}
-
-function PreviewProgressBar() {
-  return (
-    <div className="space-y-3 max-w-xs">
-      <ProgressBar value={72} label="Upload" color="blue" />
-      <ProgressBar value={48} label="Storage" color="amber" />
-      <ProgressBar value={90} label="CPU load" color="red" />
-    </div>
-  )
-}
-
-function PreviewChip() {
-  const [chips, setChips] = useState(['AAPL', 'TSLA', 'MSFT'])
-  return (
-    <div className="flex flex-wrap gap-2">
-      {chips.map(c => (
-        <Chip key={c} onRemove={() => setChips(p => p.filter(x => x !== c))}>{c}</Chip>
-      ))}
-      <Chip>Read-only</Chip>
-    </div>
-  )
-}
-
-function PreviewDropZone() {
-  const [file, setFile] = useState<File | null>(null)
-  return (
-    <div className="max-w-xs">
-      <DropZone file={file} hint="CSV, XLSX — max 50 MB" onFiles={([f]) => setFile(f)} />
-      {file && <Btn variant="secondary" className="mt-2" onClick={() => setFile(null)}>Clear</Btn>}
-    </div>
-  )
-}
-
-// ─── Data ─────────────────────────────────────────────────────────────────────
-
-const DOCS: ComponentDoc[] = [
-  {
-    name: 'Button',
-    export: 'Btn',
-    file: 'components/ui/Button.tsx',
-    description: 'Styled button with three semantic variants. Forwards all native <button> attributes.',
-    props: [
-      { name: 'variant',   type: "'primary' | 'secondary' | 'danger'", default: "'primary'", description: 'Visual style of the button.' },
-      { name: 'className', type: 'string', default: "''", description: 'Extra Tailwind classes merged onto the button element.' },
-      { name: '...rest',   type: 'React.ButtonHTMLAttributes<HTMLButtonElement>', description: 'All standard button attributes (onClick, disabled, type, …).' },
-    ],
-    preview: PreviewButton,
-  },
-  {
-    name: 'Card',
-    export: 'Card',
-    file: 'components/ui/Card.tsx',
-    description: 'White / dark rounded container with border and p-6 padding. Use as a layout block.',
-    props: [
-      { name: 'children',  type: 'ReactNode', required: true, description: 'Content rendered inside the card.' },
-      { name: 'className', type: 'string', description: 'Extra Tailwind classes appended to the wrapper div.' },
-    ],
-    preview: PreviewCard,
-  },
-  {
-    name: 'ErrorBanner',
-    export: 'ErrorBanner',
-    file: 'components/ui/ErrorBanner.tsx',
-    description: 'Full-width red-tinted alert paragraph. Renders nothing when message is empty.',
-    props: [
-      { name: 'message', type: 'string', required: true, description: 'Error text to display.' },
-    ],
-    preview: PreviewErrorBanner,
-  },
-  {
-    name: 'Input',
-    export: 'Input',
-    file: 'components/ui/Input.tsx',
-    description: 'Styled text input, optionally wrapped in a labelled group. Forwards all native <input> attributes.',
-    props: [
-      { name: 'label',     type: 'string', description: "When provided, wraps the input in a <div> with a <label> above it." },
-      { name: 'id',        type: 'string', description: "Used to link the label's htmlFor when label is set." },
-      { name: 'className', type: 'string', description: 'Extra Tailwind classes on the <input> element.' },
-      { name: '...rest',   type: 'React.InputHTMLAttributes<HTMLInputElement>', description: 'All standard input attributes (value, onChange, placeholder, disabled, …).' },
-    ],
-    preview: PreviewInput,
-  },
-  {
-    name: 'Label',
-    export: 'Label',
-    file: 'components/ui/Label.tsx',
-    description: 'Styled <label> element. Use standalone or alongside Input when manual control is needed.',
-    props: [
-      { name: '...rest', type: 'React.LabelHTMLAttributes<HTMLLabelElement>', description: 'All standard label attributes (htmlFor, children, …).' },
-    ],
-    preview: PreviewLabel,
-  },
-  {
-    name: 'Modal',
-    export: 'Modal',
-    file: 'components/ui/Modal.tsx',
-    description: 'Fixed full-screen overlay with a scrollable inner panel (max-height 90 vh). Mount/unmount to show/hide.',
-    props: [
-      { name: 'title',    type: 'string',    required: true, description: 'Heading text shown in the modal header.' },
-      { name: 'onClose',  type: '() => void', description: 'When provided, an × button is rendered in the header.' },
-      { name: 'maxWidth', type: 'string', default: "'max-w-lg'", description: 'Tailwind max-width class controlling the dialog width.' },
-      { name: 'children', type: 'ReactNode', required: true, description: 'Content rendered inside the modal body.' },
-    ],
-    preview: PreviewModal,
-  },
-  {
-    name: 'PageTitle',
-    export: 'PageTitle',
-    file: 'components/ui/PageTitle.tsx',
-    description: 'Bold h1 heading sized at text-xl. Use once at the top of each page.',
-    props: [
-      { name: 'children', type: 'ReactNode', required: true, description: 'Title text or elements.' },
-    ],
-    preview: PreviewPageTitle,
-  },
-  {
-    name: 'Spinner',
-    export: 'Spinner',
-    file: 'components/ui/Spinner.tsx',
-    description: 'Animated inline loading indicator with three size presets.',
-    props: [
-      { name: 'size', type: "'sm' | 'md' | 'lg'", default: "'md'", description: 'sm = 16 px, md = 24 px, lg = 32 px ring.' },
-    ],
-    preview: PreviewSpinner,
-  },
-  {
-    name: 'Toggle',
-    export: 'Toggle',
-    file: 'components/ui/Toggle.tsx',
-    description: 'Pill-shaped accessible switch with a sliding knob. Uses role="switch" and aria-checked.',
-    props: [
-      { name: 'checked',  type: 'boolean',              required: true, description: 'Controlled checked state.' },
-      { name: 'onChange', type: '(v: boolean) => void', required: true, description: 'Called with the new value when the user clicks.' },
-      { name: 'disabled', type: 'boolean', description: 'When true, interaction is blocked and the knob is greyed out.' },
-    ],
-    preview: PreviewToggle,
-  },
-  {
-    name: 'Badge',
-    export: 'Badge',
-    file: 'components/ui/Badge.tsx',
-    description: 'Colour-coded rounded label for status, severity, or category tags.',
-    props: [
-      { name: 'variant',  type: "'info' | 'success' | 'warn' | 'error' | 'neutral'", default: "'neutral'", description: 'Colour scheme of the badge.' },
-      { name: 'dot',      type: 'boolean', description: 'When true, prepends a small filled circle matching the variant colour.' },
-      { name: 'children', type: 'ReactNode', required: true, description: 'Badge text or content.' },
-    ],
-    preview: PreviewBadge,
-  },
-  {
-    name: 'StatCard',
-    export: 'StatCard',
-    file: 'components/ui/StatCard.tsx',
-    description: 'KPI tile displaying a large metric value, a label, and an optional sub-text. Use in a grid row.',
-    props: [
-      { name: 'value', type: 'string | number', required: true, description: 'Primary metric value displayed large.' },
-      { name: 'label', type: 'string',          required: true, description: 'Short descriptor shown below the value in uppercase.' },
-      { name: 'sub',   type: 'string', description: 'Secondary detail line shown below the label in muted text.' },
-    ],
-    preview: PreviewStatCard,
-  },
-  {
-    name: 'Tabs',
-    export: 'Tabs',
-    file: 'components/ui/Tabs.tsx',
-    description: 'Horizontal tab bar with an active underline indicator. Fully controlled — caller manages active state.',
-    props: [
-      { name: 'tabs',     type: 'Array<{ key: string; label: string }>', required: true, description: 'Tab definitions in display order.' },
-      { name: 'active',   type: 'string', required: true, description: 'The key of the currently active tab.' },
-      { name: 'onChange', type: '(key: string) => void', required: true, description: "Called with the clicked tab's key." },
-    ],
-    preview: PreviewTabs,
-  },
-  {
-    name: 'ProgressBar',
-    export: 'ProgressBar',
-    file: 'components/ui/ProgressBar.tsx',
-    description: 'Thin linear progress indicator. Value is clamped to 0–100.',
-    props: [
-      { name: 'value', type: 'number', required: true, description: 'Fill percentage (0–100).' },
-      { name: 'label', type: 'string', description: 'When provided, renders a row above the bar with the label left and percentage right.' },
-      { name: 'color', type: "'blue' | 'green' | 'amber' | 'red'", default: "'blue'", description: 'Fill colour of the progress bar.' },
-    ],
-    preview: PreviewProgressBar,
-  },
-  {
-    name: 'Chip',
-    export: 'Chip',
-    file: 'components/ui/Chip.tsx',
-    description: 'Small inline tag. Pass onRemove to show a × dismiss button.',
-    props: [
-      { name: 'children', type: 'ReactNode', required: true, description: 'Chip content.' },
-      { name: 'onRemove', type: '() => void', description: 'When provided, an × button is rendered that calls this handler.' },
-    ],
-    preview: PreviewChip,
-  },
-  {
-    name: 'DropZone',
-    export: 'DropZone',
-    file: 'components/ui/DropZone.tsx',
-    description: 'Drag-and-drop file upload area. Also opens a file picker on click.',
-    props: [
-      { name: 'onFiles', type: '(files: File[]) => void', description: 'Called with the array of dropped or selected files.' },
-      { name: 'accept',  type: 'string', description: 'MIME type or extension filter forwarded to the hidden <input type="file">. E.g. "video/*" or ".zip".' },
-      { name: 'hint',    type: 'string', description: 'Small helper text shown below the drop prompt (e.g. accepted formats, size limit).' },
-      { name: 'file',    type: 'File | null', description: 'When set, replaces the placeholder text with the file name.' },
-    ],
-    notes: 'DropZone manages its own internal dragging state. The file prop is display-only — keep the actual File object in the parent and pass it back in.',
-    preview: PreviewDropZone,
-  },
-]
-
-const IDS = DOCS.map(d => d.name.toLowerCase())
-
-// ─── Active section tracking ──────────────────────────────────────────────────
-
-function useActiveSection(ids: string[]): string {
-  const [active, setActive] = useState(ids[0] ?? '')
-
-  useEffect(() => {
-    // root = <main> because that element carries overflow-y:auto; default viewport root would miss scroll events
-    const root = document.querySelector('main')
-    const visible = new Set<string>()
-
-    const observers = ids.map(id => {
-      const el = document.getElementById(id)
-      if (!el) return null
-      const obs = new IntersectionObserver(
-        ([entry]) => {
-          if (entry.isIntersecting) visible.add(id)
-          else visible.delete(id)
-          const first = ids.find(i => visible.has(i))
-          if (first) setActive(first)
-        },
-        // -60% bottom margin: a section is only "active" once it enters the top 40% of the viewport
-        { root, rootMargin: '0px 0px -60% 0px', threshold: 0 },
-      )
-      obs.observe(el)
-      return obs
-    })
-
-    return () => observers.forEach(o => o?.disconnect())
-  }, [ids])
-
-  return active
-}
+import { ErrorBanner } from '../../../components/ui/ErrorBanner'
+import { useUIComponents } from '../../../context/UIComponentsContext'
+import { previewRegistry } from './previewRegistry'
+import type { UIComponentDoc, UIComponentProp } from '@services'
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function PropTable({ props }: { props: Prop[] }) {
+function PropTable({ props }: { props: UIComponentProp[] }) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full text-xs">
@@ -446,8 +38,10 @@ function PropTable({ props }: { props: Prop[] }) {
   )
 }
 
-function ComponentCard({ doc }: { doc: ComponentDoc }) {
+function ComponentCard({ doc }: { doc: UIComponentDoc }) {
   const [tab, setTab] = useState<'props' | 'preview'>('props')
+  // undefined when doc.name has no entry in previewRegistry — hides the Preview tab entirely
+  const Preview = previewRegistry[doc.name]
 
   return (
     <div id={doc.name.toLowerCase()} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -474,7 +68,7 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
         </code>
       </div>
       <div className="bg-white dark:bg-slate-800">
-        {doc.preview && (
+        {Preview && (
           <div className="flex border-b border-slate-200 dark:border-slate-700 px-5">
             {(['props', 'preview'] as const).map(t => (
               <button
@@ -492,7 +86,7 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
           </div>
         )}
         <div className="px-5 py-4">
-          {tab === 'props' || !doc.preview ? (
+          {tab === 'props' || !Preview ? (
             <>
               {doc.props.length > 0 ? <PropTable props={doc.props} /> : <p className="text-xs text-slate-400">No props.</p>}
               {doc.notes && (
@@ -502,7 +96,7 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
               )}
             </>
           ) : (
-            <doc.preview />
+            <Preview />
           )}
         </div>
       </div>
@@ -510,19 +104,69 @@ function ComponentCard({ doc }: { doc: ComponentDoc }) {
   )
 }
 
+// ─── Active section tracking ──────────────────────────────────────────────────
+
+function useActiveSection(ids: string[]): string {
+  const [active, setActive] = useState(ids[0] ?? '')
+
+  useEffect(() => {
+    const root = document.querySelector('main')
+    const visible = new Set<string>()
+
+    const observers = ids.map(id => {
+      const el = document.getElementById(id)
+      if (!el) return null
+      const obs = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) visible.add(id)
+          else visible.delete(id)
+          const first = ids.find(i => visible.has(i))
+          if (first) setActive(first)
+        },
+        { root, rootMargin: '0px 0px -60% 0px', threshold: 0 },
+      )
+      obs.observe(el)
+      return obs
+    })
+
+    return () => observers.forEach(o => o?.disconnect())
+  }, [ids])
+
+  return active
+}
+
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
 export default function DocsUI() {
+  const { components, loading, error } = useUIComponents()
   const [query, setQuery] = useState('')
-  const active = useActiveSection(IDS)
+
+  const ids = components.map(d => d.name.toLowerCase())
+  const active = useActiveSection(ids)
 
   const searching = query.trim() !== ''
   const filtered = searching
-    ? DOCS.filter(d =>
+    ? components.filter(d =>
         d.name.toLowerCase().includes(query.toLowerCase()) ||
         d.description.toLowerCase().includes(query.toLowerCase()),
       )
-    : DOCS
+    : components
+
+  if (loading) {
+    return (
+      <DocPageShell maxWidth="max-w-5xl">
+        <div className="flex justify-center py-24"><Spinner size="lg" /></div>
+      </DocPageShell>
+    )
+  }
+
+  if (error) {
+    return (
+      <DocPageShell maxWidth="max-w-5xl">
+        <ErrorBanner message={error} />
+      </DocPageShell>
+    )
+  }
 
   return (
     <DocPageShell maxWidth="max-w-5xl">
@@ -530,7 +174,7 @@ export default function DocsUI() {
         <div>
           <PageTitle>UI Components</PageTitle>
           <p className="text-sm text-slate-500 mt-1">
-            {DOCS.length} components · <span className="text-red-500">*</span> required prop
+            {components.length} components · <span className="text-red-500">*</span> required prop
           </p>
         </div>
         <div className="w-64">
@@ -543,7 +187,7 @@ export default function DocsUI() {
           <nav className="w-40 shrink-0 sticky top-0 self-start">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Components</p>
             <ul className="space-y-0.5">
-              {DOCS.map(d => {
+              {components.map(d => {
                 const id = d.name.toLowerCase()
                 const isActive = active === id
                 return (

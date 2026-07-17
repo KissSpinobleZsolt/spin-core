@@ -10,13 +10,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, get_pg, get_ch
-from app.events import LogLevel, BotEvent, ModuleEvent, UserEvent, lifecycle_message
+from app.events import LogLevel, BotEvent, ComponentEvent, ModuleEvent, PageEvent, UserEvent, lifecycle_message
 from app.model_tracker import run_sequential_trackers
 from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
 from app.state import get_settings, set_settings
 
-from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications
+from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications, ui_components
 from app.routes.model_status import _required_models
 
 
@@ -137,6 +137,9 @@ async def lifespan(app: FastAPI):
     for bt in seed.bot_types:
         pg.upsert_bot_type(bt)
 
+    for uc in seed.ui_components:
+        pg.upsert_ui_component(uc)
+
     # Seed default bots on first run
     if not pg.get_bots(admin=True):
         import dataclasses
@@ -196,6 +199,20 @@ async def lifespan(app: FastAPI):
                 )
     except Exception as exc:
         print(f"[spin-core] Failed to write startup bot.init logs: {exc}", file=sys.stderr)
+
+    # Write component.init for any UI component that has no CH history yet
+    try:
+        components_with_logs = ch.get_component_names_with_logs()
+        for comp in pg.get_ui_components():
+            if comp["name"] not in components_with_logs:
+                ch.write_module_log(
+                    "system", "system", ComponentEvent.INIT,
+                    {"component": comp["name"], "file": comp["file"], "source": "startup"},
+                    level=LogLevel.INFO, name=comp["name"],
+                    message=lifecycle_message(ComponentEvent.INIT, comp["name"]),
+                )
+    except Exception as exc:
+        print(f"[spin-core] Failed to write startup component.init logs: {exc}", file=sys.stderr)
 
     # Write user.init for the admin if it was just seeded this startup
     if admin_created and admin_email:
@@ -272,6 +289,21 @@ async def lifespan(app: FastAPI):
     for lang, data in DEFAULT_TRANSLATIONS.items():
         pg.merge_i18n_data(lang, data)
 
+    # Ensure the "system" virtual module exists — represents the native platform
+    pg.upsert_module({
+        "name": "System",
+        "description": "Native platform pages and built-in components.",
+        "remote_url": "",
+        "scope": "system",
+        "component": "",
+        "route": "",
+        "icon": "🖥️",
+        "enabled": True,
+        "roles": ["user", "admin"],
+        "presets": {},
+        "subscription": "system",
+    })
+
     _PAGE_REGISTRY_SEED = [
         ("", {"title": "Dashboard", "component_key": "Dashboard", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
         ("logs", {"title": "Logs", "component_key": "Logs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 8}}),
@@ -288,8 +320,25 @@ async def lifespan(app: FastAPI):
         ("admin/docs/api", {"title": "API Docs", "component_key": "DocsApi", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
         ("admin/docs/deployment", {"title": "Deployment Docs", "component_key": "DocsDeployment", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
     ]
+    try:
+        pages_with_logs = ch.get_page_routes_with_logs()
+    except Exception:
+        # ClickHouse unavailable at startup — fall back to empty so all pages get an init log
+        # written once CH recovers; this may produce a duplicate log on the next clean restart
+        pages_with_logs = set()
     for route, data in _PAGE_REGISTRY_SEED:
         pg.seed_page_registry(route, {**data, "type": "native", "enabled": True})
+        page_key = route or "/"
+        if page_key not in pages_with_logs:
+            try:
+                ch.write_module_log(
+                    "system", "system", PageEvent.INIT,
+                    {"route": route or "/", "title": data["title"], "source": "seed"},
+                    level=LogLevel.INFO, name=page_key,
+                    message=lifecycle_message(PageEvent.INIT, data["title"]),
+                )
+            except Exception as exc:
+                print(f"[spin-core] Failed to write page.init log for {page_key}: {exc}", file=sys.stderr)
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())
@@ -361,3 +410,4 @@ app.include_router(bots.router)
 app.include_router(plugin_proxy.router)
 app.include_router(pages.router)
 app.include_router(notifications.router)
+app.include_router(ui_components.router)
