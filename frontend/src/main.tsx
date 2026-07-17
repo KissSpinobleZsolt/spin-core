@@ -46,3 +46,11 @@ createRoot(document.getElementById('root')!).render(
     </QueryClientProvider>
   </StrictMode>,
 )
+
+// Remove the splash screen once React has committed its first render to the DOM
+requestAnimationFrame(() => {
+  const splash = document.getElementById('splash')
+  if (!splash) return
+  splash.classList.add('fade-out')                       // trigger CSS opacity transition
+  splash.addEventListener('transitionend', () => splash.remove(), { once: true })  // clean up the DOM node after fade completes
+})
