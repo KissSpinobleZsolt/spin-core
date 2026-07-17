@@ -4,7 +4,6 @@ import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '../components
 import {
   logsService,
   type ChatLogDetails,
-  type ChatLogEntry,
   type LogEntry,
   type UserLogEntry,
 } from '@services'
