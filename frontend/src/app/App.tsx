@@ -1,16 +1,13 @@
 import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
 import { CookieConsentModal } from '../components/cookieConsent'
-import { useI18nSync } from '../i18n/i18nSync'
-import { loginFallback } from './loginFallback.constant'
 
+// i18n and theme initialisation moved to Layout — both now only run after the user is authenticated
 export default function App() {
-  const i18nReady = useI18nSync() // blocks render until translation strings are loaded
-  if (!i18nReady) return loginFallback // reuse the same stable spinner shown during route lazy-loads
   return (
     <>
-      <RouterProvider router={router} />
-      <CookieConsentModal />
+      <RouterProvider router={router} />  {/* renders the matched route tree; unauthenticated routes skip Layout */}
+      <CookieConsentModal />  {/* rendered outside RouterProvider so it appears before login */}
     </>
   )
 }

@@ -18,7 +18,10 @@
       "@utils":        ["./src/utils/index.ts"],
       "@utils/*":      ["./src/utils/*"],
       "@constants/*":  ["./src/constants/*"],
-      "@i18n/*":       ["./src/i18n/*"]
+      "@i18n/*":       ["./src/i18n/*"],
+      // bare entry needed: @store/* only matches sub-paths; from '@store' falls through without it
+      "@store":        ["./src/store/index.ts"],
+      "@store/*":      ["./src/store/*"]
     },
     "lib": ["ES2023", "DOM"],
     "module": "esnext",
