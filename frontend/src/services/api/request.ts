@@ -46,7 +46,12 @@ export async function request<T>(
   if (res.status === 401) {
     localStorage.removeItem('token')
     localStorage.removeItem('auth_user')
-    window.location.href = '/login'
+    if (token) {
+      // Token was present but rejected — session expired or revoked
+      window.location.href = '/login'
+    } else {
+      throw new Error(`${method} ${url} → 401 Unauthorized`)
+    }
   }
 
   if (!res.ok) {

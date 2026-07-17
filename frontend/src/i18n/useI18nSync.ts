@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import i18n from './index'
 import { i18nService } from '@services'
 import { useHealth } from '../context/HealthContext'
+import { useAuth } from '../context/AuthContext'
 
 // Only fetches and adds bundle — does NOT call changeLanguage (that fires languageChanged → loop)
 export async function reloadTranslations(lang: string): Promise<void> {
@@ -13,6 +14,8 @@ export function useI18nSync(): boolean {
   const [ready, setReady] = useState(false)
   const health = useHealth()
   const lastVersionRef = useRef<string | undefined>(undefined)
+  const { user } = useAuth()
+  const prevUserRef = useRef(user)
 
   // Initial load + language-switch handler
   useEffect(() => {
@@ -40,6 +43,16 @@ export function useI18nSync(): boolean {
     }
     lastVersionRef.current = version
   }, [health.translations, ready])
+
+  // Reload translations after login — the pre-auth fetch failed (401), so we retry once the
+  // token is available (null → non-null user transition)
+  useEffect(() => {
+    const prev = prevUserRef.current
+    prevUserRef.current = user
+    if (user && !prev) {
+      reloadTranslations(i18n.language)
+    }
+  }, [user])
 
   return ready
 }
