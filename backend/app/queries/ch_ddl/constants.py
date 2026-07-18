@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS api_logs (
 ) ENGINE = MergeTree()
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+"""  # DDL for the HTTP request log table; auto-expires rows after 30 days via TTL
 
 CH_DDL_APP_LOGS = """
 CREATE TABLE IF NOT EXISTS app_logs (
@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS app_logs (
 ) ENGINE = MergeTree()
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+"""  # DDL for the platform lifecycle log table; auto-expires rows after 30 days
 
 CH_DDL_USER_LOGS = """
 CREATE TABLE IF NOT EXISTS user_logs (
@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS user_logs (
 ) ENGINE = MergeTree()
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+"""  # DDL for the user lifecycle log table (login, create, update, delete); 30-day TTL
 
 CH_DDL_MODULE_LOGS = """
 CREATE TABLE IF NOT EXISTS module_logs (
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS module_logs (
 ) ENGINE = MergeTree()
 ORDER BY (scope, event_time)
 TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+"""  # DDL for the per-module event log table; ordered by (scope, event_time) for efficient scope-scoped queries
 
 CH_DDL_NOTIFICATIONS = """
 CREATE TABLE IF NOT EXISTS notifications (
@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS notifications (
 ) ENGINE = MergeTree()
 ORDER BY event_time
 TTL toDateTime(event_time) + INTERVAL 7 DAY
-"""
+"""  # DDL for the notifications table; shorter 7-day TTL since notifications are ephemeral
 
 CH_DDL_BOT_LOGS = """
 CREATE TABLE IF NOT EXISTS bot_logs (
@@ -86,4 +86,4 @@ CREATE TABLE IF NOT EXISTS bot_logs (
 ) ENGINE = MergeTree()
 ORDER BY (bot_name, event_time)
 TTL toDateTime(event_time) + INTERVAL 30 DAY
-"""
+"""  # DDL for the bot event log table; ordered by (bot_name, event_time) for efficient bot-scoped queries

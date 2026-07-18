@@ -17,45 +17,45 @@ class PostgresAdapter:
     """Manages all PostgreSQL CRUD operations for the platform via SQLAlchemy."""
     def __init__(self, db_url: str) -> None:
         """Create the SQLAlchemy engine, session factory, schema, and run migrations."""
-        self._engine = create_engine(db_url)
-        self._Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)
-        Base.metadata.create_all(bind=self._engine)
-        self._run_migrations()
+        self._engine = create_engine(db_url)  # create the SQLAlchemy engine for the given PostgreSQL DSN
+        self._Session = sessionmaker(autocommit=False, autoflush=False, bind=self._engine)  # session factory; autocommit=False gives explicit transaction control
+        Base.metadata.create_all(bind=self._engine)  # create all tables that don't already exist (idempotent)
+        self._run_migrations()  # apply any schema changes not handled by create_all
 
     def _run_migrations(self) -> None:
         """Apply idempotent ALTER TABLE migrations to bring the schema up to date."""
         with self._engine.connect() as conn:
-            for stmt in PG_MIGRATION_STMTS:
-                conn.execute(text(stmt))
-            conn.commit()
+            for stmt in PG_MIGRATION_STMTS:  # iterate each ALTER TABLE / ADD COLUMN IF NOT EXISTS statement
+                conn.execute(text(stmt))  # execute as raw SQL; each statement is idempotent
+            conn.commit()  # commit all migration statements in a single transaction
 
     def test_connection(self) -> None:
-        with self._engine.connect():
+        with self._engine.connect():  # open and immediately close a connection; raises on DB unreachable
             pass
 
     def _session(self):
-        return self._Session()
+        return self._Session()  # create a new SQLAlchemy session bound to the engine
 
     @contextmanager
     def _session_ctx(self):
         """Context manager that opens a SQLAlchemy session and closes it on exit."""
-        db = self._session()
+        db = self._session()  # obtain a fresh session for this operation
         try:
-            yield db
+            yield db  # hand the session to the caller's with-block
         finally:
-            db.close()
+            db.close()  # always release the connection back to the pool
 
     def get_user_by_email(self, email: str) -> UserRecord | None:
         """Return the UserRecord for the given email, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(UserRow).filter(UserRow.email == email).first()
+            row = db.query(UserRow).filter(UserRow.email == email).first()  # case-sensitive exact match on the unique email column
             if not row:
-                return None
+                return None  # caller must handle the None case (e.g. raise 401)
             return UserRecord(
                 email=row.email,
                 name=row.name,
                 hashed_password=row.hashed_password,
-                roles=list(row.roles),
+                roles=list(row.roles),        # convert Postgres ARRAY to a plain Python list
                 default_theme=row.default_theme,
             )
 
@@ -76,33 +76,33 @@ class PostgresAdapter:
                 roles=roles,
                 default_theme=default_theme,
             )
-            db.add(row)
-            db.commit()
-            return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)
+            db.add(row)    # stage the new row for insert
+            db.commit()    # flush and commit; auto-increment id is assigned by the DB
+            return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)  # construct from local vars; avoids a round-trip refresh
 
     def update_user_theme(self, email: str, theme: str) -> None:
         """Update the stored default_theme preference for a user by email."""
         with self._session_ctx() as db:
-            row = db.query(UserRow).filter(UserRow.email == email).first()
-            if row:
-                row.default_theme = theme
-                db.commit()
+            row = db.query(UserRow).filter(UserRow.email == email).first()  # locate the user by email
+            if row:  # silently no-op for unknown emails; callers already validate via token
+                row.default_theme = theme  # mutate the ORM instance; SQLAlchemy tracks the change
+                db.commit()  # flush the UPDATE to the DB
 
     def get_page(self, key: str) -> str | None:
         """Return the content string for the given page key, or None if absent."""
         with self._session_ctx() as db:
-            row = db.query(PageRow).filter(PageRow.page_key == key).first()
-            return row.content if row else None
+            row = db.query(PageRow).filter(PageRow.page_key == key).first()  # look up the page by its logical key
+            return row.content if row else None  # return the raw content string or None if the key is absent
 
     def upsert_page(self, key: str, content: str) -> None:
         """Insert or update the page_responses row for the given key."""
         with self._session_ctx() as db:
-            row = db.query(PageRow).filter(PageRow.page_key == key).first()
+            row = db.query(PageRow).filter(PageRow.page_key == key).first()  # check for an existing row before deciding insert vs update
             if row:
-                row.content = content
+                row.content = content  # update in-place; SQLAlchemy tracks the change
             else:
-                db.add(PageRow(page_key=key, content=content))
-            db.commit()
+                db.add(PageRow(page_key=key, content=content))  # no existing row; insert a new one
+            db.commit()  # flush the change to the DB
 
     def _bot_row_to_record(self, row: BotRow) -> BotRecord:
         """Convert a BotRow ORM instance to a BotRecord dataclass.
@@ -154,32 +154,32 @@ class PostgresAdapter:
         with self._session_ctx() as db:
             q = db.query(BotRow)
             if not admin:
-                q = q.filter(BotRow.active == True)
-            rows = q.order_by(BotRow.created_at).all()
+                q = q.filter(BotRow.active == True)  # non-admins only see bots with active=True
+            rows = q.order_by(BotRow.created_at).all()  # stable chronological order
             if admin:
-                return [self._bot_row_to_record(r) for r in rows]
+                return [self._bot_row_to_record(r) for r in rows]  # admins see every bot regardless of restricted flag
             result = []
             for r in rows:
                 if r.restricted == "admin" and "admin" not in (user_roles or []):
-                    continue
+                    continue  # skip admin-restricted bots when the caller lacks the admin role
                 result.append(self._bot_row_to_record(r))
-            return result
+            return result  # filtered list visible to this caller
 
     def get_bots_for_module(self, module_id: str, user_roles: list[str] | None = None) -> list[BotRecord]:
         """Return active bots associated with a specific module, filtered by the caller's roles."""
         with self._session_ctx() as db:
             rows = (
                 db.query(BotRow)
-                .filter(BotRow.active == True, BotRow.modules.contains([module_id]))
-                .order_by(BotRow.created_at)
+                .filter(BotRow.active == True, BotRow.modules.contains([module_id]))  # Postgres ARRAY @> operator checks membership
+                .order_by(BotRow.created_at)  # stable chronological order
                 .all()
             )
             result = []
             for r in rows:
                 if r.restricted == "admin" and "admin" not in (user_roles or []):
-                    continue
+                    continue  # hide admin-restricted bots from users without the admin role
                 result.append(self._bot_row_to_record(r))
-            return result
+            return result  # filtered list of bots scoped to this module
 
     def seed_bots_for_module(self, module_id: str, bots_data: list[dict], created_by: str = "") -> list["BotRecord"]:
         """Provision bots declared in a module manifest, skipping any that already exist.
@@ -194,19 +194,19 @@ class PostgresAdapter:
             List of ``BotRecord`` instances for bots that were newly created (excludes skipped duplicates).
         """
         import sys
-        new_bots: list[BotRecord] = []
+        new_bots: list[BotRecord] = []  # accumulates only the newly created bots (skips duplicates)
         for bot in bots_data:
-            name = bot.get("name", "").strip()
+            name = bot.get("name", "").strip()  # name is the deduplication key
             if not name:
-                continue
+                continue  # skip entries without a name to avoid creating anonymous bots
             with self._session_ctx() as db:
                 exists = (
                     db.query(BotRow)
-                    .filter(BotRow.name == name, BotRow.modules.contains([module_id]))
+                    .filter(BotRow.name == name, BotRow.modules.contains([module_id]))  # check for exact name + module membership
                     .first()
                 )
             if exists:
-                continue
+                continue  # already provisioned; do not overwrite admin edits
             record = self.create_bot(
                 name=name,
                 description=bot.get("description", ""),
@@ -221,15 +221,15 @@ class PostgresAdapter:
                 created_by=created_by,
                 config_schema=bot.get("config_schema") or {},
             )
-            new_bots.append(record)
-            print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)
-        return new_bots
+            new_bots.append(record)  # track for log emission by the caller
+            print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)  # log to stderr so it appears in Docker logs
+        return new_bots  # caller uses this to emit BotEvent.INIT log entries
 
     def get_bot_types(self) -> list[dict]:
         """Return all bot types ordered alphabetically by name."""
         with self._session_ctx() as db:
-            rows = db.query(BotTypeRow).order_by(BotTypeRow.name).all()
-            return [self._bot_type_row_to_dict(r) for r in rows]
+            rows = db.query(BotTypeRow).order_by(BotTypeRow.name).all()  # alphabetical order for stable UI display
+            return [self._bot_type_row_to_dict(r) for r in rows]  # convert ORM rows to plain dicts for JSON serialisation
 
     def upsert_bot_type(self, data: dict) -> dict:
         """Insert or update a bot type by name and return the resulting dict."""
@@ -265,8 +265,8 @@ class PostgresAdapter:
     def get_bot_by_id(self, bot_id: str) -> BotRecord | None:
         """Return the BotRecord for the given ID, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
-            return self._bot_row_to_record(row) if row else None
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()  # UUID primary-key lookup
+            return self._bot_row_to_record(row) if row else None  # None signals a 404 to the caller
 
     def create_bot(
         self,
@@ -286,7 +286,7 @@ class PostgresAdapter:
         """Insert a new bot row and return the resulting BotRecord."""
         with self._session_ctx() as db:
             row = BotRow(
-                id=str(uuid.uuid4()),
+                id=str(uuid.uuid4()),  # generate a fresh UUID as the primary key
                 name=name,
                 description=description,
                 type=type,
@@ -296,16 +296,16 @@ class PostgresAdapter:
                 icon=icon,
                 # A bot with no module assignments can never appear in any UI surface,
                 # so activating it would be confusing — force it off.
-                active=active and bool(modules),
+                active=active and bool(modules),  # coerce active to False when modules list is empty
                 restricted=restricted,
                 modules=modules,
                 created_by=created_by,
-                config_schema=config_schema or {},
+                config_schema=config_schema or {},  # default to empty dict if caller passes None
             )
-            db.add(row)
-            db.commit()
-            db.refresh(row)
-            return self._bot_row_to_record(row)
+            db.add(row)     # stage the insert
+            db.commit()     # persist to the DB
+            db.refresh(row)  # reload server-set fields (created_at, updated_at)
+            return self._bot_row_to_record(row)  # convert to the database-agnostic BotRecord
 
     def update_bot(
         self,
@@ -324,9 +324,9 @@ class PostgresAdapter:
     ) -> BotRecord | None:
         """Update an existing bot by ID and return the updated BotRecord, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()  # locate the row to update
             if not row:
-                return None
+                return None  # signals a 404 to the caller
             row.name = name
             row.description = description
             row.type = type
@@ -334,26 +334,26 @@ class PostgresAdapter:
             row.model = model
             row.system_prompt = system_prompt
             row.icon = icon
-            row.active = active and bool(modules)
+            row.active = active and bool(modules)  # force active=False when modules list becomes empty
             row.restricted = restricted
             row.modules = modules
             # Only update when explicitly provided — admin-UI PUT omits this field and
             # must not silently clobber the manifest-seeded schema.
-            if config_schema is not None:
+            if config_schema is not None:  # None means "leave existing schema unchanged"
                 row.config_schema = config_schema
-            db.commit()
-            db.refresh(row)
-            return self._bot_row_to_record(row)
+            db.commit()      # persist all mutations
+            db.refresh(row)  # reload server-set fields (updated_at)
+            return self._bot_row_to_record(row)  # convert to the database-agnostic BotRecord
 
     def delete_bot(self, bot_id: str) -> bool:
         """Delete a bot by ID and return True if the row existed."""
         with self._session_ctx() as db:
-            row = db.query(BotRow).filter(BotRow.id == bot_id).first()
+            row = db.query(BotRow).filter(BotRow.id == bot_id).first()  # locate the row to delete
             if not row:
-                return False
-            db.delete(row)
-            db.commit()
-            return True
+                return False  # signals a 404 to the caller
+            db.delete(row)  # stage the DELETE
+            db.commit()     # execute and commit
+            return True  # confirm the row was found and deleted
 
     # ------------------------------------------------------------------
     # Modules
@@ -382,33 +382,33 @@ class PostgresAdapter:
         with self._session_ctx() as db:
             q = db.query(ModuleRow)
             if enabled_only:
-                q = q.filter(ModuleRow.enabled == True)
+                q = q.filter(ModuleRow.enabled == True)  # sidebar view; only enabled modules shown
             rows = q.all()
             result = []
             for r in rows:
-                if user_roles is not None:
+                if user_roles is not None:  # None means "no role filter" (admin context)
                     mod_roles = list(r.roles or [])
                     if mod_roles and not any(role in mod_roles for role in user_roles):
-                        continue
+                        continue  # skip modules whose role list does not intersect the caller's roles
                 result.append(self._module_row_to_dict(r))
-            return result
+            return result  # filtered list ready for JSON serialisation
 
     def get_module(self, module_id: str) -> dict | None:
         """Return the module dict for the given ID, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
-            return self._module_row_to_dict(row) if row else None
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()  # UUID primary-key lookup
+            return self._module_row_to_dict(row) if row else None  # None signals a 404 to the caller
 
     def get_module_by_id(self, module_id: str) -> dict | None:
         """Return the module dict for the given primary-key ID, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()  # UUID primary-key lookup
             return self._module_row_to_dict(row) if row else None
 
     def get_module_by_scope(self, scope: str) -> dict | None:
         """Return the module dict for the given Webpack federation scope, or None if not found."""
         with self._session_ctx() as db:
-            row = db.query(ModuleRow).filter(ModuleRow.scope == scope).first()
+            row = db.query(ModuleRow).filter(ModuleRow.scope == scope).first()  # unique-index lookup on the scope column
             return self._module_row_to_dict(row) if row else None
 
     def upsert_module(self, data: dict) -> dict:
@@ -502,18 +502,18 @@ class PostgresAdapter:
         modules array becomes empty after removal are deleted outright.
         """
         with self._session_ctx() as db:
-            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
+            row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()  # locate the module row to delete
             if not row:
-                return False
-            for bot in db.query(BotRow).filter(BotRow.modules.contains([module_id])).all():
-                remaining = [m for m in (bot.modules or []) if m != module_id]
+                return False  # signals a 404 to the caller
+            for bot in db.query(BotRow).filter(BotRow.modules.contains([module_id])).all():  # find every bot scoped to this module
+                remaining = [m for m in (bot.modules or []) if m != module_id]  # remove the deleted module from the bot's list
                 if remaining:
-                    bot.modules = remaining
+                    bot.modules = remaining  # still has other modules; just update the array
                 else:
-                    db.delete(bot)
-            db.delete(row)
-            db.commit()
-            return True
+                    db.delete(bot)  # orphaned bot with no modules left; remove it entirely
+            db.delete(row)  # stage the module row deletion
+            db.commit()     # commit the module delete and all bot changes atomically
+            return True  # confirms the row was found and deleted
 
     # ------------------------------------------------------------------
     # i18n
@@ -522,32 +522,32 @@ class PostgresAdapter:
     def get_i18n_data(self, lang: str) -> dict | None:
         """Return the translation dict for the given language code, or None if absent."""
         with self._session_ctx() as db:
-            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
-            return dict(row.data) if row else None
+            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()  # primary-key lookup on the lang column
+            return dict(row.data) if row else None  # copy to a plain dict; None when the language hasn't been seeded yet
 
     def set_i18n_data(self, lang: str, data: dict) -> None:
         """Upsert the full translation data dict for the given language code."""
         from datetime import datetime
         with self._session_ctx() as db:
-            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()
+            row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()  # check for an existing row
             if row:
-                row.data = data
-                row.updated_at = datetime.utcnow()
+                row.data = data                        # replace the full JSON blob
+                row.updated_at = datetime.utcnow()    # bump the timestamp for version tracking
             else:
-                db.add(TranslationRow(lang=lang, data=data, updated_at=datetime.utcnow()))
-            db.commit()
+                db.add(TranslationRow(lang=lang, data=data, updated_at=datetime.utcnow()))  # first-time insert for this language
+            db.commit()  # persist the change
 
     def merge_i18n_data(self, lang: str, defaults: dict) -> None:
         """Deep-merge defaults into the existing translation data, preserving admin overrides."""
-        existing = self.get_i18n_data(lang) or {}
-        self.set_i18n_data(lang, _deep_merge(defaults, existing))
+        existing = self.get_i18n_data(lang) or {}  # treat a missing language as an empty dict
+        self.set_i18n_data(lang, _deep_merge(defaults, existing))  # admin edits win over defaults because existing is the override arg
 
     def get_i18n_versions(self) -> dict[str, str]:
         """Return a mapping of language code to ISO-formatted last-updated timestamp."""
         with self._session_ctx() as db:
-            rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()
+            rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()  # select only two columns; avoids loading the large data JSON
             return {
-                r.lang: r.updated_at.isoformat() if r.updated_at else ""
+                r.lang: r.updated_at.isoformat() if r.updated_at else ""  # empty string for rows with no timestamp
                 for r in rows
             }
 
@@ -567,26 +567,26 @@ class PostgresAdapter:
             q = (
                 db.query(ModuleDocumentRow)
                 .filter(
-                    ModuleDocumentRow.module_id == module_id,
-                    ModuleDocumentRow.collection == collection,
+                    ModuleDocumentRow.module_id == module_id,   # scope to the owning module
+                    ModuleDocumentRow.collection == collection,  # scope to the named collection
                 )
                 .offset(skip)
                 .limit(limit)
             )
-            return [{"id": row.id, **(row.data or {})} for row in q.all()]
+            return [{"id": row.id, **(row.data or {})} for row in q.all()]  # merge the PK into the data dict for the caller
 
     def insert_document(self, module_id: str, collection: str, data: dict) -> str:
         """Insert a document into a module collection and return its generated ID."""
         with self._session_ctx() as db:
             row = ModuleDocumentRow(
-                id=str(uuid.uuid4()),
+                id=str(uuid.uuid4()),  # generate a fresh UUID as the document PK
                 module_id=module_id,
                 collection=collection,
                 data=data,
             )
-            db.add(row)
-            db.commit()
-            return row.id
+            db.add(row)    # stage the insert
+            db.commit()    # persist; id is already known (not server-generated) so no refresh needed
+            return row.id  # return the generated UUID to the caller for use as the document reference
 
     def update_document(self, module_id: str, collection: str, doc_id: str, update: dict) -> bool:
         """Replace a document's data payload and return True if the document existed."""
@@ -594,17 +594,17 @@ class PostgresAdapter:
             row = (
                 db.query(ModuleDocumentRow)
                 .filter(
-                    ModuleDocumentRow.id == doc_id,
-                    ModuleDocumentRow.module_id == module_id,
-                    ModuleDocumentRow.collection == collection,
+                    ModuleDocumentRow.id == doc_id,              # locate by PK
+                    ModuleDocumentRow.module_id == module_id,    # scope guard: prevent cross-module updates
+                    ModuleDocumentRow.collection == collection,   # scope guard: prevent cross-collection updates
                 )
                 .first()
             )
             if not row:
-                return False
-            row.data = update
-            db.commit()
-            return True
+                return False  # signals a 404 to the caller
+            row.data = update  # replace the full JSON payload; partial updates are not supported
+            db.commit()        # persist
+            return True  # confirms the document was found and updated
 
     def delete_document(self, module_id: str, collection: str, doc_id: str) -> bool:
         """Delete a document from a module collection and return True if it existed."""
@@ -612,19 +612,20 @@ class PostgresAdapter:
             row = (
                 db.query(ModuleDocumentRow)
                 .filter(
-                    ModuleDocumentRow.id == doc_id,
-                    ModuleDocumentRow.module_id == module_id,
-                    ModuleDocumentRow.collection == collection,
+                    ModuleDocumentRow.id == doc_id,              # locate by PK
+                    ModuleDocumentRow.module_id == module_id,    # scope guard: prevent cross-module deletes
+                    ModuleDocumentRow.collection == collection,   # scope guard: prevent cross-collection deletes
                 )
                 .first()
             )
             if not row:
-                return False
-            db.delete(row)
-            db.commit()
-            return True
+                return False  # signals a 404 to the caller
+            db.delete(row)  # stage the DELETE
+            db.commit()     # execute and commit
+            return True  # confirms the document was found and deleted
 
     def _page_registry_row_to_dict(self, row: "PageRegistryRow") -> dict:
+        """Convert a PageRegistryRow ORM instance to a plain dictionary."""
         return {
             "id": row.id,
             "route": row.route,
@@ -634,8 +635,8 @@ class PostgresAdapter:
             "remote_url": row.remote_url,
             "scope": row.scope,
             "component": row.component,
-            "roles": list(row.roles or []),
-            "skeleton": dict(row.skeleton) if row.skeleton else {},
+            "roles": list(row.roles or []),            # convert ARRAY to list; guard against NULL
+            "skeleton": dict(row.skeleton) if row.skeleton else {},  # copy to plain dict; empty dict for NULL rows
             "enabled": row.enabled,
         }
 
@@ -648,21 +649,21 @@ class PostgresAdapter:
     def get_page_config(self, route: str) -> dict | None:
         """Return the page registry config for the given route, or None if absent."""
         with self._session_ctx() as db:
-            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
-            return self._page_registry_row_to_dict(row) if row else None
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()  # unique-index lookup on the route column
+            return self._page_registry_row_to_dict(row) if row else None  # None signals a 404 to the caller
 
     def update_page_config(self, route: str, data: dict) -> dict | None:
         """Update mutable page registry fields for the given route and return the updated dict."""
         with self._session_ctx() as db:
-            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()  # locate by unique route
             if not row:
-                return None
-            for field in ("title", "roles", "skeleton", "enabled"):
+                return None  # signals a 404 to the caller
+            for field in ("title", "roles", "skeleton", "enabled"):  # only mutable fields; type/component/remote_url are immutable post-seed
                 if field in data:
-                    setattr(row, field, data[field])
-            db.commit()
-            db.refresh(row)
-            return self._page_registry_row_to_dict(row)
+                    setattr(row, field, data[field])  # apply each provided field; omitted fields are left unchanged
+            db.commit()      # persist the mutations
+            db.refresh(row)  # reload the row to pick up any server-set values
+            return self._page_registry_row_to_dict(row)  # return the updated config to the caller
 
     def seed_page_registry(self, route: str, data: dict) -> None:
         """Insert a page_registry entry only if the route does not already exist.
@@ -670,8 +671,8 @@ class PostgresAdapter:
         Skips existing rows to preserve any admin edits to title/roles/skeleton made after initial seed.
         """
         with self._session_ctx() as db:
-            existing = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
-            if not existing:
+            existing = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()  # check for a prior seed
+            if not existing:  # only insert on first run; subsequent startups must not overwrite admin edits
                 row = PageRegistryRow(
                     route=route,
                     title=data.get("title", ""),
@@ -684,19 +685,20 @@ class PostgresAdapter:
                     skeleton=data.get("skeleton", {}),
                     enabled=data.get("enabled", True),
                 )
-                db.add(row)
-                db.commit()
+                db.add(row)    # stage the insert
+                db.commit()    # persist; no refresh needed since caller doesn't use the returned row
 
     # ── UI Components ────────────────────────────────────────────────────────
 
     def _ui_component_row_to_dict(self, row: UIComponentRow) -> dict:
+        """Convert a UIComponentRow ORM instance to a plain dictionary."""
         return {
             "id": row.id,
             "name": row.name,
             "export": row.export,
             "file": row.file,
             "description": row.description,
-            "props": row.props or [],
+            "props": row.props or [],  # guard against NULL; callers always expect a list
             "notes": row.notes,
             "sort_order": row.sort_order,
         }
@@ -704,32 +706,32 @@ class PostgresAdapter:
     def get_ui_components(self) -> list[dict]:
         """Return all UI component docs ordered by sort_order then name."""
         with self._session_ctx() as db:
-            rows = db.query(UIComponentRow).order_by(UIComponentRow.sort_order, UIComponentRow.name).all()
-            return [self._ui_component_row_to_dict(r) for r in rows]
+            rows = db.query(UIComponentRow).order_by(UIComponentRow.sort_order, UIComponentRow.name).all()  # primary: sort_order, secondary: name for ties
+            return [self._ui_component_row_to_dict(r) for r in rows]  # convert ORM rows to plain dicts
 
     def upsert_ui_component(self, data: dict) -> dict:
         """Insert or update a UI component entry by name and return the resulting dict."""
         with self._session_ctx() as db:
-            row = db.query(UIComponentRow).filter(UIComponentRow.name == data["name"]).first()
+            row = db.query(UIComponentRow).filter(UIComponentRow.name == data["name"]).first()  # unique-name lookup to decide insert vs update
             if not row:
                 row = UIComponentRow(
-                    id=str(uuid.uuid4()),
+                    id=str(uuid.uuid4()),                  # generate a fresh UUID for the new entry
                     name=data["name"],
-                    export=data.get("export", data["name"]),
+                    export=data.get("export", data["name"]),  # default export name equals component name
                     file=data.get("file", ""),
                     description=data.get("description", ""),
                     props=data.get("props", []),
                     notes=data.get("notes"),
                     sort_order=data.get("sort_order", 0),
                 )
-                db.add(row)
+                db.add(row)  # stage the insert
             else:
-                row.export = data.get("export", row.export)
+                row.export = data.get("export", row.export)              # update only fields present in the payload
                 row.file = data.get("file", row.file)
                 row.description = data.get("description", row.description)
                 row.props = data.get("props", row.props)
                 row.notes = data.get("notes", row.notes)
                 row.sort_order = data.get("sort_order", row.sort_order)
-            db.commit()
-            db.refresh(row)
-            return self._ui_component_row_to_dict(row)
+            db.commit()      # persist the insert or update
+            db.refresh(row)  # reload server-set fields
+            return self._ui_component_row_to_dict(row)  # return the final state to the caller

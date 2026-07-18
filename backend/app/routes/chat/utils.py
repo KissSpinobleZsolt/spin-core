@@ -19,24 +19,24 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
     Returns:
         A single string suitable for use as the ``system`` role message.
     """
-    is_admin = "admin" in user_roles
+    is_admin = "admin" in user_roles  # determines whether admin-only nav links are included
 
     # Look up the preprompt text defined on the bot's type.
-    preprompt = ""
+    preprompt = ""  # default to empty if the bot type has no preprompt or doesn't exist
     for bt in pg.get_bot_types():
         if bt["name"] == bot.type:
-            preprompt = bt.get("preprompt") or ""
+            preprompt = bt.get("preprompt") or ""  # guard against None in the DB
             break
 
-    modules = pg.get_modules(enabled_only=True, user_roles=user_roles)
-    bots = pg.get_bots(admin=False, user_roles=user_roles)
+    modules = pg.get_modules(enabled_only=True, user_roles=user_roles)  # only enabled modules visible to this user
+    bots = pg.get_bots(admin=False, user_roles=user_roles)              # active bots visible to this user
 
-    nav = _NAV_PUBLIC + (_NAV_ADMIN if is_admin else [])
+    nav = _NAV_PUBLIC + (_NAV_ADMIN if is_admin else [])  # build the navigation list based on the caller's role
 
     # Optional current-module context block appended when the request originates
     # from a specific module page.
     module_lines = []
-    if module:
+    if module:  # inject module-specific context when the chat originates from a module page
         module_lines = [
             "",
             "### Current Module",
@@ -50,7 +50,7 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
         "You are running inside spin-core, a full-stack AI platform.",
         "",
         "### Pages",
-        *[f"- [{name}]({route}): {desc}" for route, name, desc in nav],
+        *[f"- [{name}]({route}): {desc}" for route, name, desc in nav],  # unpack nav tuples into Markdown links
         "",
         "### Installed Modules",
         *(
@@ -63,11 +63,11 @@ def _build_system_message(pg, bot, user_roles: list[str], module: dict | None = 
             [f"- {b.icon} {b.name} [{b.type}]: {b.description}" for b in bots]
             if bots else ["- (none available)"]
         ),
-        *module_lines,
+        *module_lines,  # append module block when present; empty list means nothing is added
         "",
         "## END PLATFORM CONTEXT ##",
     ]
 
     # Join non-empty sections with a blank line between them.
-    parts = [p for p in [preprompt, "\n".join(ctx_lines), bot.system_prompt] if p]
-    return "\n\n".join(parts)
+    parts = [p for p in [preprompt, "\n".join(ctx_lines), bot.system_prompt] if p]  # filter out empty strings
+    return "\n\n".join(parts)  # double newline separates sections for clean LLM readability
