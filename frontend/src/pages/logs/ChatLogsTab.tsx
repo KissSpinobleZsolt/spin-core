@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react' // filter, page, and expand state
 import { type ChatLogDetails } from '@services' // chat log detail shape
-import { Btn } from '../../components/ui/button' // filter + clear buttons
-import { Input } from '../../components/ui/input' // email filter input
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error display
-import { Pagination } from '../../components/ui/Pagination' // page controls
+import { Btn } from '@components/ui/button' // filter + clear buttons
+import { Input } from '@components/ui/input' // email filter input
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error display
+import { Pagination } from '@components/ui/Pagination' // page controls
 import { formatEventTime } from '@utils' // consistent time formatting
 import { useChatLogs } from '@hooks' // paginated chat log fetch hook
 import { PAGE_SIZE } from './PAGE_SIZE.constant' // rows per page

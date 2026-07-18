@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react' // async load + polling control
 import { botConfigService, type BotProcesses } from '@services' // processes data type + fetch
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error display
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error display
 import { StatRow } from './StatRow' // key-value stat row
 import { SEVERITY_COLOUR_MAP } from './SEVERITY_COLOUR_MAP.constant' // severity classes
 

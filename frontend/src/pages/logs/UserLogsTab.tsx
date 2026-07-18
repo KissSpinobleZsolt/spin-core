@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react' // filter and page state
 import { type UserLogEntry } from '@services' // user log entry shape
-import { Btn } from '../../components/ui/button' // filter + clear buttons
-import { Input } from '../../components/ui/input' // owner filter input
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error display
-import { Table, type TableColumn } from '../../components/ui/Table' // data table
-import { Pagination } from '../../components/ui/Pagination' // page controls
+import { Btn } from '@components/ui/button' // filter + clear buttons
+import { Input } from '@components/ui/input' // owner filter input
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error display
+import { Table, type TableColumn } from '@components/ui/Table' // data table
+import { Pagination } from '@components/ui/Pagination' // page controls
 import { formatEventTime } from '@utils' // consistent time formatting
 import { useUserLogs } from '@hooks' // paginated user log fetch hook
 import { LevelBadge } from './LevelBadge' // log level badge

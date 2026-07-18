@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react' // scroll-to-bottom + ref
 import { useNavigate, useParams } from 'react-router-dom' // route params + navigation
 import { botsService, type Bot } from '@services' // bot CRUD
 import { useGet, useChatStream } from '@hooks' // data fetching + streaming chat
-import { Btn } from '../../components/ui/button' // send / stop button
+import { Btn } from '@components/ui/button' // send / stop button
 import { useSettings } from '@context' // module list for resolving scope
 import BotConfigPage from '../botConfigPage' // config panel for non-communicator bots
 import { BotConfigSkeleton } from './BotConfigSkeleton' // placeholder when scope not yet resolved

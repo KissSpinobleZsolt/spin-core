@@ -1,4 +1,4 @@
-import { Tabs } from '../../components/ui/tabs' // tab bar
+import { Tabs } from '@components/ui/tabs' // tab bar
 import { ApiLogsTab } from './ApiLogsTab' // API request log tab
 import { UserLogsTab } from './UserLogsTab' // user activity log tab
 import { ChatLogsTab } from './ChatLogsTab' // chat log tab

@@ -1,9 +1,9 @@
 import { botsService, type Bot } from '@services' // bots CRUD service
 import { useGet } from '@hooks' // data-fetching hook
-import { PageTitle } from '../../components/ui/PageTitle' // page heading
-import { AdminPageShell } from '../../components/layout/adminPageShell' // layout wrapper
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error message
+import { PageTitle } from '@components/ui/PageTitle' // page heading
+import { AdminPageShell } from '@components/layout/adminPageShell' // layout wrapper
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error message
 import { BotCard } from './BotCard' // single bot card
 
 export default function Bots() { // public bot catalogue (hides system bots)

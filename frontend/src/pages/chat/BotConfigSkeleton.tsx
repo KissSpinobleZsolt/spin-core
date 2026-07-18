@@ -1,6 +1,6 @@
 import { useNavigate } from 'react-router-dom' // back navigation
 import { type Bot } from '@services' // Bot entity type
-import { BOT_TYPES, TYPE_BADGE } from '../../constants/botConstants' // type labels + badge classes
+import { BOT_TYPES, TYPE_BADGE } from '@constants/botConstants' // type labels + badge classes
 import { SkeletonRow } from './SkeletonRow' // animated placeholder row
 import { SkeletonSection } from './SkeletonSection' // section grouping for skeleton rows
 

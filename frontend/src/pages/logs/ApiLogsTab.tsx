@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react' // filter and page state
 import { type LogEntry } from '@services' // API log entry shape
-import { Btn } from '../../components/ui/button' // filter + clear buttons
-import { Input } from '../../components/ui/input' // filter inputs
-import { StatCard } from '../../components/ui/statCard' // metric cards
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error display
-import { Table, type TableColumn } from '../../components/ui/Table' // data table
-import { Pagination } from '../../components/ui/Pagination' // page controls
+import { Btn } from '@components/ui/button' // filter + clear buttons
+import { Input } from '@components/ui/input' // filter inputs
+import { StatCard } from '@components/ui/statCard' // metric cards
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error display
+import { Table, type TableColumn } from '@components/ui/Table' // data table
+import { Pagination } from '@components/ui/Pagination' // page controls
 import { formatEventTime } from '@utils' // consistent time formatting
 import { useApiLogs } from '@hooks' // paginated API log fetch hook
 import { LevelBadge } from './LevelBadge' // log level badge

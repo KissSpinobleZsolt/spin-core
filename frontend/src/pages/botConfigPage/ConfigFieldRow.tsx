@@ -1,5 +1,5 @@
 import { type BotConfigSchemaField } from '@services' // schema field descriptor type
-import { Toggle } from '../../components/ui/toggle' // boolean toggle control
+import { Toggle } from '@components/ui/toggle' // boolean toggle control
 
 export function ConfigFieldRow({ // renders boolean/select/number/password inputs from schema
   field,

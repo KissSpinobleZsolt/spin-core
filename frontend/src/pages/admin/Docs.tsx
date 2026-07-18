@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { PageTitle } from '../../components/ui/PageTitle'
-import { Input } from '../../components/ui/input'
+import { PageTitle } from '@components/ui/PageTitle'
+import { Input } from '@components/ui/input'
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 

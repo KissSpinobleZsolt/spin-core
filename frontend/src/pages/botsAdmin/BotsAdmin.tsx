@@ -5,14 +5,14 @@ import {
   settingsService, type ModuleConfig,
 } from '@services' // CRUD services
 import { useGet } from '@hooks' // data fetching
-import { Btn } from '../../components/ui/button' // action buttons
-import { Badge } from '../../components/ui/badge' // type badge in table
-import { Toggle } from '../../components/ui/toggle' // active toggle in table
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // error message
-import { PageTitle } from '../../components/ui/PageTitle' // page heading
-import { Table, type TableColumn } from '../../components/ui/Table' // data table
-import { BOT_TYPES } from '../../constants/botConstants' // type label map
+import { Btn } from '@components/ui/button' // action buttons
+import { Badge } from '@components/ui/badge' // type badge in table
+import { Toggle } from '@components/ui/toggle' // active toggle in table
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { ErrorBanner } from '@components/ui/ErrorBanner' // error message
+import { PageTitle } from '@components/ui/PageTitle' // page heading
+import { Table, type TableColumn } from '@components/ui/Table' // data table
+import { BOT_TYPES } from '@constants/botConstants' // type label map
 import { BotModal } from './BotModal' // add/edit form modal
 import { BotLogsDrawer } from './BotLogsDrawer' // logs slide-in drawer
 
