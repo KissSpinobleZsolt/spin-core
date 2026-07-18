@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageTitle } from '@components/ui/PageTitle'
-import { DocPageShell } from '../@components/layout/docPageShell'
+import { DocPageShell } from '@components/layout/docPageShell'
 import { Tabs } from '@components/ui/tabs'
 import { AnomaScanLayout } from './AnomaScanLayout'
 import { CloudInsightAILayout } from './CloudInsightAILayout'

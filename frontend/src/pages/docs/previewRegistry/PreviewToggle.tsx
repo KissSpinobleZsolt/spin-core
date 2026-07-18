@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Toggle } from '../@components/ui/toggle' // on/off switch
+import { Toggle } from '@components/ui/toggle' // on/off switch
 
 // Shows two interactive toggles and one disabled toggle.
 export function PreviewToggle() {

@@ -7,10 +7,10 @@ export const Bots           = lazy(() => import('../../pages/bots'))            
 export const Chat           = lazy(() => import('../../pages/chat'))                   // bot chat with config panel
 export const LLMs           = lazy(() => import('../../pages/admin/LLMs'))             // LLM model management
 export const Users          = lazy(() => import('../../pages/admin/Users'))            // user management
-export const Modules        = lazy(() => import('../../pages/admin/modules'))          // MF module management
-export const Status         = lazy(() => import('../../pages/admin/status'))           // platform health status
-export const Layouts        = lazy(() => import('../../pages/admin/layouts'))          // layout component demos
-export const DocsUI         = lazy(() => import('../../pages/admin/docs/ui'))          // UI component catalogue docs
-export const DocsApi        = lazy(() => import('../../pages/admin/docs/api'))         // API reference docs
-export const DocsDeployment = lazy(() => import('../../pages/admin/docs/deployment'))  // deployment guide docs
+export const Modules        = lazy(() => import('../../pages/modules'))          // MF module management
+export const Status         = lazy(() => import('../../pages/status'))           // platform health status
+export const Layouts        = lazy(() => import('../../pages/layouts'))          // layout component demos
+export const DocsUI         = lazy(() => import('../../pages/docs/ui'))          // UI component catalogue docs
+export const DocsApi        = lazy(() => import('../../pages/docs/api'))         // API reference docs
+export const DocsDeployment = lazy(() => import('../../pages/docs/deployment'))  // deployment guide docs
 export const NotFound       = lazy(() => import('../../pages/NotFound'))               // 404 catch-all page

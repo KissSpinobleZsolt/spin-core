@@ -1,4 +1,4 @@
-import { PageTitle } from '../@components/ui/PageTitle' // large page-level heading
+import { PageTitle } from '@components/ui/PageTitle' // large page-level heading
 
 // Shows the PageTitle component with sample text.
 export function PreviewPageTitle() {

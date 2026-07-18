@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { PageTitle } from '@components/ui/PageTitle'
-import { DocPageShell } from '../../@components/layout/docPageShell'
+import { DocPageShell } from '@components/layout/docPageShell'
 import { Input } from '@components/ui/input'
 import type { Method } from './Method.type' // used to cast the legend method array
 import { GROUPS } from './GROUPS.constant' // full list of API groups to render

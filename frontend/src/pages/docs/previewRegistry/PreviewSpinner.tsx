@@ -1,4 +1,4 @@
-import { Spinner } from '../@components/ui/spinner' // animated loading indicator
+import { Spinner } from '@components/ui/spinner' // animated loading indicator
 
 // Shows all three Spinner sizes (sm, md, lg) side by side with labels.
 export function PreviewSpinner() {

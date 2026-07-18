@@ -1,6 +1,6 @@
 import { useState } from 'react' // tab state
 import { PageTitle } from '@components/ui/PageTitle' // page heading
-import { DocPageShell } from '../../@components/layout/docPageShell' // docs layout
+import { DocPageShell } from '@components/layout/docPageShell' // docs layout
 import { Tabs } from '@components/ui/tabs' // tab bar
 import { DockerTab } from './DockerTab' // Docker Compose section
 import { KubernetesTab } from './KubernetesTab' // Kubernetes section

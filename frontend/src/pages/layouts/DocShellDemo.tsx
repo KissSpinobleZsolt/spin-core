@@ -1,4 +1,4 @@
-import { DocPageShell } from '../@components/layout/docPageShell'
+import { DocPageShell } from '@components/layout/docPageShell'
 import { Card } from '@components/ui/Card'
 
 // Demo showing DocPageShell padding, centring, and prop overrides

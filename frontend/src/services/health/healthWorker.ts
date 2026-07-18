@@ -1,4 +1,4 @@
-import type { HealthPayload } from './types'
+import type { HealthPayload } from './HealthPayload.type'
 
 // || not ?? — Number(undefined) is NaN, which is falsy; ?? would keep NaN because it is not null/undefined
 const INTERVAL_MS = Number(import.meta.env.VITE_HEALTH_INTERVAL_MS) || 30_000

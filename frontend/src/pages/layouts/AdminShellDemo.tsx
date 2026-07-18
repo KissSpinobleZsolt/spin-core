@@ -1,4 +1,4 @@
-import { AdminPageShell } from '../@components/layout/adminPageShell'
+import { AdminPageShell } from '@components/layout/adminPageShell'
 import { Card } from '@components/ui/Card'
 
 // Demo showing AdminPageShell width-constraining and spacing behaviour

@@ -1,5 +1,5 @@
 import { PageTitle } from '@components/ui/PageTitle' // page heading
-import { AdminPageShell } from '../@components/layout/adminPageShell' // layout wrapper
+import { AdminPageShell } from '@components/layout/adminPageShell' // layout wrapper
 import { AppHealthSection } from './AppHealthSection' // API health row
 import { DbStatusSection } from './DbStatusSection' // postgres + clickhouse rows
 import { InstalledLLMsSection } from './InstalledLLMsSection' // ollama model list

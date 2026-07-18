@@ -1,4 +1,4 @@
-import type { Notification } from './types'
+import type { Notification } from './Notification.type'
 
 type Listener = (batch: Notification[]) => void
 

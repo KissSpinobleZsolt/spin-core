@@ -1,4 +1,4 @@
-import { ProgressBar } from '../@components/ui/progressBar' // labelled progress bar
+import { ProgressBar } from '@components/ui/progressBar' // labelled progress bar
 
 // Shows three ProgressBar instances with different values and colours.
 export function PreviewProgressBar() {

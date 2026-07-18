@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { Btn } from '../@components/ui/button' // trigger button
-import { Modal } from '../@components/ui/modal' // overlay dialog
+import { Btn } from '@components/ui/button' // trigger button
+import { Modal } from '@components/ui/modal' // overlay dialog
 
 // Demonstrates a Modal opened via a button, with Cancel and Confirm actions.
 export function PreviewModal() {

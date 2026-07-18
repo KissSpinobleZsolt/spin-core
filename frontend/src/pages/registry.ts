@@ -10,10 +10,10 @@ export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType<obj
   BotsAdmin:       lazy(() => import('./botsAdmin')),          // bot management admin page
   LLMs:            lazy(() => import('./admin/LLMs')),         // LLM model management (flat file)
   Users:           lazy(() => import('./admin/Users')),        // user management (flat file)
-  Modules:         lazy(() => import('./admin/modules')),      // MF module management
-  Status:          lazy(() => import('./admin/status')),       // platform health status
-  Layouts:         lazy(() => import('./admin/layouts')),      // layout component demos
-  DocsUI:          lazy(() => import('./admin/docs/ui')),      // UI component catalogue docs
-  DocsApi:         lazy(() => import('./admin/docs/api')),     // API reference docs
-  DocsDeployment:  lazy(() => import('./admin/docs/deployment')), // deployment guide docs
+  Modules:         lazy(() => import('./modules')),      // MF module management
+  Status:          lazy(() => import('./status')),       // platform health status
+  Layouts:         lazy(() => import('./layouts')),      // layout component demos
+  DocsUI:          lazy(() => import('./docs/ui')),      // UI component catalogue docs
+  DocsApi:         lazy(() => import('./docs/api')),     // API reference docs
+  DocsDeployment:  lazy(() => import('./docs/deployment')), // deployment guide docs
 }

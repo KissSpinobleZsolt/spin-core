@@ -1,9 +1,9 @@
 import { useState } from 'react'
-import { PageTitle } from '../@components/ui/PageTitle'
-import { DocPageShell } from '../../@components/layout/docPageShell'
-import { Input } from '../@components/ui/input'
-import { Spinner } from '../@components/ui/spinner'
-import { ErrorBanner } from '../@components/ui/ErrorBanner'
+import { PageTitle } from '@components/ui/PageTitle'
+import { DocPageShell } from '@components/layout/docPageShell'
+import { Input } from '@components/ui/input'
+import { Spinner } from '@components/ui/spinner'
+import { ErrorBanner } from '@components/ui/ErrorBanner'
 import { useUIComponents } from '@context'
 import { useActiveSection } from '../useActiveSection.hook' // shared scroll-spy hook
 import { ComponentCard } from './ComponentCard' // docs card per component
@@ -50,7 +50,7 @@ export default function DocsUI() {
           </p>
         </div>
         <div className="w-64">
-          <Input placeholder="Search components…" value={query} onChange={e => setQuery(e.target.value)} />
+          <Input placeholder="Search components…" value={query} onChange={(e: React.ChangeEvent<HTMLInputElement>) => setQuery(e.target.value)} />
         </div>
       </div>
 

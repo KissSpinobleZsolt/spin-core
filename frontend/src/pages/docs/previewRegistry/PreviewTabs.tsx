@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Tabs } from '../@components/ui/tabs' // horizontal tab bar
+import { Tabs } from '@components/ui/tabs' // horizontal tab bar
 
 // Shows a three-tab bar with a controlled active key and a readout below.
 export function PreviewTabs() {

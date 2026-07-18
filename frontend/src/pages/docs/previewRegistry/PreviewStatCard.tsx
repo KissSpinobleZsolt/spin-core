@@ -1,4 +1,4 @@
-import { StatCard } from '../@components/ui/statCard' // KPI metric card
+import { StatCard } from '@components/ui/statCard' // KPI metric card
 
 // Shows two StatCard instances in a two-column grid.
 export function PreviewStatCard() {
