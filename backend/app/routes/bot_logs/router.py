@@ -7,7 +7,7 @@ from app.database import get_ch
 from app.deps import admin_dep
 from app.routes.bot_logs.utils import _get_bot_name
 
-router = APIRouter(prefix="/api/bot-logs", tags=["bot-logs"])
+router = APIRouter(prefix="/api/bot-logs", tags=["bot-logs"])  # mounts all bot-log endpoints under /api/bot-logs
 
 
 @router.get("/{bot_id}/summary")
@@ -21,7 +21,7 @@ async def get_bot_logs_summary(
     offset: int = Query(default=0, ge=0),
 ):
     """Return hourly aggregated event summaries for a bot log, filtered by time range and event type."""
-    bot_name = _get_bot_name(bot_id)
+    bot_name = _get_bot_name(bot_id)  # resolve bot_id to bot_name; raises 404 if not found
     return get_ch().query_bot_logs_summary(
         bot_name,
         from_dt=from_dt,
@@ -43,7 +43,7 @@ async def read_bot_logs(
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
 ):
     """Return paginated raw event log entries for a bot, filtered by time range and event type."""
-    bot_name = _get_bot_name(bot_id)
+    bot_name = _get_bot_name(bot_id)  # resolve bot_id to bot_name; raises 404 if not found
     return get_ch().query_bot_logs(
         bot_name,
         limit=limit,

@@ -4,13 +4,13 @@ from app.database import get_pg
 from app.deps import token_dep, admin_dep
 from app.routes.pages.schemas import PageConfigPatch
 
-router = APIRouter(prefix="/api/pages", tags=["pages"])
+router = APIRouter(prefix="/api/pages", tags=["pages"])  # mounts page registry endpoints under /api/pages
 
 
 @router.get("")
 def list_pages(_: str = Depends(admin_dep)):
     """Return all page_registry entries ordered by route (admin only)."""
-    return get_pg().list_pages()
+    return get_pg().list_pages()  # returns all rows ordered by route for the admin pages table
 
 
 @router.get("/config")
@@ -42,12 +42,12 @@ def get_page_config(route: str = Query(...), _: str = Depends(token_dep)):
             "enabled": mod["enabled"],
         }
 
-    config = get_pg().get_page_config(route)
+    config = get_pg().get_page_config(route)  # look up the native page in page_registry
     if not config:
         raise HTTPException(status_code=404, detail="Page not found")
     if not config.get("enabled", True):  # default True so freshly seeded pages are visible before an explicit toggle
         raise HTTPException(status_code=404, detail="Page disabled")
-    return config
+    return config  # return the page config dict directly to the caller
 
 
 @router.patch("/config")
@@ -56,4 +56,4 @@ def patch_page_config(body: PageConfigPatch, route: str = Query(...), _: str = D
     updated = get_pg().update_page_config(route, body.model_dump(exclude_none=True))  # exclude_none so omitted fields are not overwritten
     if not updated:
         raise HTTPException(status_code=404, detail="Page not found")
-    return updated
+    return updated  # return the full updated config dict

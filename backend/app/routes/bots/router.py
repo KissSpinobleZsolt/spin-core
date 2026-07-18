@@ -7,7 +7,7 @@ from app.deps import token_dep, admin_dep
 from app.events import LogLevel, BotEvent, lifecycle_message
 from app.routes.bots.schemas import BotPayload, BotOut
 
-router = APIRouter(prefix="/api/bots", tags=["bots"])
+router = APIRouter(prefix="/api/bots", tags=["bots"])  # mounts all bot CRUD endpoints under /api/bots
 
 
 @router.get("/types")
@@ -20,14 +20,14 @@ def list_bot_types(_: str = Depends(token_dep)):
 def list_bots(email: str = Depends(token_dep), module_id: Optional[str] = Query(default=None)):
     """Return bots visible to the authenticated user, optionally scoped to a specific module."""
     pg = get_pg()
-    user = pg.get_user_by_email(email)
-    user_roles = user.roles if user else []
-    is_admin = "admin" in user_roles
+    user = pg.get_user_by_email(email)         # load the user record to determine roles
+    user_roles = user.roles if user else []     # default to no roles if the user lookup fails
+    is_admin = "admin" in user_roles            # admins see all bots regardless of active flag
     if module_id:
-        bots = pg.get_bots_for_module(module_id, user_roles=user_roles)
+        bots = pg.get_bots_for_module(module_id, user_roles=user_roles)  # scope to the requested module
     else:
-        bots = pg.get_bots(admin=is_admin, user_roles=user_roles)
-    return [BotOut(**b.__dict__) for b in bots]
+        bots = pg.get_bots(admin=is_admin, user_roles=user_roles)  # platform-wide bot list filtered by role
+    return [BotOut(**b.__dict__) for b in bots]  # convert BotRecord dataclasses to response model instances
 
 
 @router.post("", response_model=BotOut, status_code=201)
@@ -44,18 +44,18 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         active=payload.active,
         restricted=payload.restricted,
         modules=payload.modules,
-        created_by=admin_email,
+        created_by=admin_email,  # record which admin created this bot
         config_schema=payload.config_schema,
     )
     ch = get_ch()
-    ch.write_bot_log(
+    ch.write_bot_log(  # log the creation event to ClickHouse for audit trail
         bot.name, admin_email, BotEvent.INIT,
         {"bot_id": bot.id},
         level=LogLevel.INFO,
         name=bot.name,
         message=lifecycle_message(BotEvent.INIT, bot.name),
     )
-    return BotOut(**bot.__dict__)
+    return BotOut(**bot.__dict__)  # convert the BotRecord to the response schema
 
 
 @router.get("/{bot_id}", response_model=BotOut)
@@ -66,17 +66,17 @@ def get_bot(bot_id: str, email: str = Depends(token_dep)):
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")
 
-    user = pg.get_user_by_email(email)
+    user = pg.get_user_by_email(email)      # load the user to determine role-based visibility
     user_roles = user.roles if user else []
     is_admin = "admin" in user_roles
 
-    if not is_admin:
+    if not is_admin:  # non-admins have additional restrictions
         if not bot.active:
-            raise HTTPException(status_code=404, detail="Bot not found")
+            raise HTTPException(status_code=404, detail="Bot not found")  # hide inactive bots by returning 404
         if bot.restricted == "admin" and "admin" not in user_roles:
-            raise HTTPException(status_code=403, detail="Access denied")
+            raise HTTPException(status_code=403, detail="Access denied")  # admin-restricted bot requires the admin role
 
-    return BotOut(**bot.__dict__)
+    return BotOut(**bot.__dict__)  # return the bot to the caller
 
 
 @router.put("/{bot_id}", response_model=BotOut)
@@ -102,21 +102,21 @@ def update_bot(bot_id: str, payload: BotPayload, email: str = Depends(admin_dep)
         config_schema=payload.config_schema,
     )
     if not bot:
-        raise HTTPException(status_code=404, detail="Bot not found")
+        raise HTTPException(status_code=404, detail="Bot not found")  # guard against race condition between read and update
     if payload.active and not old.active:
-        event = BotEvent.ACTIVATE
+        event = BotEvent.ACTIVATE    # bot is being enabled
     elif not payload.active and old.active:
-        event = BotEvent.DEACTIVATE
+        event = BotEvent.DEACTIVATE  # bot is being disabled
     else:
-        event = BotEvent.UPDATE
-    get_ch().write_bot_log(
+        event = BotEvent.UPDATE  # configuration changed without toggling active state
+    get_ch().write_bot_log(  # log the outcome event to ClickHouse
         bot.name, email, event,
         {"bot_id": bot_id},
         level=LogLevel.INFO,
         name=bot.name,
         message=lifecycle_message(event, bot.name),
     )
-    return BotOut(**bot.__dict__)
+    return BotOut(**bot.__dict__)  # return the updated bot to the caller
 
 
 @router.delete("/{bot_id}", status_code=204)
@@ -127,7 +127,7 @@ def delete_bot(bot_id: str, email: str = Depends(admin_dep)):
     bot = pg.get_bot_by_id(bot_id)
     if not bot or not pg.delete_bot(bot_id):
         raise HTTPException(status_code=404, detail="Bot not found")
-    get_ch().write_bot_log(
+    get_ch().write_bot_log(  # log the deletion event before the bot record is gone
         bot.name, email, BotEvent.DELETE,
         {"bot_id": bot_id},
         level=LogLevel.INFO,

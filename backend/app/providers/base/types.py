@@ -23,10 +23,10 @@ class NormalizedChunk:
         completion_tokens: Total output tokens, populated only on the final chunk.
     """
 
-    content: str
-    done: bool = False
-    prompt_tokens: int = 0
-    completion_tokens: int = 0
+    content: str              # text delta for this chunk; empty string on the terminal sentinel chunk
+    done: bool = False        # True only on the last chunk; signals the chat route to close the SSE stream
+    prompt_tokens: int = 0    # input token count reported by the provider; set on the final chunk only
+    completion_tokens: int = 0  # output token count reported by the provider; set on the final chunk only
 
 
 class LLMProvider(ABC):

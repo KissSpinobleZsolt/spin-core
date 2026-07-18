@@ -16,4 +16,4 @@ _TEMPLATES: dict[str, str] = {  # maps the last segment of an event_type slug to
 def lifecycle_message(event_type: str, name: str) -> str:
     """Return the human-readable message for a lifecycle event type and entity name."""
     key = event_type.split(".")[-1]  # extract the action segment (e.g. "init" from "bot.init")
-    return _TEMPLATES.get(key, "").format(name=name)
+    return _TEMPLATES.get(key, "").format(name=name)  # substitute entity name; returns empty string for unrecognised event keys
