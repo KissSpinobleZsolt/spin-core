@@ -1,4 +1,11 @@
 /** @module services/bots — Bot CRUD, type catalogue, and provider configuration. */
-export * from './types'
-export * from './constants'
+export type { LLMProvider } from './LLMProvider.type'
+export type { BotType } from './BotType.type'
+export type { BotConfigSchemaField } from './BotConfigSchemaField.type'
+export type { BotConfigSchema } from './BotConfigSchema.type'
+export type { Bot } from './Bot.type'
+export type { BotPayload } from './BotPayload.type'
+export { BASE_PATH } from './bots.constant'
+export { PROVIDER_LABELS } from './providerLabels.constant'
+export { PROVIDER_MODEL_HINTS } from './providerModelHints.constant'
 export { botsService } from './botsService'

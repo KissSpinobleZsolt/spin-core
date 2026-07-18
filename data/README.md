@@ -10,12 +10,14 @@ Mounted read-only into the backend container at `SEED_PATH` (`/app/seed-data/see
 
 ```json
 {
+  "dashboard": { "content": "…markdown…" },
+  "bot_types": [ … ],
+  "bots": [ … ],
   "settings": {
     "theme": { "default_theme": "dark" },
     "modules": [ … ]
   },
-  "dashboard": { "content": "…markdown…" },
-  "bots": [ … ]
+  "ui_components": [ … ]
 }
 ```
 

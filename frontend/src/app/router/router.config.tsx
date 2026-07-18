@@ -31,7 +31,7 @@ export const router = createBrowserRouter([
             path: 'logs',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <PageLoader /> // lazy-loads the Logs page
+                <PageLoader />
               </RoleGuard>
             ),
           },
@@ -47,7 +47,7 @@ export const router = createBrowserRouter([
             path: 'bots-admin',
             element: (
               <RoleGuard requiredRoles={['admin']}>
-                <PageLoader /> // lazy-loads the BotsAdmin page
+                <PageLoader />
               </RoleGuard>
             ),
           },

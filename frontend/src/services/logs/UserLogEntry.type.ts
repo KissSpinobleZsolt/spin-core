@@ -8,9 +8,3 @@ export interface UserLogEntry {
   name: string
   details: string
 }
-
-/** Paginated list of user log entries. */
-export interface UserLogsPage {
-  items: UserLogEntry[]
-  total: number
-}

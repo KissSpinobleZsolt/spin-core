@@ -1,15 +1,8 @@
 import { apiService } from '../api'
 import { safeJsonParse } from '@utils'
-import type { AuthCredentials, AuthUser } from './types'
-
-const IS_MOCK = import.meta.env.VITE_USE_MOCK === 'true'
-const USER_KEY = 'auth_user'
-
-const MOCK_USER: AuthUser = {
-  name: 'User Doe',
-  roles: ['user', 'admin'],
-  defaultTheme: 'dark',
-}
+import type { AuthCredentials } from './AuthCredentials.type'
+import type { AuthUser } from './AuthUser.type'
+import { BASE_PATH, IS_MOCK, USER_KEY, MOCK_USER } from './auth.constant'
 
 /** Handles login, logout, and persisting the authenticated user in localStorage. */
 export const authService = {
@@ -19,7 +12,7 @@ export const authService = {
       return MOCK_USER
     }
     const { token, user } = await apiService.post<{ token: string; user: AuthUser }>(
-      '/auth/login',
+      `/${BASE_PATH}/login`,
       _credentials,
     )
     localStorage.setItem('token', token)

@@ -49,7 +49,7 @@ Every HTTP request is automatically appended to `app_logs` by the middleware in 
 | `user_logs` | 30 days | User lifecycle events — login, create, update, delete |
 | `module_logs` | 30 days | All module events in one table; `scope` column identifies the module. Table is ensured on module registration. |
 | `bot_logs` | 30 days | All bot events in one table; `bot_name` column identifies the bot. Chat completions are written here. Table is ensured on bot provisioning. |
-| `notifications` | 30 days | Platform notifications delivered via WebSocket (`/api/notifications/ws`) |
+| `notifications` | 7 days | Platform notifications delivered via WebSocket (`/api/notifications/ws`) |
 
 All `from`/`to` query params default to the start of the current month → now.
 
@@ -187,7 +187,7 @@ All log endpoints support `from` and `to` query params (ISO datetime, e.g. `2026
 | Method | Path | Description |
 |--------|------|-------------|
 | `GET` | `/api/logs` | Raw `app_logs` rows. Params: `limit`, `offset`, `event_type`, `user_email`, `from`, `to`. Returns `{items, total}`. |
-| `GET` | `/api/logs/summary` | Hourly aggregates from `app_logs_mv`. Params: `from`, `to`, `event_type`, `path`, `limit`, `offset`. Returns `{items, total}`. |
+| `GET` | `/api/logs/summary` | Hourly aggregates. Params: `from`, `to`, `event_type`, `path`, `limit`, `offset`. Returns `{items, total}`. |
 | `POST` | `/api/logs/purge` | Admin | Force-optimize all ClickHouse log tables (`OPTIMIZE TABLE … FINAL`) to enforce TTL expiry immediately. Returns `{purged: string[], errors: string[]}`. |
 
 **Module logs:**
@@ -196,9 +196,9 @@ All log endpoints support `from` and `to` query params (ISO datetime, e.g. `2026
 |--------|------|------|-------------|
 | `POST` | `/api/module-logs/{moduleId}` | Bearer | Write a log entry to `module_{scope}_logs`. Body: `{event_type, details}`. |
 | `GET` | `/api/module-logs/{moduleId}` | Admin | Raw module log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
-| `GET` | `/api/module-logs/{moduleId}/summary` | Admin | Hourly aggregates from `module_{scope}_logs_mv`. Params: `from`, `to`, `event_type`. Returns `{items, total}`. |
+| `GET` | `/api/module-logs/{moduleId}/summary` | Admin | Hourly aggregates. Params: `from`, `to`, `event_type`. Returns `{items, total}`. |
 
-Module log tables and their MVs are created automatically when a module is registered via `POST /api/settings/modules`.
+Module log tables are created automatically when a module is registered via `POST /api/settings/modules`.
 
 ### Translations (i18n)
 
@@ -326,44 +326,82 @@ Per-bot event log stored in the `bot_logs` ClickHouse table (single table; `bot_
 ```
 backend/
 ├── app/
-│   ├── main.py           # App factory, HTTP logging middleware, router registration
-│   ├── config.py         # Centralised env-var constants (OLLAMA_URL, …)
+│   ├── main.py           # App factory, lifespan, middleware, router registration
+│   ├── database.py       # init_db(), get_pg() / get_ch() — singleton holders
 │   ├── schemas.py        # Shared Pydantic models (ModuleInput, …)
-│   ├── settings.py       # AppSettings dataclass, read/write settings.json
-│   ├── seed_loader.py    # Loads ./data/seed.json → SeedData (dashboard, bots, theme, modules)
-│   ├── database.py       # init_db(), get_pg() / get_ch()
-│   ├── auth.py           # JWT creation/validation, password hashing
-│   ├── deps.py           # FastAPI Depends wrappers — token_dep / admin_dep
-│   ├── state.py          # In-process AppSettings singleton
-│   ├── i18n_defaults.py  # Default EN + RO translations (deep-merged into PostgreSQL every startup)
-│   ├── model_tracker.py  # Background async pull tracker — progress dict consumed by the SSE stream
+│   ├── settings.py       # AppSettings dataclass + read/write settings.json
+│   ├── auth/             # JWT + password hashing
+│   │   ├── constants.py  # SECRET_KEY, ALGORITHM, TOKEN_EXPIRE_HOURS
+│   │   ├── token.py      # create_token(), decode_token()
+│   │   └── utils.py      # hash_password(), verify_password()
+│   ├── config/           # Env-var reads
+│   │   └── constants.py  # OLLAMA_URL, ANTHROPIC_API_KEY, OPENAI_API_KEY, OPENAI_BASE_URL
+│   ├── deps/             # FastAPI Depends wrappers
+│   │   ├── token.py      # token_dep — validates Bearer JWT
+│   │   └── admin.py      # admin_dep — asserts "admin" in roles (HTTP 403 on failure)
+│   ├── events/           # Event type registry + lifecycle log formatting
+│   │   ├── types.py      # LogLevel, UserEvent, ModuleEvent, ComponentEvent, PageEvent, BotEvent
+│   │   └── lifecycle.py  # lifecycle_message(event_type, name)
+│   ├── i18n_defaults/    # Default translations (deep-merged into PostgreSQL every startup)
+│   │   ├── en.py         # English dict
+│   │   ├── ro.py         # Romanian dict
+│   │   └── defaults.py   # DEFAULT_TRANSLATIONS = {"en": EN, "ro": RO}
+│   ├── model_tracker/    # Ollama pull-progress tracker
+│   │   ├── constants.py  # OLLAMA_URL, _SPEED_WINDOW, _model_progress registry
+│   │   ├── types.py      # ModelPhase, ModelProgress dataclass
+│   │   ├── tracker.py    # get_model_progress(), run_sequential_trackers(), start_pull()
+│   │   └── utils.py      # _fmt_speed(), _fmt_eta(), _process_pull_line()
+│   ├── providers/        # LLM backend strategy implementations
+│   │   ├── base/types.py         # NormalizedChunk dataclass, LLMProvider ABC
+│   │   ├── ollama.py             # OllamaProvider — NDJSON stream
+│   │   ├── anthropic_provider/   # AnthropicProvider
+│   │   │   ├── constants.py
+│   │   │   └── provider.py
+│   │   └── openai_compat/        # OpenAICompatProvider (Groq, Azure, vLLM)
+│   │       ├── constants.py
+│   │       └── provider.py
+│   ├── seed_loader/      # data/seed.json parsing
+│   │   ├── constants.py  # SEED_PATH, _FALLBACK_BOT
+│   │   ├── types.py      # BotSeed, SeedData dataclasses
+│   │   └── loader.py     # load_seed() — parses seed.json; falls back to built-in defaults
+│   ├── state/            # In-process AppSettings singleton
+│   │   ├── constants.py  # _settings module-level variable
+│   │   └── state.py      # get_settings(), set_settings()
 │   ├── db/
-│   │   ├── interface.py  # UserRecord + BotRecord dataclasses
-│   │   ├── postgres.py   # PostgresAdapter — users, pages, bots, modules, i18n, module data via SQLAlchemy
-│   │   └── clickhouse.py # ClickHouseLogAdapter — app_logs + module log tables + MVs
-│   ├── queries/          # Raw SQL constants imported by db/ adapters
-│   │   ├── ch_ddl.py     # CREATE TABLE statements for all ClickHouse tables
-│   │   ├── ch_inserts.py # INSERT INTO statements
-│   │   ├── ch_selects.py # SELECT constants + str.format() query templates
-│   │   └── pg_migrations.py # Idempotent ALTER TABLE migration list
+│   │   ├── postgres/
+│   │   │   ├── adapter.py  # PostgresAdapter — full CRUD over all 9 PostgreSQL tables
+│   │   │   ├── orm.py      # SQLAlchemy ORM models
+│   │   │   └── utils.py    # _deep_merge() helper
+│   │   ├── clickhouse/
+│   │   │   ├── adapter.py  # ClickHouseLogAdapter — DDL, inserts, paginated + summary queries
+│   │   │   └── utils.py    # _month_start() default time-bound helper
+│   │   └── interface/
+│   │       ├── bot_record.py   # BotRecord dataclass
+│   │       └── user_record.py  # UserRecord dataclass
+│   ├── queries/          # All raw SQL/ClickHouse query strings (never inline in adapters or routes)
+│   │   ├── ch_ddl/constants.py     # CREATE TABLE IF NOT EXISTS for all 6 ClickHouse tables
+│   │   ├── ch_inserts/constants.py # INSERT statement templates
+│   │   ├── ch_selects/constants.py # SELECT templates: paginated, summary, notifications
+│   │   └── pg_migrations.py        # PG_MIGRATION_STMTS — idempotent ALTER TABLE list
 │   └── routes/
-│       ├── auth.py           # /api/auth/login
-│       ├── dashboard.py      # /api/dashboard, /api/user/theme
-│       ├── settings.py       # /api/settings/* (modules CRUD + manifest discovery)
-│       ├── logs.py           # /api/logs, /api/logs/summary, /api/logs/purge
-│       ├── module_logs.py    # /api/module-logs/{id} (write/read/summary)
-│       ├── module_data.py    # /api/module-data/*
-│       ├── i18n.py           # /api/i18n/{lang}
-│       ├── health.py         # /api/health — DB liveness checks
-│       ├── plugin_proxy.py   # /api/plugin/{scope}/{path} — forwards to module backend_url
-│       ├── bots.py           # /api/bots — bot CRUD (stored in PostgreSQL)
-│       ├── bot_logs.py       # /api/bot-logs/{bot_id} — per-bot ClickHouse log read
-│       ├── model_status.py   # /api/model-status — Ollama readiness, installed models, pull/delete, SSE stream
-│       ├── chat.py           # /api/chat — streaming LLM proxy, bot system prompt injection
-│       ├── pages.py          # /api/pages/config — server-driven page registry CRUD
-│       └── notifications.py  # /api/notifications/ws — WebSocket notification stream
+│       ├── auth/           # POST /api/auth/login
+│       ├── bots/           # GET/POST /api/bots, GET/PUT/DELETE /api/bots/{id}, GET /api/bots/types
+│       ├── bot_logs/       # GET /api/bot-logs/{id}, GET /api/bot-logs/{id}/summary
+│       ├── chat/           # POST /api/chat, GET /api/chat/logs, GET /api/chat/logs/summary
+│       ├── dashboard/      # GET /api/dashboard, PATCH /api/user/theme
+│       ├── health/         # GET /api/health
+│       ├── i18n/           # GET/PUT /api/i18n/{lang}
+│       ├── logs/           # GET /api/logs, GET /api/logs/summary, POST /api/logs/purge
+│       ├── model_status/   # GET/POST /api/model-status/*, DELETE /api/model-status/{name}, SSE stream
+│       ├── module_data/    # GET/POST/PUT/DELETE /api/module-data/{module_id}/{collection}
+│       ├── module_logs/    # POST/GET /api/module-logs/{module_id}, GET …/summary
+│       ├── notifications/  # WS /api/notifications/ws
+│       ├── pages/          # GET /api/pages, GET/PATCH /api/pages/config
+│       ├── plugin_proxy/   # * /api/plugin/{scope}/{path} — forwards to module backend_url
+│       ├── settings/       # PATCH/GET/POST/PUT/DELETE /api/settings/*
+│       └── ui_components/  # GET /api/ui-components, PUT /api/ui-components/{name}
 ├── requirements.txt
-└── Dockerfile         # single pip install layer — core deps only (no ML libraries)
+└── Dockerfile            # single pip install layer — core deps only (no ML libraries)
 ```
 
 > **Module plugin pattern** — ML-heavy dependencies (PyTorch, ultralytics, OpenCV) live in the module's own `backend/Dockerfile`, not in the core image. The core backend stays lightweight. Each module that needs server-side logic declares `"backend_url"` in its `manifest.json`; the core backend proxy at `/api/plugin/{scope}/…` routes requests there at runtime.
