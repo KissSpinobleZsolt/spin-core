@@ -1,10 +1,4 @@
-export interface UIComponentProp {
-  name: string
-  type: string
-  default?: string
-  required: boolean
-  description: string
-}
+import type { UIComponentProp } from './UIComponentProp.type'
 
 export interface UIComponentDoc {
   id: string

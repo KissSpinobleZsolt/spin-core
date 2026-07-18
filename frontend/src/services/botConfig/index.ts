@@ -1,3 +1,11 @@
 /** @module services/botConfig — Plugin-backend calls for bot entity and config management. */
-export * from './types'
+export type { BotEntity } from './BotEntity.type'
+export type { BotTeam } from './BotTeam.type'
+export type { BotConfig } from './BotConfig.type'
+export type { BotProcesses } from './BotProcesses.type'
+export type { EntityAddPayload } from './EntityAddPayload.type'
+export type { EntityPatchPayload } from './EntityPatchPayload.type'
+export type { BotUrlParams } from './BotUrlParams.type'
+export { BASE_PATH } from './botConfig.constant'
+export { urlBuilder } from './urlBuilder'
 export { botConfigService } from './botConfigService'

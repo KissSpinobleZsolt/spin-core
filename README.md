@@ -155,7 +155,7 @@ pnpm install
 pnpm dev        # Vite dev server on http://localhost:3000
 ```
 
-The backend reads `POSTGRES_URL`, `CLICKHOUSE_HOST`, and `OLLAMA_BASE_URL` from the environment. When running natively they default to `localhost` — no extra config needed if you used the docker compose infra step above.
+The backend reads `POSTGRES_URL`, `CLICKHOUSE_URL`, and `OLLAMA_URL` from the environment. When running natively they default to `localhost` — no extra config needed if you used the docker compose infra step above.
 
 ---
 
@@ -226,12 +226,9 @@ Browser
        ├─ /admin/status   — live system overview with clickable navigation
        ├─ /api/*  ──►  Backend (FastAPI)
        │                  ├─ PostgreSQL  — users, pages, bots, modules, i18n, module data
-       │                  ├─ ClickHouse  — HTTP request log (app_logs)
-       │                  │               per-module log tables (module_{scope}_logs)
-       │                  │               chat completion log (module_chatbot_logs)
-       │                  │               refreshable MVs rebuilt every 10 min:
-       │                  │                 app_logs_mv           — hourly HTTP stats
-       │                  │                 module_{scope}_logs_mv — hourly module stats
+       │                  ├─ ClickHouse  — HTTP request log (api_logs, app_logs, user_logs)
+       │                  │               per-module log table (module_logs)
+       │                  │               chat completion log (bot_logs)
        │                  └─ Ollama      — streaming LLM proxy (/api/chat)
        │                                  bot system prompt injected per request
        │                                  each completion persisted to module_chatbot_logs
@@ -299,7 +296,7 @@ spin-core/
 ├── frontend/         # React SPA — see frontend/README.md
 ├── data/             # seed.json (first-run defaults) — see data/README.md
 ├── modules/
-|   ├── AnomaScan/            # Reference MF remote — see modules/anomascan/README.md
+|   ├── AnomaScan/            # Reference MF remote — see modules/AnomaScan/README.md
 |   ├── cloud-insight-ai/     # Reference MF remote — see modules/cloud-insight-ai/README.md
 │   └── hello-world/          # Reference MF remote — see modules/hello-world/README.md
 ├── k8s/              # Kubernetes manifests — see k8s/README.md

@@ -8,9 +8,3 @@ export type InstalledModel = {
   quantization?: string | null
   format?: string | null
 }
-
-/** Ollama reachability status together with the list of installed models. */
-export type InstalledModelsData = {
-  ollama: 'ok' | 'unreachable'
-  models: InstalledModel[]
-}

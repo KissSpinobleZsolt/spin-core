@@ -1,8 +1,4 @@
-export interface SkeletonConfig {
-  type: 'table' | 'cards' | 'doc'
-  columns?: number
-  rows?: number
-}
+import type { SkeletonConfig } from './SkeletonConfig.type'
 
 export interface PageConfig {
   id: string
