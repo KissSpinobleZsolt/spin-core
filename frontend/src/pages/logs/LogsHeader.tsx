@@ -1,5 +1,5 @@
-import { Btn } from '../../components/ui/button' // purge button
-import { PageTitle } from '../../components/ui/PageTitle' // page heading
+import { Btn } from '@components/ui/button' // purge button
+import { PageTitle } from '@components/ui/PageTitle' // page heading
 import { useLogsContext } from './LogsContext.context' // purge state + handler
 
 export function LogsHeader() { // page title row with purge action and result feedback

@@ -1,9 +1,9 @@
 import { useState, useEffect } from 'react' // form state and data loading
 import { useNavigate } from 'react-router-dom' // back navigation
 import { type Bot, type BotConfigSchemaField, botConfigService, type BotTeam, type BotEntity } from '@services' // bot + config types
-import { Spinner } from '../../components/ui/spinner' // loading indicator
-import { Btn } from '../../components/ui/button' // save button
-import { BOT_TYPES, TYPE_BADGE } from '../../constants/botConstants' // type labels + badge classes
+import { Spinner } from '@components/ui/spinner' // loading indicator
+import { Btn } from '@components/ui/button' // save button
+import { BOT_TYPES, TYPE_BADGE } from '@constants/botConstants' // type labels + badge classes
 import { SectionHeader } from './SectionHeader' // collapsible section toggle
 import { ConfigFieldRow } from './ConfigFieldRow' // renders a single schema field
 import { WatchlistSection } from './WatchlistSection' // symbol watchlist management

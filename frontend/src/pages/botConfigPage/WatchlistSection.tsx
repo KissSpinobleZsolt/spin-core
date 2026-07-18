@@ -1,8 +1,8 @@
 import { useState } from 'react' // local add/remove state
 import { botConfigService, type BotEntity, type BotTeam } from '@services' // entity CRUD + types
-import { Toggle } from '../../components/ui/toggle' // active/inactive toggle
-import { Btn } from '../../components/ui/button' // add button
-import { Spinner } from '../../components/ui/spinner' // loading indicator
+import { Toggle } from '@components/ui/toggle' // active/inactive toggle
+import { Btn } from '@components/ui/button' // add button
+import { Spinner } from '@components/ui/spinner' // loading indicator
 
 export function WatchlistSection({ // manages watched symbols per team
   entities,

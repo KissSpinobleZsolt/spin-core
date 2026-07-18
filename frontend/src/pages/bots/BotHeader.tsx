@@ -1,6 +1,6 @@
 import { type Bot } from '@services' // Bot entity shape
-import { Badge } from '../../components/ui/badge' // status badge
-import { BOT_TYPES } from '../../constants/botConstants' // bot type label map
+import { Badge } from '@components/ui/badge' // status badge
+import { BOT_TYPES } from '@constants/botConstants' // bot type label map
 
 export function BotHeader({ bot }: { bot: Bot }) { // displays icon + name + type badge
   return (

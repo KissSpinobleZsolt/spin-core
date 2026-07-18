@@ -7,13 +7,13 @@ import {
   type InstalledModelsData,
 } from '@services' // bot + module service calls
 import { useGet } from '@hooks' // installed models fetch
-import { Btn } from '../../components/ui/button' // action buttons
-import { Input } from '../../components/ui/input' // text input
-import { Label } from '../../components/ui/Label' // form label
-import { Modal } from '../../components/ui/modal' // modal wrapper
-import { Toggle } from '../../components/ui/toggle' // active toggle
-import { ErrorBanner } from '../../components/ui/ErrorBanner' // save error
-import { BOT_TYPES, CUSTOM_ICONS } from '../../constants/botConstants' // type options + icon picker
+import { Btn } from '@components/ui/button' // action buttons
+import { Input } from '@components/ui/input' // text input
+import { Label } from '@components/ui/Label' // form label
+import { Modal } from '@components/ui/modal' // modal wrapper
+import { Toggle } from '@components/ui/toggle' // active toggle
+import { ErrorBanner } from '@components/ui/ErrorBanner' // save error
+import { BOT_TYPES, CUSTOM_ICONS } from '@constants/botConstants' // type options + icon picker
 import { Select } from './Select' // local dropdown wrapper
 import { BLANK } from './BLANK.constant' // empty form defaults
 

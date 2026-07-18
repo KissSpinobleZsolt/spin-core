@@ -1,7 +1,7 @@
 import { useNavigate } from 'react-router-dom' // navigate to chat
 import { type Bot } from '@services' // Bot entity
-import { Btn } from '../../components/ui/button' // action button
-import { Card } from '../../components/ui/Card' // card wrapper
+import { Btn } from '@components/ui/button' // action button
+import { Card } from '@components/ui/Card' // card wrapper
 import { BotHeader } from './BotHeader' // icon + name + type badge
 
 export function BotCard({ bot }: { bot: Bot }) { // clickable card that navigates to /bots/:id

@@ -3,9 +3,9 @@ import {
   logsService, type Bot, type BotLogEntry, type BotLogSummaryEntry, type BotLogsParams,
 } from '@services' // log service + types
 import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '@components/timeRangeFilter' // time range selector
-import { Btn } from '../../components/ui/button' // prev/next buttons
-import { StatCard } from '../../components/ui/statCard' // summary metric cards
-import { Spinner } from '../../components/ui/spinner' // loading indicator
+import { Btn } from '@components/ui/button' // prev/next buttons
+import { StatCard } from '@components/ui/statCard' // summary metric cards
+import { Spinner } from '@components/ui/spinner' // loading indicator
 import { LevelBadge } from './LevelBadge' // log level coloured badge
 import { PAGE_SIZE } from './PAGE_SIZE.constant' // rows per page
 

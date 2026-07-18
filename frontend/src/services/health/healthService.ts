@@ -1,4 +1,4 @@
-import type { HealthPayload } from './types'
+import type { HealthPayload } from './HealthPayload.type'
 
 /** Spawns a background health-check worker and returns a cleanup function that terminates it. */
 export const healthService = {
