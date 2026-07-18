@@ -1,0 +1,13 @@
+from app.queries.ch_inserts.constants import (  # ClickHouse INSERT INTO statement templates
+    CH_INSERT_API_LOGS,
+    CH_INSERT_APP_LOGS,
+    CH_INSERT_USER_LOGS,
+    CH_INSERT_MODULE_LOGS,
+    CH_INSERT_BOT_LOGS,
+    CH_INSERT_NOTIFICATIONS,
+)
+
+__all__ = [
+    "CH_INSERT_API_LOGS", "CH_INSERT_APP_LOGS", "CH_INSERT_USER_LOGS",
+    "CH_INSERT_MODULE_LOGS", "CH_INSERT_BOT_LOGS", "CH_INSERT_NOTIFICATIONS",
+]

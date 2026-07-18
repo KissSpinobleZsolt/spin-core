@@ -17,7 +17,7 @@ from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings,
 from app.state import get_settings, set_settings
 
 from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications, ui_components
-from app.routes.model_status import _required_models
+from app.routes.model_status.utils import _required_models
 
 
 def _build_module_dict(m: dict) -> dict:
