@@ -8,8 +8,8 @@ modules:
     port: 3001
 
   - name: cloud-insight-ai
-    repo: https://github.com/KissSpinobleZsolt/spi-module-data-ingestion.git
-    path: modules/data-ingestion
+    repo: https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai.git
+    path: modules/cloud-insight-ai
     port: 3002
     backend_port: 8002
 
