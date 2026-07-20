@@ -123,16 +123,3 @@ class PageRegistryRow(Base):
     roles = Column(ARRAY(String), nullable=False, default=list)                # roles that may access this page
     skeleton = Column(JSON, nullable=False, default=dict)                      # loading skeleton config rendered while the page loads
     enabled = Column(Boolean, nullable=False, default=True)                    # False hides the page from the router
-
-
-class UIComponentRow(Base):
-    """SQLAlchemy ORM model for the ui_components table."""
-    __tablename__ = "ui_components"
-    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))  # UUID PK
-    name = Column(String, nullable=False, unique=True)                          # unique component name used as the lookup key
-    export = Column(String, nullable=False)                                     # named export from the component file
-    file = Column(String, nullable=False)                                       # source file path relative to the frontend src directory
-    description = Column(Text, nullable=False, default="")                      # documentation description rendered in the UI catalogue
-    props = Column(JSON, nullable=False, default=list)                          # list of PropSchema objects describing accepted props
-    notes = Column(Text, nullable=True)                                         # optional freeform notes for developers
-    sort_order = Column(Integer, nullable=False, default=0)                     # ascending sort key controlling display order in the catalogue

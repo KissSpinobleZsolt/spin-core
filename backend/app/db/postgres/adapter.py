@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.interface import UserRecord, BotRecord
 from app.db.postgres.orm import (
     Base, UserRow, PageRow, BotTypeRow, BotRow, TranslationRow,
-    ModuleRow, ModuleDocumentRow, PageRegistryRow, UIComponentRow,
+    ModuleRow, ModuleDocumentRow, PageRegistryRow,
 )
 from app.db.postgres.utils import _deep_merge
 from app.queries.pg_migrations import PG_MIGRATION_STMTS
@@ -87,6 +87,16 @@ class PostgresAdapter:
             if row:  # silently no-op for unknown emails; callers already validate via token
                 row.default_theme = theme  # mutate the ORM instance; SQLAlchemy tracks the change
                 db.commit()  # flush the UPDATE to the DB
+
+    def ensure_user_has_role(self, email: str, role: str) -> bool:
+        """Add role to the user's roles array if not already present. Returns True if the row was updated."""
+        with self._session_ctx() as db:
+            row = db.query(UserRow).filter(UserRow.email == email).first()  # locate by email
+            if not row or role in row.roles:  # no-op when user absent or role already present
+                return False
+            row.roles = list(row.roles) + [role]  # SQLAlchemy needs a new list object to detect the ARRAY mutation
+            db.commit()  # flush the UPDATE to the DB
+            return True
 
     def get_page(self, key: str) -> str | None:
         """Return the content string for the given page key, or None if absent."""
@@ -665,6 +675,16 @@ class PostgresAdapter:
             db.refresh(row)  # reload the row to pick up any server-set values
             return self._page_registry_row_to_dict(row)  # return the updated config to the caller
 
+    def delete_page_registry(self, route: str) -> bool:
+        """Delete a page_registry row by route. Returns True if a row was deleted."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not row:
+                return False
+            db.delete(row)  # remove the stale row permanently
+            db.commit()
+            return True
+
     def seed_page_registry(self, route: str, data: dict) -> None:
         """Insert a page_registry entry only if the route does not already exist.
 
@@ -688,50 +708,3 @@ class PostgresAdapter:
                 db.add(row)    # stage the insert
                 db.commit()    # persist; no refresh needed since caller doesn't use the returned row
 
-    # ── UI Components ────────────────────────────────────────────────────────
-
-    def _ui_component_row_to_dict(self, row: UIComponentRow) -> dict:
-        """Convert a UIComponentRow ORM instance to a plain dictionary."""
-        return {
-            "id": row.id,
-            "name": row.name,
-            "export": row.export,
-            "file": row.file,
-            "description": row.description,
-            "props": row.props or [],  # guard against NULL; callers always expect a list
-            "notes": row.notes,
-            "sort_order": row.sort_order,
-        }
-
-    def get_ui_components(self) -> list[dict]:
-        """Return all UI component docs ordered by sort_order then name."""
-        with self._session_ctx() as db:
-            rows = db.query(UIComponentRow).order_by(UIComponentRow.sort_order, UIComponentRow.name).all()  # primary: sort_order, secondary: name for ties
-            return [self._ui_component_row_to_dict(r) for r in rows]  # convert ORM rows to plain dicts
-
-    def upsert_ui_component(self, data: dict) -> dict:
-        """Insert or update a UI component entry by name and return the resulting dict."""
-        with self._session_ctx() as db:
-            row = db.query(UIComponentRow).filter(UIComponentRow.name == data["name"]).first()  # unique-name lookup to decide insert vs update
-            if not row:
-                row = UIComponentRow(
-                    id=str(uuid.uuid4()),                  # generate a fresh UUID for the new entry
-                    name=data["name"],
-                    export=data.get("export", data["name"]),  # default export name equals component name
-                    file=data.get("file", ""),
-                    description=data.get("description", ""),
-                    props=data.get("props", []),
-                    notes=data.get("notes"),
-                    sort_order=data.get("sort_order", 0),
-                )
-                db.add(row)  # stage the insert
-            else:
-                row.export = data.get("export", row.export)              # update only fields present in the payload
-                row.file = data.get("file", row.file)
-                row.description = data.get("description", row.description)
-                row.props = data.get("props", row.props)
-                row.notes = data.get("notes", row.notes)
-                row.sort_order = data.get("sort_order", row.sort_order)
-            db.commit()      # persist the insert or update
-            db.refresh(row)  # reload server-set fields
-            return self._ui_component_row_to_dict(row)  # return the final state to the caller

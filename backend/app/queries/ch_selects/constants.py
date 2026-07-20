@@ -4,10 +4,6 @@
 CH_TEST_CONNECTION = "SELECT 1"  # minimal connectivity probe; raises on unreachable ClickHouse
 
 CH_BOT_NAMES_WITH_LOGS = "SELECT DISTINCT bot_name FROM bot_logs"  # used at startup to skip re-initialising bots that already have log entries
-CH_COMPONENT_NAMES_WITH_LOGS = (
-    "SELECT DISTINCT name FROM module_logs"
-    " WHERE scope = 'system' AND event_type = 'component.init'"
-)  # used at startup to skip re-seeding UI components that already have a component.init log entry
 CH_PAGE_ROUTES_WITH_LOGS = (
     "SELECT DISTINCT name FROM module_logs"
     " WHERE scope = 'system' AND event_type = 'page.init'"

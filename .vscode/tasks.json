@@ -108,31 +108,22 @@
     // Prod: builds a Docker image from the local folder and serves it via nginx.
 
     {
-      "label": "Hello World — dev",
+      "label": "Spin Docs — dev",
       "detail": "webpack serve (hot reload) — port 3001",
       "type": "shell",
       "command": "npm install --prefer-offline && npm start",
-      "options": { "cwd": "${workspaceFolder}/modules/hello-world" },
+      "options": { "cwd": "${workspaceFolder}/modules/spin-docs" },
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-spin-docs", "close": false },
       "problemMatcher": []
     },
     {
-      "label": "Hello World — prod (local)",
+      "label": "Spin Docs — prod (local)",
       "detail": "Build Docker image from local folder and run on port 3001",
       "type": "shell",
-      "command": "docker compose up --build hello-world",
+      "command": "docker compose up --build spin-docs",
       "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
-      "problemMatcher": []
-    },
-    {
-      "label": "Hello World — prod (GitHub)",
-      "detail": "Pull latest from GitHub, build Docker image, run on port 3001",
-      "type": "shell",
-      "command": "git -C modules/hello-world pull origin main && docker compose up --build hello-world",
-      "isBackground": true,
-      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-hello-world", "close": false },
+      "presentation": { "reveal": "always", "panel": "dedicated", "group": "mod-spin-docs", "close": false },
       "problemMatcher": []
     },
 

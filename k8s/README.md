@@ -55,7 +55,7 @@ Available keys:
 bash scripts/k8s-push.sh
 ```
 
-Builds `backend`, `frontend`, and `hello-world`, then pushes two tags to `ghcr.io/kissspinoblezsolt/spin-core-<name>`:
+Builds `backend`, `frontend`, and `spin-docs`, then pushes two tags to `ghcr.io/kissspinoblezsolt/spin-core-<name>`:
 - `:<git-sha>` — content-addressable, used by the deploy script
 - `:latest` — convenience alias
 
@@ -98,7 +98,7 @@ Subsequent deploys are instant — the volume persists between restarts.
 |---------|----------|
 | `frontend` | 30080 |
 | `backend` | 30800 |
-| `hello-world` | 30001 |
+| `spin-docs` | 30001 |
 
 ## Configuration
 
@@ -128,7 +128,7 @@ k8s/
 │   └── model-downloader-job.yaml  # Job: pulls models via OLLAMA_HOST, then exits
 ├── backend/                  # Deployment + Service (NodePort 30800)
 ├── frontend/                 # Deployment + Service (NodePort 30080)
-└── hello-world/              # Deployment + Service (NodePort 30001)
+└── spin-docs/                # Deployment + Service (NodePort 30001)
 ```
 
 ## Day-to-day operations

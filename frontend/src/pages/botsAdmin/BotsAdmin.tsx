@@ -140,12 +140,16 @@ export default function BotsAdmin() { // admin page for managing all bots
     {
       key: 'active',
       header: 'Active',
+      headerClassName: 'w-px',
+      className: 'w-px',
       cell: bot => (
         <Toggle checked={bot.active} onChange={() => handleToggle(bot)} disabled={bot.modules.length === 0} />
       ),
     },
     {
       key: 'actions',
+      headerClassName: 'w-px',
+      className: 'w-px whitespace-nowrap',
       cell: bot => (
         <div className="flex gap-2">
           <Btn variant="secondary" onClick={() => setSearchParams({ logs: bot.id })}>Logs</Btn>
@@ -157,7 +161,7 @@ export default function BotsAdmin() { // admin page for managing all bots
   ]
 
   return (
-    <div className="max-w-5xl space-y-6">
+    <div className="space-y-6">
       <PageTitle>Bots</PageTitle>
 
       {isLoading && <Spinner />}

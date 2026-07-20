@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { settingsService, pagesService, type ModuleConfig, type DiscoveredModule, type PageConfig } from '@services'
 import { useSettings } from '@context'
 import { useGet } from '@hooks'
@@ -8,7 +9,6 @@ import { Toggle } from '@components/ui/toggle'
 import { Tabs } from '@components/ui/tabs'
 import { ErrorBanner } from '@components/ui/ErrorBanner'
 import { PageTitle } from '@components/ui/PageTitle'
-import { AdminPageShell } from '@components/layout/adminPageShell'
 import type { ModalState } from './ModalState.type'
 import { ModuleModal } from './ModuleModal'
 import { ModuleLogsDrawer } from './ModuleLogsDrawer'
@@ -98,7 +98,7 @@ export default function Modules() {
   }
 
   return (
-    <AdminPageShell>
+    <div className="space-y-6">
       <PageTitle>Modules</PageTitle>
 
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
@@ -149,7 +149,7 @@ export default function Modules() {
       {logsModule && (
         <ModuleLogsDrawer module={logsModule} onClose={() => setLogsModule(null)} />
       )}
-    </AdminPageShell>
+    </div>
   )
 }
 
@@ -161,6 +161,8 @@ interface NativePagesTabProps {
 }
 
 function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
+  const navigate = useNavigate()
+
   if (pages.length === 0)
     return <p className="text-sm text-slate-500">No native pages found.</p>  // shown while useGet resolves or if seed was skipped
 
@@ -173,7 +175,8 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
             <th className="pb-2 pr-4">Route</th>
             <th className="pb-2 pr-4">Component key</th>  {/* router key used to lazy-load the matching page component */}
             <th className="pb-2 pr-4">Roles</th>
-            <th className="pb-2">Enabled</th>
+            <th className="pb-2 w-px">Enabled</th>
+            <th className="pb-2 w-px"></th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -195,8 +198,11 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
                   ))}
                 </div>
               </td>
-              <td className="py-2">
+              <td className="py-2 w-px">
                 <Toggle checked={page.enabled} onChange={() => onToggle(page)} />  {/* calls PATCH /api/pages/config to flip enabled */}
+              </td>
+              <td className="py-2 w-px">
+                <Btn variant="secondary" onClick={() => navigate(`/${page.route}`)}>▶</Btn>
               </td>
             </tr>
           ))}
@@ -228,6 +234,8 @@ function FederationTab({
   onAdd, onEdit, onDelete, onToggle, onLogs,
   onScan, onClearDiscovered, onEnableDiscovered, onAddDiscovered,
 }: FederationTabProps) {
+  const navigate = useNavigate()
+
   return (
     <>
       {modules.length === 0 ? (
@@ -240,8 +248,10 @@ function FederationTab({
                 <th className="pb-2 pr-4">Module</th>
                 <th className="pb-2 pr-4">Root slug</th>
                 <th className="pb-2 pr-4">Scope</th>
-                <th className="pb-2 pr-4">Enabled</th>
-                <th className="pb-2"></th>
+                <th className="pb-2 pr-4">Roles</th>
+                <th className="pb-2 pr-4 w-px">Enabled</th>
+                <th className="pb-2 w-px"></th>
+                <th className="pb-2 w-px"></th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
@@ -257,14 +267,26 @@ function FederationTab({
                   <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">{m.route}</td>
                   <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">{m.scope}</td>
                   <td className="py-2 pr-4">
+                    <div className="flex gap-1 flex-wrap">
+                      {m.roles.map(r => (
+                        <Badge key={r} variant="neutral">{r}</Badge>  // one badge per role
+                      ))}
+                    </div>
+                  </td>
+                  <td className="py-2 pr-4 w-px">
                     <Toggle checked={m.enabled} onChange={() => onToggle(m)} />
                   </td>
-                  <td className="py-2">
+                      <td className="py-2 w-px whitespace-nowrap">
                     <div className="flex gap-2">
                       <Btn variant="secondary" onClick={() => onLogs(m)}>Logs</Btn>
                       <Btn variant="secondary" onClick={() => onEdit(m)}>Edit</Btn>
                       <Btn variant="danger"    onClick={() => onDelete(m.id)}>Delete</Btn>
                     </div>
+                  </td>
+                  <td className="py-2 w-px">
+                    {m.route && (
+                      <Btn variant="secondary" onClick={() => navigate(`/modules/${m.id}`)}>▶</Btn>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -320,7 +342,7 @@ function FederationTab({
                         description: d.description ?? '',
                         remote_url:  d.remote_url  ?? '',
                         scope:       d.scope       ?? '',
-                        component:   d.component   ?? './App',  // default component path matches the hello-world module convention
+                        component:   d.component   ?? './App',  // MF container protocol default — matches webpack.config.js exposes entry
                         route:       d.route       ?? '',
                         icon:        d.icon        ?? '🧩',
                         enabled:     true,  // new modules default to enabled so they appear in the sidebar immediately

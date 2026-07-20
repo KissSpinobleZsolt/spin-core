@@ -11,7 +11,7 @@ data:
   OLLAMA_URL: "http://ollama.spin-core.svc.cluster.local:11434"
   OLLAMA_MODEL: "qwen2.5:7b"
   OLLAMA_EMBED_MODEL: "nomic-embed-text:latest"
-  MODULE_REGISTRY_URLS: "http://hello-world.spin-core.svc.cluster.local"
+  MODULE_REGISTRY_URLS: "http://spin-docs.spin-core.svc.cluster.local"
   # Cloud LLM provider base URL (optional). Leave empty to use the official OpenAI endpoint.
   # Set to e.g. "https://api.groq.com/openai/v1" for Groq-hosted models.
   OPENAI_BASE_URL: ""

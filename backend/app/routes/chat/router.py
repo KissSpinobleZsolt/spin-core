@@ -19,7 +19,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 
-from app.database import get_ch, get_pg
+from app.database import get_ch, get_pg, get_logger
 from app.deps import token_dep, admin_dep
 from app.events import BotEvent, LogLevel
 from app.providers import get_provider
@@ -116,65 +116,49 @@ async def chat(payload: ChatRequest, user_email: str = Depends(token_dep)):
             # JSON error chunk so the frontend can display a human-readable message.
             yield json.dumps({"error": str(exc)}) + "\n"
             if bot_name:
-                try:
-                    get_ch().write_bot_log(
-                        bot_name, user_email, BotEvent.ERROR,
-                        {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
-                        level=LogLevel.ERROR, name=bot_name,
-                        message=str(exc),
-                    )
-                except Exception:
-                    pass
+                get_logger().bot(  # log at ERROR level; message is the exception text
+                    BotEvent.ERROR, bot_name, user_email,
+                    {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
+                    level=LogLevel.ERROR, message=str(exc),
+                )
             return
         except Exception as exc:
             yield json.dumps({"error": f"Unexpected error: {exc}"}) + "\n"
             if bot_name:
-                try:
-                    get_ch().write_bot_log(
-                        bot_name, user_email, BotEvent.ERROR,
-                        {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
-                        level=LogLevel.ERROR, name=bot_name,
-                        message=f"Unexpected error: {exc}",
-                    )
-                except Exception:
-                    pass
+                get_logger().bot(
+                    BotEvent.ERROR, bot_name, user_email,
+                    {"bot_id": payload.bot_id, "error": str(exc), "provider": effective_provider, "model": effective_model},
+                    level=LogLevel.ERROR, message=f"Unexpected error: {exc}",
+                )
             return
 
-        # Write the completion log to ClickHouse after the stream is fully consumed.
-        # Failures here are silent so a logging outage never breaks the chat.
-        try:
-            duration_ms = round((time.time() - start) * 1000, 2)
-            log_details = {
-                "provider": effective_provider,
-                "model": effective_model,
-                "messages": [m.model_dump() for m in payload.messages],
-                "response": "".join(response_parts),
-                "prompt_tokens": prompt_tokens,
-                "eval_tokens": eval_tokens,
-                "duration_ms": duration_ms,
-            }
-            if payload.bot_id:
-                log_details["bot_id"] = payload.bot_id
-                log_details["bot_name"] = bot_name
-            if payload.module_id:
-                log_details["module_id"] = payload.module_id
-            ch = get_ch()
-            ch.write_module_log(
-                _CHATBOT_SCOPE,
-                user_email,
-                "chat.completion",
-                log_details,
+        # Write the completion log after the stream is fully consumed;
+        # AppLogger swallows all exceptions so a CH outage never breaks the chat.
+        duration_ms = round((time.time() - start) * 1000, 2)  # total wall time for the stream in milliseconds
+        log_details = {
+            "provider": effective_provider,
+            "model": effective_model,
+            "messages": [m.model_dump() for m in payload.messages],
+            "response": "".join(response_parts),  # full reconstructed assistant reply
+            "prompt_tokens": prompt_tokens,
+            "eval_tokens": eval_tokens,
+            "duration_ms": duration_ms,
+        }
+        if payload.bot_id:
+            log_details["bot_id"] = payload.bot_id  # attach bot context when a bot drove the conversation
+            log_details["bot_name"] = bot_name
+        if payload.module_id:
+            log_details["module_id"] = payload.module_id  # attach module context for per-module log filtering
+        get_logger().module(  # record the full exchange in the chatbot module log
+            "chat.completion", _CHATBOT_SCOPE, name="", owner=user_email,
+            details=log_details,
+        )
+        if bot_name:
+            get_logger().bot(  # record a concise summary in bot_logs for the per-bot dashboard
+                BotEvent.INFO, bot_name, user_email,
+                {"bot_id": payload.bot_id, "provider": effective_provider, "model": effective_model, "prompt_tokens": prompt_tokens, "eval_tokens": eval_tokens, "duration_ms": duration_ms},
+                message=f"Chat completed. {eval_tokens} tokens, {duration_ms}ms.",
             )
-            if bot_name:
-                ch.write_bot_log(
-                    bot_name, user_email, BotEvent.INFO,
-                    {"bot_id": payload.bot_id, "provider": effective_provider, "model": effective_model, "prompt_tokens": prompt_tokens, "eval_tokens": eval_tokens, "duration_ms": duration_ms},
-                    level=LogLevel.INFO, name=bot_name,
-                    message=f"Chat completed. {eval_tokens} tokens, {duration_ms}ms.",
-                )
-        except Exception:
-            # ClickHouse logging must never surface errors to the chat stream.
-            pass
 
     return StreamingResponse(stream(), media_type="application/x-ndjson")
 
@@ -187,18 +171,15 @@ async def abort_chat(payload: AbortPayload, user_email: str = Depends(token_dep)
         bot = get_pg().get_bot_by_id(payload.bot_id)
         if not bot:
             return
-        ch = get_ch()
-        from app.events import lifecycle_message
-        ch.write_bot_log(
-            bot.name, user_email, BotEvent.ABORT,
+        get_logger().bot(  # WARN level — abort is user-initiated but not an error
+            BotEvent.ABORT, bot.name, user_email,
             {"bot_id": payload.bot_id, **({"module_id": payload.module_id} if payload.module_id else {})},
-            level=LogLevel.WARN, name=bot.name,
-            message=lifecycle_message(BotEvent.ABORT, bot.name),
+            level=LogLevel.WARN,
         )
-        ch.write_module_log(
-            _CHATBOT_SCOPE, user_email, "chat.abort",
-            {"bot_id": payload.bot_id, "bot_name": bot.name,
-             **({"module_id": payload.module_id} if payload.module_id else {})},
+        get_logger().module(  # also record in the chatbot module log for the per-module timeline
+            "chat.abort", _CHATBOT_SCOPE, name="", owner=user_email,
+            details={"bot_id": payload.bot_id, "bot_name": bot.name,
+                     **({"module_id": payload.module_id} if payload.module_id else {})},
         )
     except Exception:
         pass

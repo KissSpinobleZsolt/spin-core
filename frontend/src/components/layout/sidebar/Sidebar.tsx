@@ -13,7 +13,7 @@ export default function Sidebar() {
 
   const collapsed = sidebarCollapsed
 
-  const systemModule = modules.find(m => m.scope === 'system')
+  const systemModule = modules.find(m => m.scope === 'system') // the built-in Dashboard entry
 
   const dashboardIcon = systemModule ? (
     <span className="text-base leading-none">{systemModule.icon}</span>
@@ -44,13 +44,18 @@ export default function Sidebar() {
     },
   ]
 
-  // system scope is excluded here — it is rendered as the fixed dashboard nav item above,
-  // not as a dynamic module entry, so showing it twice would be wrong
+  // system scope excluded — rendered as the fixed dashboard nav item above
   const visibleModules = modules.filter(
     m => m.enabled && m.scope !== 'system' && (!m.roles.length || m.roles.some(r => user?.roles.includes(r))),
   )
 
-  const isAdmin = user?.roles.includes('admin')
+  // Split into role groups — determines sidebar section ordering: user → admin → system
+  const userModules   = visibleModules.filter(m => !m.roles.includes('admin') && !m.roles.includes('system'))
+  const adminModules  = visibleModules.filter(m => m.roles.includes('admin')  && !m.roles.includes('system'))
+  const systemModules = visibleModules.filter(m => m.roles.includes('system'))
+
+  const isAdmin  = user?.roles.includes('admin')
+  const isSystem = user?.roles.includes('system')
 
   const logoutIcon = (
     <svg className="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -58,6 +63,22 @@ export default function Sidebar() {
         d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
     </svg>
   )
+
+  /** Renders a group of modules (user/admin/system) with online/offline handling. */
+  const renderModuleGroup = (mods: typeof visibleModules) =>
+    mods.map(m =>
+      moduleReachability[m.id] === false ? (
+        <OfflineModuleItem key={m.id} icon={m.icon} label={m.name} collapsed={collapsed} />
+      ) : (
+        <NavItem
+          key={m.id}
+          to={`/modules/${m.id}`}
+          icon={<span className="text-base leading-none">{m.icon}</span>}
+          label={m.name}
+          collapsed={collapsed}
+        />
+      )
+    )
 
   return (
     <aside
@@ -106,8 +127,8 @@ export default function Sidebar() {
           ))}
         </div>
 
-        {/* Module entries */}
-        {visibleModules.length > 0 && (
+        {/* ── Group 1: User modules ─────────────────────────── */}
+        {userModules.length > 0 && (
           <>
             {!collapsed && (
               <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500 mt-5 mb-3">
@@ -116,24 +137,12 @@ export default function Sidebar() {
             )}
             {collapsed && <div className="my-3 border-t border-slate-700/60" />}
             <div className="space-y-1">
-              {visibleModules.map(m =>
-                moduleReachability[m.id] === false ? (
-                  <OfflineModuleItem key={m.id} icon={m.icon} label={m.name} collapsed={collapsed} />
-                ) : (
-                  <NavItem
-                    key={m.id}
-                    to={`/modules/${m.id}`}
-                    icon={<span className="text-base leading-none">{m.icon}</span>}
-                    label={m.name}
-                    collapsed={collapsed}
-                  />
-                )
-              )}
+              {renderModuleGroup(userModules)}
             </div>
           </>
         )}
 
-        {/* Admin section */}
+        {/* ── Group 2: Admin section ────────────────────────── */}
         {isAdmin && (
           <>
             {!collapsed && (
@@ -219,67 +228,35 @@ export default function Sidebar() {
                 />
               </div>
 
-              {!collapsed && (
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600 mt-4 mb-2">
-                  Utils
-                </p>
+              {/* Admin-role DB modules (e.g. admin-only federation remotes) */}
+              {adminModules.length > 0 && (
+                <>
+                  {!collapsed && (
+                    <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600 mt-4 mb-2">
+                      Modules
+                    </p>
+                  )}
+                  {collapsed && <div className="my-2 mx-2 border-t border-slate-700/40" />}
+                  <div className={collapsed ? 'space-y-1' : 'pl-2 space-y-1'}>
+                    {renderModuleGroup(adminModules)}
+                  </div>
+                </>
               )}
-              {collapsed && <div className="my-2 mx-2 border-t border-slate-700/40" />}
-              <div className={collapsed ? '' : 'pl-2 space-y-1'}>
-                <NavItem
-                  to="/admin/layouts"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                        d="M4 5a1 1 0 011-1h14a1 1 0 011 1v3a1 1 0 01-1 1H5a1 1 0 01-1-1V5zm0 8a1 1 0 011-1h6a1 1 0 011 1v6a1 1 0 01-1 1H5a1 1 0 01-1-1v-6zm10 0a1 1 0 011-1h4a1 1 0 011 1v6a1 1 0 01-1 1h-4a1 1 0 01-1-1v-6z" />
-                    </svg>
-                  }
-                  label="Layouts"
-                  collapsed={collapsed}
-                />
-              </div>
+            </div>
+          </>
+        )}
 
-              {!collapsed && (
-                <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-600 mt-4 mb-2">
-                  Docs
-                </p>
-              )}
-              {collapsed && <div className="my-2 mx-2 border-t border-slate-700/40" />}
-              <div className={collapsed ? '' : 'pl-2 space-y-1'}>
-                <NavItem
-                  to="/admin/docs/ui"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                        d="M9 3H5a2 2 0 00-2 2v4m6-6h10a2 2 0 012 2v4M9 3v10m0 0h10M9 13H5a2 2 0 00-2 2v4a2 2 0 002 2h4a2 2 0 002-2v-4a2 2 0 00-2-2z" />
-                    </svg>
-                  }
-                  label="UI"
-                  collapsed={collapsed}
-                />
-                <NavItem
-                  to="/admin/docs/api"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                        d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
-                    </svg>
-                  }
-                  label="API"
-                  collapsed={collapsed}
-                />
-                <NavItem
-                  to="/admin/docs/deployment"
-                  icon={
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
-                        d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                    </svg>
-                  }
-                  label="Deployment"
-                  collapsed={collapsed}
-                />
-              </div>
+        {/* ── Group 3: System section ───────────────────────── */}
+        {isSystem && (
+          <>
+            {!collapsed && (
+              <p className="px-3 text-[10px] font-semibold uppercase tracking-widest text-slate-500 mt-5 mb-3">
+                System
+              </p>
+            )}
+            {collapsed && <div className="my-3 border-t border-slate-700/60" />}
+            <div className="space-y-1">
+              {renderModuleGroup(systemModules)}
             </div>
           </>
         )}

@@ -1,0 +1,27 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: spin-docs
+  namespace: spin-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: spin-docs
+  template:
+    metadata:
+      labels:
+        app: spin-docs
+    spec:
+      containers:
+        - name: spin-docs
+          image: ghcr.io/kissspinoblezsolt/spin-core-spin-docs:latest
+          imagePullPolicy: Always  # Always, not IfNotPresent — manifest defaults to :latest, which nodes cache aggressively; deploy script overrides to SHA at apply time
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /manifest.json
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 5

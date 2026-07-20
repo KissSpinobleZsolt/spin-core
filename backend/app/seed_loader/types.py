@@ -27,4 +27,3 @@ class SeedData:
     bots: list[BotSeed] = field(default_factory=lambda: [BotSeed(**_FALLBACK_BOT)])  # always provides at least one bot
     default_theme: Literal["dark", "light"] = "dark"  # initial platform theme persisted to settings.json
     modules: list[dict] = field(default_factory=list)  # legacy module entries from seed.json settings.modules
-    ui_components: list[dict] = field(default_factory=list)  # UI component docs seeded into the ui_components table

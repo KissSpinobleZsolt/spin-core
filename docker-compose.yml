@@ -170,9 +170,9 @@ services:
       ollama:
         condition: service_healthy
     restart: unless-stopped
- # ── Core Module Hello World frontend services (serve remoteEntry.js + manifest.json) ──────────
-  hello-world:
-    build: ./modules/hello-world
+ # ── Spin Docs module (architecture diagrams + dev docs, system role only) ────────────
+  spin-docs:
+    build: ./modules/spin-docs
     ports:
       - "3001:80"
     healthcheck:
@@ -195,7 +195,7 @@ services:
       ADMIN_PASSWORD: change-me
       ADMIN_NAME: Admin
       OLLAMA_URL: http://ollama:11434
-      MODULE_REGISTRY_URLS: http://cloud-insight-ai:80,http://hello-world:80,http://anomascan:80,http://bots-trader-platform:80
+      MODULE_REGISTRY_URLS: http://cloud-insight-ai:80,http://anomascan:80,http://bots-trader-platform:80,http://spin-docs:80
       # Cloud LLM providers — leave blank to disable; bots using that provider will
       # return an error chunk instead of streaming tokens.
       # Anthropic Claude: get your key at https://console.anthropic.com/settings/keys
@@ -219,6 +219,8 @@ services:
         condition: service_healthy
       ollama:
         condition: service_healthy
+      spin-docs:
+        condition: service_healthy  # spin-docs must be up so its remote_url is reachable on first seed
     restart: unless-stopped
 
   frontend:

@@ -9,7 +9,7 @@ export function Toggle({ checked, onChange, disabled }: ToggleProps) {
       aria-checked={checked}
       disabled={disabled}
       onClick={() => onChange(!checked)}
-      className={`toggle__track ${checked ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-600'}`}
+      className={`toggle__track ${checked ? 'bg-blue-600' : 'bg-slate-400 dark:bg-slate-600'}`}
     >
       <span className={`toggle__thumb ${checked ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>

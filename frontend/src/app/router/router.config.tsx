@@ -5,12 +5,10 @@ import { AuthGuard } from '../../components/guards/AuthGuard' // redirects unaut
 import { RoleGuard } from '../../components/guards/roleGuard' // restricts child routes to admin role
 import { FederatedPage } from '../../components/modules/federatedPage' // Webpack module federation loader
 import { PageLoader } from '@components/layout/PageLoader' // suspense wrapper for lazy-loaded pages
-import { UIComponentsProvider } from '@context' // provides the component catalogue for the UI docs page
 import { loginFallback } from '../loginFallback.constant' // stable spinner shown during route lazy-load
 import {
   Dashboard, Login, Translations, Bots, Chat,
-  LLMs, Users, Modules, Status, Layouts,
-  DocsUI, DocsApi, DocsDeployment, NotFound,
+  LLMs, Users, Modules, Status, NotFound,
 } from './lazyPages.constant' // all code-split page components
 
 export const router = createBrowserRouter([
@@ -84,40 +82,6 @@ export const router = createBrowserRouter([
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <Status />
-              </RoleGuard>
-            ),
-          },
-          {
-            path: 'admin/layouts',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <Layouts />
-              </RoleGuard>
-            ),
-          },
-          {
-            path: 'admin/docs/ui',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <UIComponentsProvider> {/* docs page needs the component catalogue context */}
-                  <DocsUI />
-                </UIComponentsProvider>
-              </RoleGuard>
-            ),
-          },
-          {
-            path: 'admin/docs/api',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <DocsApi />
-              </RoleGuard>
-            ),
-          },
-          {
-            path: 'admin/docs/deployment',
-            element: (
-              <RoleGuard requiredRoles={['admin']}>
-                <DocsDeployment />
               </RoleGuard>
             ),
           },

@@ -4,11 +4,11 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 
 ## Available modules
 
-Each module lives in its own GitHub repository and is wired into spin-core as a git submodule (see `workspace.yml`).
+External modules live in their own GitHub repositories and are wired into spin-core as git submodules. The `spin-docs` module is bundled directly in this repository.
 
 | Module | Repo | Frontend port | Backend port | Scope | Description |
 |--------|------|--------------|--------------|-------|-------------|
-| [hello-world](hello-world/README.md) | [spi-module-hello-world](https://github.com/KissSpinobleZsolt/spi-module-hello-world) | 3001 | — | `helloWorld` | Reference remote — counter widget (frontend only) |
+| [spin-docs](spin-docs/) | *(bundled)* | 3001 | — | `spinDocs` | Architecture diagrams + developer docs (system role) |
 | [CloudInsight AI](cloud-insight-ai/README.md) | [spi-module-cloud-insight-ai](https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai) | 3002 | 8002 | `cloudInsightAI` | Data source upload, processing, and management |
 | [AnomaScan](AnomaScan/README.md) | [spi-module-anomascan](https://github.com/KissSpinobleZsolt/spi-module-anomascan) | 3003 | 8003 | `anomaScan` | YOLO object detection and model fine-tuning |
 
@@ -20,9 +20,9 @@ Each module lives in its own GitHub repository and is wired into spin-core as a 
 bash scripts/setup-workspace.sh
 ```
 
-**Working on a module:**
+**Working on a submodule module:**
 ```bash
-cd modules/hello-world        # full git repo — push/PR against spi-module-hello-world
+cd modules/cloud-insight-ai   # full git repo — push/PR against the upstream repo
 git checkout -b feat/my-thing
 # ... make changes, then:
 git push origin feat/my-thing
@@ -30,11 +30,11 @@ git push origin feat/my-thing
 
 **Bumping a module version in spin-core (after a module PR is merged):**
 ```bash
-cd modules/hello-world
+cd modules/cloud-insight-ai
 git pull origin main
 cd ../..
-git add modules/hello-world
-git commit -m "chore: bump hello-world submodule to <sha>"
+git add modules/cloud-insight-ai
+git commit -m "chore: bump cloud-insight-ai submodule to <sha>"
 ```
 
 > The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
@@ -63,13 +63,13 @@ Modules are registered in **Admin → Modules** (`/admin/modules`). Two ways:
 
 | Field | Example | Description |
 |-------|---------|-------------|
-| Name | `Hello World` | Display name in sidebar |
-| Description | `Counter widget` | Short description shown in the discovery panel |
+| Name | `Spin Docs` | Display name in sidebar |
+| Description | `Architecture diagrams` | Short description shown in the discovery panel |
 | Remote URL | `http://localhost:3001/remoteEntry.js` | Browser-accessible URL of `remoteEntry.js` |
-| Scope | `helloWorld` | Webpack container scope (must match `webpack.config.js`) |
+| Scope | `spinDocs` | Webpack container scope (must match `webpack.config.js`) |
 | Component | `./App` | Exposed component name |
-| Root slug | `hello-world` | URL path under `/modules/` |
-| Icon | `👋` | Emoji shown in sidebar |
+| Root slug | `spin-docs` | URL path under `/modules/` |
+| Icon | `📚` | Emoji shown in sidebar |
 | Presets | (auto-populated) | `{ i18n, layout, settings }` injected as `presets` prop; `i18n` is loaded automatically from the manifest on registration — do not enter it manually |
 
 ## manifest.json
@@ -162,12 +162,14 @@ The host sets `window.React` and `window.ReactDOM` before injecting each remote 
 
 ## Building a new module
 
-1. Copy `modules/hello-world/` as a starting point.
-2. Update `webpack.config.js`:
-   - Change `name` (scope) and `exposes` entry.
-   - Keep the `externals` block unchanged.
-3. Update `public/manifest.json` with your module's metadata.
-4. Run standalone: `npm install && npm start` (port configurable in `webpack.config.js`).
-5. Register via Admin → Modules → Scan, or manually.
+Use `modules/spin-docs/` as a minimal reference — it is a frontend-only webpack MF remote with no plugin backend.
 
-See [hello-world/README.md](hello-world/README.md) for a detailed walkthrough.
+1. Create `modules/your-module-name/` and copy the structure from `spin-docs/`.
+2. Update `webpack.config.js`:
+   - Change `name` (scope), `output.uniqueName`, and `exposes` entry.
+   - Keep the `externals` block unchanged.
+   - Set `devServer.port` to a free port.
+3. Update `public/manifest.json` with your module's metadata.
+4. Run standalone: `npm install && npm start`.
+5. Register via Admin → Modules → Scan, or manually.
+6. Add a service entry to `docker-compose.yml` (build + port mapping + healthcheck).

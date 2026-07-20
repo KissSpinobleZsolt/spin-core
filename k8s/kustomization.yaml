@@ -14,7 +14,7 @@ images:
     newTag: latest
   - name: ghcr.io/kissspinoblezsolt/spin-core-frontend
     newTag: latest
-  - name: ghcr.io/kissspinoblezsolt/spin-core-hello-world
+  - name: ghcr.io/kissspinoblezsolt/spin-core-spin-docs
     newTag: latest
 
 resources:
@@ -34,7 +34,7 @@ resources:
   - ollama/model-downloader-job.yaml
   - backend/service.yaml
   - backend/deployment.yaml
-  - hello-world/service.yaml
-  - hello-world/deployment.yaml
+  - spin-docs/service.yaml
+  - spin-docs/deployment.yaml
   - frontend/service.yaml
   - frontend/deployment.yaml
