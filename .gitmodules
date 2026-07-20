@@ -1,6 +1,3 @@
-[submodule "modules/hello-world"]
-	path = modules/hello-world
-	url = https://github.com/KissSpinobleZsolt/spi-module-hello-world.git
 [submodule "modules/cloud-insight-ai"]
 	path = modules/cloud-insight-ai
 	url = https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai.git
