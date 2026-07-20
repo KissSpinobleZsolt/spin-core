@@ -88,6 +88,16 @@ class PostgresAdapter:
                 row.default_theme = theme  # mutate the ORM instance; SQLAlchemy tracks the change
                 db.commit()  # flush the UPDATE to the DB
 
+    def ensure_user_has_role(self, email: str, role: str) -> bool:
+        """Add role to the user's roles array if not already present. Returns True if the row was updated."""
+        with self._session_ctx() as db:
+            row = db.query(UserRow).filter(UserRow.email == email).first()  # locate by email
+            if not row or role in row.roles:  # no-op when user absent or role already present
+                return False
+            row.roles = list(row.roles) + [role]  # SQLAlchemy needs a new list object to detect the ARRAY mutation
+            db.commit()  # flush the UPDATE to the DB
+            return True
+
     def get_page(self, key: str) -> str | None:
         """Return the content string for the given page key, or None if absent."""
         with self._session_ctx() as db:

@@ -7,7 +7,7 @@ export const DC_SERVICES = [
   { name: 'backend',                      port: '8000',       image: 'build ./backend',                   description: 'FastAPI core — REST API, auth, streaming chat, plugin proxy' },
   { name: 'frontend',                     port: '3000',       image: 'build ./frontend',                  description: 'React 19 SPA (production Nginx build)' },
   { name: 'frontend-dev',                 port: '3000',       image: 'build ./frontend (dev)',             description: 'Vite dev server with HMR — activated via --profile dev' },
-  { name: 'hello-world',                  port: '3001',       image: 'build ./modules/hello-world',       description: 'Reference MF remote module' },
+  { name: 'spin-docs',                    port: '3001',       image: 'build ./modules/spin-docs',         description: 'Architecture diagrams + dev docs (system role)' },
   { name: 'cloud-insight-ai',             port: '3002',       image: 'build ./modules/cloud-insight-ai',  description: 'Data Ingestion MF remote' },
   { name: 'cloud-insight-ai-backend',     port: '8002',       image: 'build (module backend)',            description: 'Data Ingestion FastAPI backend' },
   { name: 'anomascan',                    port: '3003',       image: 'build ./modules/AnomaScan',         description: 'Vision Watch MF remote' },

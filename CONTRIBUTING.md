@@ -101,14 +101,15 @@ gh repo create KissSpinobleZsolt/spi-module-your-name \
   --public --description "spin-core your-name MF remote"
 ```
 
-Then initialise the module directory from the `hello-world` template and push it:
+Then initialise the module directory from the `spin-docs` template and push it:
 
 ```bash
-cp -r modules/hello-world modules/your-module-name
+cp -r modules/spin-docs modules/your-module-name
 cd modules/your-module-name
+rm -rf node_modules dist package-lock.json
 git init -b main
 git add .
-git commit -m "chore: initial commit — new module from hello-world template"
+git commit -m "chore: initial commit — new module from spin-docs template"
 git remote add origin https://github.com/KissSpinobleZsolt/spi-module-your-name.git
 git push -u origin main
 cd ../..

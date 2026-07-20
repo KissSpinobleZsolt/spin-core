@@ -90,7 +90,7 @@ docker compose up backend postgres clickhouse
 | `ANTHROPIC_API_KEY` | _(empty)_ | Anthropic Claude API key — required for bots with `provider = "anthropic"`. Obtain at console.anthropic.com |
 | `OPENAI_API_KEY` | _(empty)_ | OpenAI API key — also used for Groq, Mistral, Azure OpenAI, and any other OpenAI-compatible endpoint |
 | `OPENAI_BASE_URL` | _(empty)_ | Override the OpenAI-compatible base URL (e.g. `https://api.groq.com/openai/v1`). Leave blank for `api.openai.com` |
-| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` on startup (auto-discovery) and by `GET /api/settings/modules/discover`. Docker Compose default: `http://cloud-insight-ai:80,http://hello-world:80,http://anomascan:80` |
+| `MODULE_REGISTRY_URLS` | _(empty)_ | Comma-separated base URLs scanned for `manifest.json` by `GET /api/settings/modules/discover`. Docker Compose default: `http://cloud-insight-ai:80,http://anomascan:80,http://spin-docs:80` |
 
 ## Admin bootstrap
 

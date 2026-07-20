@@ -23,7 +23,7 @@ Does a `docker compose stop` + `docker compose up -d` on the named service(s). W
 
 ## `k8s-push.sh`
 
-Builds the three app images (`backend`, `frontend`, `hello-world`) and pushes them to
+Builds the three app images (`backend`, `frontend`, `spin-docs`) and pushes them to
 `ghcr.io/kissspinoblezsolt/spin-core-<name>` tagged with the current git SHA and `:latest`.
 Run this before `k8s-deploy.sh` whenever the source changes.
 

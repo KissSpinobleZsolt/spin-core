@@ -38,15 +38,15 @@ data:
         },
         "modules": [
           {
-            "name": "Hello World",
-            "description": "Example federated micro-frontend module.",
-            "scope": "helloWorld",
+            "name": "Spin Docs",
+            "description": "Platform architecture diagrams and developer documentation.",
+            "scope": "spinDocs",
             "component": "./App",
-            "route": "hello-world",
-            "icon": "👋",
+            "route": "spin-docs",
+            "icon": "📚",
             "enabled": true,
-            "roles": ["user", "admin"],
-            "remote_url": "http://hello-world.spin-core.svc.cluster.local/remoteEntry.js",
+            "roles": ["system"],
+            "remote_url": "http://spin-docs.spin-core.svc.cluster.local/remoteEntry.js",
             "presets": { "i18n": {}, "layout": {}, "settings": {} }
           }
         ]

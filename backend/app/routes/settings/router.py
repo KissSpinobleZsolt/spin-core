@@ -4,9 +4,9 @@ import os
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Response
 
-from app.database import get_ch, get_pg
+from app.database import get_pg, get_logger
 from app.deps import admin_dep
-from app.events import LogLevel, ModuleEvent, lifecycle_message
+from app.events import ModuleEvent, BotEvent
 from app.schemas import ModuleInput
 from app.settings import write_settings
 from app.state import get_settings
@@ -35,13 +35,9 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
     """Register a new module, provision its ClickHouse tables, and seed bots declared in its manifest (admin only)."""
     pg = get_pg()
     module = pg.create_module(payload.model_dump())  # insert the module row and get the full dict back
-    ch = get_ch()
-    ch.write_module_log(  # log the registration event immediately after the row is created
-        module["scope"], email, ModuleEvent.INIT,
+    get_logger().module(  # log the registration event immediately after the row is created
+        ModuleEvent.INIT, module["scope"], module["name"], email,
         {"module_id": module["id"], "scope": module["scope"]},
-        level=LogLevel.INFO,
-        name=module["name"],
-        message=lifecycle_message(ModuleEvent.INIT, module["name"]),
     )
     try:
         manifest_url = payload.remote_url.rsplit("/remoteEntry.js", 1)[0] + "/manifest.json"  # derive the manifest URL from the federation entry point
@@ -52,12 +48,9 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
         bots_data = manifest.get("bots") or []  # optional bots section in the manifest
         new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email) if bots_data else []  # provision declared bots, skipping duplicates
         for bot in new_bots:
-            from app.events import BotEvent
-            ch.write_bot_log(  # log each newly provisioned bot to ClickHouse
-                bot.name, email, BotEvent.INIT,
+            get_logger().bot(  # log each newly provisioned bot
+                BotEvent.INIT, bot.name, email,
                 {"bot_id": bot.id, "module_id": module["id"], "module_scope": module["scope"]},
-                level=LogLevel.INFO, name=bot.name,
-                message=lifecycle_message(BotEvent.INIT, bot.name),
             )
         if not payload.backend_url and manifest.get("backend_url"):
             module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module  # auto-configure backend_url from manifest when not explicitly set
@@ -95,19 +88,15 @@ async def update_module(module_id: str, payload: ModuleInput, email: str = Depen
     module = pg.update_module(module_id, payload.model_dump())  # apply all fields from the payload
     if module is None:
         raise HTTPException(status_code=404, detail="Module not found")  # guard against race condition
-    ch = get_ch()
     if payload.enabled and not old["enabled"]:
         event = ModuleEvent.ACTIVATE    # module is being re-enabled
     elif not payload.enabled and old["enabled"]:
         event = ModuleEvent.DEACTIVATE  # module is being disabled
     else:
         event = ModuleEvent.UPDATE  # configuration changed without toggling enabled state
-    ch.write_module_log(  # log the outcome event to ClickHouse
-        module["scope"], email, event,
+    get_logger().module(  # log the outcome event; message auto-generated from event slug
+        event, module["scope"], module["name"], email,
         {"module_id": module_id},
-        level=LogLevel.INFO,
-        name=module["name"],
-        message=lifecycle_message(event, module["name"]),
     )
     return module  # return the updated module dict
 
@@ -119,12 +108,9 @@ async def delete_module(module_id: str, email: str = Depends(admin_dep)):
     mod = pg.get_module_by_id(module_id)  # read before delete to capture name and scope for the log entry
     if not mod or not pg.delete_module(module_id):
         raise HTTPException(status_code=404, detail="Module not found")
-    get_ch().write_module_log(  # log the deletion event; module row is already gone at this point
-        mod["scope"], email, ModuleEvent.DELETE,
+    get_logger().module(  # log deletion after the row is gone; name/scope captured above
+        ModuleEvent.DELETE, mod["scope"], mod["name"], email,
         {"module_id": module_id},
-        level=LogLevel.INFO,
-        name=mod["name"],
-        message=lifecycle_message(ModuleEvent.DELETE, mod["name"]),
     )
     return Response(status_code=204)  # 204 No Content
 

@@ -2,9 +2,9 @@ shell:
   repo: https://github.com/KissSpinobleZsolt/spin-core.git
 
 modules:
-  - name: hello-world
-    repo: https://github.com/KissSpinobleZsolt/spi-module-hello-world.git
-    path: modules/hello-world
+  - name: spin-docs
+    repo: bundled
+    path: modules/spin-docs
     port: 3001
 
   - name: cloud-insight-ai

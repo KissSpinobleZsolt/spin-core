@@ -9,8 +9,8 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.database import init_db, get_pg, get_ch
-from app.events import LogLevel, BotEvent, ComponentEvent, ModuleEvent, PageEvent, UserEvent, lifecycle_message
+from app.database import init_db, get_pg, get_ch, init_logger, get_logger
+from app.events import LogLevel, BotEvent, ComponentEvent, ModuleEvent, PageEvent, UserEvent
 from app.model_tracker import run_sequential_trackers
 from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
@@ -67,23 +67,22 @@ async def _module_health_checker() -> None:
                         resp.raise_for_status()
                         # Only re-enable if the checker itself disabled it; admin-disabled modules stay off.
                         if not enabled and scope in _auto_disabled_scopes:
-                            get_pg().update_module(m["id"], {"enabled": True})
-                            _auto_disabled_scopes.discard(scope)
+                            get_pg().update_module(m["id"], {"enabled": True})  # re-enable the module row in Postgres
+                            _auto_disabled_scopes.discard(scope)  # remove from the auto-disabled set so it won't be double-logged
                             print(f"[spin-core] Module back online, re-enabled: {scope}", file=sys.stderr)
-                            get_ch().write_module_log(
-                                scope, "system", ModuleEvent.ACTIVATE, {"source": "health-checker"},
-                                level=LogLevel.INFO, name=m.get("name", scope),
-                                message=lifecycle_message(ModuleEvent.ACTIVATE, m.get("name", scope)),
+                            get_logger().module(  # record the recovery event via the centralised logger
+                                ModuleEvent.ACTIVATE, scope, m.get("name", scope), "system",
+                                details={"source": "health-checker"},
                             )
                     except Exception:
                         if enabled:
-                            get_pg().update_module(m["id"], {"enabled": False})
-                            _auto_disabled_scopes.add(scope)
+                            get_pg().update_module(m["id"], {"enabled": False})  # mark the module offline in Postgres
+                            _auto_disabled_scopes.add(scope)  # track so the checker can re-enable it automatically
                             print(f"[spin-core] Module offline, auto-disabled: {scope}", file=sys.stderr)
-                            get_ch().write_module_log(
-                                scope, "system", ModuleEvent.DEACTIVATE, {"source": "health-checker"},
-                                level=LogLevel.WARN, name=m.get("name", scope),
-                                message=lifecycle_message(ModuleEvent.DEACTIVATE, m.get("name", scope)),
+                            get_logger().module(  # record the outage event at WARN level
+                                ModuleEvent.DEACTIVATE, scope, m.get("name", scope), "system",
+                                details={"source": "health-checker"},
+                                level=LogLevel.WARN,
                             )
         except Exception as exc:
             print(f"[spin-core] Module health check error: {exc}", file=sys.stderr)
@@ -104,8 +103,9 @@ async def _daily_log_purge() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    set_settings(read_settings())
-    init_db()
+    set_settings(read_settings())  # load settings.json into the in-process singleton before anything else touches it
+    init_db()  # connect to PostgreSQL and ClickHouse and store their adapter singletons
+    init_logger()  # wrap the CH adapter in AppLogger; must come after init_db() so get_ch() is ready
 
     pg = get_pg()
     seed = load_seed()
@@ -123,11 +123,16 @@ async def lifespan(app: FastAPI):
                 email=admin_email,
                 name=admin_name,
                 hashed_password=hash_password(admin_password),
-                roles=["user", "admin"],
+                roles=["user", "admin", "system"],  # system grants access to spin-docs and developer tooling
                 default_theme=seed.default_theme,
             )
             admin_created = True
             print(f"[spin-core] Admin user created: {admin_email}", file=sys.stderr)
+        else:
+            # Idempotent migration: ensure the admin always carries the system role,
+            # even if the user row was created before the system role was introduced.
+            if pg.ensure_user_has_role(admin_email, "system"):
+                print(f"[spin-core] Granted 'system' role to existing admin: {admin_email}", file=sys.stderr)
     else:
         print("[spin-core] ADMIN_EMAIL / ADMIN_PASSWORD not set — skipping admin seed", file=sys.stderr)
 
@@ -174,111 +179,51 @@ async def lifespan(app: FastAPI):
             except Exception as exc:
                 print(f"[spin-core] Module seed failed for {scope}: {exc}", file=sys.stderr)
 
-    # Initialise ClickHouse: migrate legacy tables/columns, then provision the 5 base tables
-    ch = get_ch()
-    ch.run_migrations()
-    ch.ensure_api_logs()
-    ch.ensure_app_logs()
-    ch.ensure_user_logs()
-    ch.ensure_module_logs_table()
-    ch.ensure_bot_logs_table()
-    ch.ensure_notifications_table()
-    ch.write_app_log("INFO", "app.start", "system", "spin-core backend started", name="spin-core")
+    # Initialise ClickHouse: migrate legacy tables/columns, then provision all base tables
+    ch = get_ch()  # raw adapter needed for DDL operations (migrations, ensure_* calls)
+    ch.run_migrations()  # rename legacy tables/columns before DDL provisioning
+    ch.ensure_api_logs()  # CREATE TABLE IF NOT EXISTS api_logs
+    ch.ensure_app_logs()  # CREATE TABLE IF NOT EXISTS app_logs
+    ch.ensure_user_logs()  # CREATE TABLE IF NOT EXISTS user_logs
+    ch.ensure_module_logs_table()  # CREATE TABLE IF NOT EXISTS module_logs
+    ch.ensure_bot_logs_table()  # CREATE TABLE IF NOT EXISTS bot_logs
+    ch.ensure_notifications_table()  # CREATE TABLE IF NOT EXISTS notifications
+    get_logger().app("app.start", "spin-core", message="spin-core backend started")  # first lifecycle event; signals successful startup
 
-    # Runs every startup — catches bots that exist in PG but lost CH history after a wipe
-    # Write bot.init for any bot that has no CH history yet (covers first-run and CH wipes)
+    # Backfill bot.init for any bot that exists in Postgres but has no CH history (first-run or CH wipe)
     try:
-        bots_with_logs = ch.get_bot_names_with_logs()
+        bots_with_logs = ch.get_bot_names_with_logs()  # set of bot names that already have at least one CH entry
         for bot in pg.get_bots(admin=True):
-            if bot.name not in bots_with_logs:
-                ch.write_bot_log(
-                    bot.name, "system", BotEvent.INIT,
+            if bot.name not in bots_with_logs:  # missing CH history — write the init event now
+                get_logger().bot(
+                    BotEvent.INIT, bot.name, "system",
                     {"bot_id": str(bot.id), "source": "startup"},
-                    level=LogLevel.INFO, name=bot.name,
-                    message=lifecycle_message(BotEvent.INIT, bot.name),
                 )
     except Exception as exc:
         print(f"[spin-core] Failed to write startup bot.init logs: {exc}", file=sys.stderr)
 
-    # Write component.init for any UI component that has no CH history yet
+    # Backfill component.init for UI components with no CH history
     try:
-        components_with_logs = ch.get_component_names_with_logs()
+        components_with_logs = ch.get_component_names_with_logs()  # set of component names with existing CH entries
         for comp in pg.get_ui_components():
-            if comp["name"] not in components_with_logs:
-                ch.write_module_log(
-                    "system", "system", ComponentEvent.INIT,
+            if comp["name"] not in components_with_logs:  # component has never been logged — write init event
+                get_logger().module(
+                    ComponentEvent.INIT, "system", comp["name"], "system",
                     {"component": comp["name"], "file": comp["file"], "source": "startup"},
-                    level=LogLevel.INFO, name=comp["name"],
-                    message=lifecycle_message(ComponentEvent.INIT, comp["name"]),
                 )
     except Exception as exc:
         print(f"[spin-core] Failed to write startup component.init logs: {exc}", file=sys.stderr)
 
-    # Write user.init for the admin if it was just seeded this startup
+    # Write user.init for the admin only if the account was seeded during this startup
     if admin_created and admin_email:
         try:
-            ch.write_user_log(
-                LogLevel.INFO, UserEvent.INIT, admin_email,
-                lifecycle_message(UserEvent.INIT, admin_name),
-                name=admin_name,
+            get_logger().user(  # records who the admin is and that the account was auto-seeded
+                UserEvent.INIT, admin_email,
                 details={"source": "seed"},
+                name=admin_name,
             )
         except Exception as exc:
             print(f"[spin-core] Failed to write admin user.init log: {exc}", file=sys.stderr)
-
-    # Auto-discover from MODULE_REGISTRY_URLS (inserts only new scopes, never overwrites)
-    registry_urls_env = os.getenv("MODULE_REGISTRY_URLS", "").strip()
-    if registry_urls_env:
-        base_urls = [u.strip().rstrip("/") for u in registry_urls_env.split(",") if u.strip()]
-        registered_scopes = {m["scope"] for m in pg.get_modules()}
-        async with httpx.AsyncClient(timeout=5.0) as client:
-            for base_url in base_urls:
-                try:
-                    resp = await client.get(f"{base_url}/manifest.json")
-                    resp.raise_for_status()
-                    m = resp.json()
-                    scope = m.get("scope")
-                    if scope and scope != "chatbot" and scope not in registered_scopes:
-                        pg.upsert_module({
-                            **_build_module_dict(m),
-                            "name": m.get("name", scope),
-                            "remote_url": m.get("remote_url") or m.get("remote_entry") or f"{base_url}/remoteEntry.js",
-                            "scope": scope,
-                            "route": m.get("route", scope.lower()),
-                            "enabled": False,  # admin must enable explicitly — auto-discovery never activates on its own
-                            "presets": {"i18n": {}, "layout": {}, "settings": {}},
-                        })
-                        registered_scopes.add(scope)
-                        print(f"[spin-core] Auto-discovered module (inactive): {scope}", file=sys.stderr)
-                        ch.write_module_log(
-                            scope, "system", ModuleEvent.INIT,
-                            {"scope": scope, "source": "auto-discovery"},
-                            level=LogLevel.INFO, name=m.get("name", scope),
-                            message=lifecycle_message(ModuleEvent.INIT, m.get("name", scope)),
-                        )
-                        mod = pg.get_module_by_scope(scope)
-                        if mod:
-                            i18n_data = m.get("i18n") or {}
-                            if i18n_data:
-                                pg.update_module(mod["id"], {"presets": {**mod.get("presets", {}), "i18n": i18n_data}})
-                                for lang, translations in i18n_data.items():
-                                    pg.merge_i18n_data(lang, translations)
-                        bots_from_manifest = m.get("bots") or []
-                        if bots_from_manifest:
-                            if not mod:
-                                # Re-fetch only when the i18n block above didn't load it
-                                mod = pg.get_module_by_scope(scope)
-                            if mod:
-                                new_bots = pg.seed_bots_for_module(mod["id"], bots_from_manifest, created_by=admin_email or "")
-                                for bot in new_bots:
-                                    ch.write_bot_log(
-                                        bot.name, "system", BotEvent.INIT,
-                                        {"bot_id": bot.id, "module_scope": scope, "source": "auto-discovery"},
-                                        level=LogLevel.INFO, name=bot.name,
-                                        message=lifecycle_message(BotEvent.INIT, bot.name),
-                                    )
-                except Exception as exc:
-                    print(f"[spin-core] Discovery failed for {base_url}: {exc}", file=sys.stderr)
 
     # Write initial settings.json on very first run (theme only)
     if not SETTINGS_PATH.exists():
@@ -321,24 +266,19 @@ async def lifespan(app: FastAPI):
         ("admin/docs/deployment", {"title": "Deployment Docs", "component_key": "DocsDeployment", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
     ]
     try:
-        pages_with_logs = ch.get_page_routes_with_logs()
+        pages_with_logs = ch.get_page_routes_with_logs()  # set of routes that already have a page.init log
     except Exception:
-        # ClickHouse unavailable at startup — fall back to empty so all pages get an init log
-        # written once CH recovers; this may produce a duplicate log on the next clean restart
+        # ClickHouse unavailable at startup — fall back to empty so all pages receive an init log;
+        # this may produce a duplicate on the next clean restart but is preferable to missing history.
         pages_with_logs = set()
     for route, data in _PAGE_REGISTRY_SEED:
-        pg.seed_page_registry(route, {**data, "type": "native", "enabled": True})
-        page_key = route or "/"
-        if page_key not in pages_with_logs:
-            try:
-                ch.write_module_log(
-                    "system", "system", PageEvent.INIT,
-                    {"route": route or "/", "title": data["title"], "source": "seed"},
-                    level=LogLevel.INFO, name=page_key,
-                    message=lifecycle_message(PageEvent.INIT, data["title"]),
-                )
-            except Exception as exc:
-                print(f"[spin-core] Failed to write page.init log for {page_key}: {exc}", file=sys.stderr)
+        pg.seed_page_registry(route, {**data, "type": "native", "enabled": True})  # idempotent upsert
+        page_key = route or "/"  # use "/" as the key for the root dashboard route
+        if page_key not in pages_with_logs:  # only write the init log once per route
+            get_logger().module(  # page events go to module_logs under the "system" scope
+                PageEvent.INIT, "system", data["title"], "system",
+                {"route": route or "/", "title": data["title"], "source": "seed"},
+            )
 
     tracker_task = asyncio.create_task(run_sequential_trackers(_required_models()))
     purge_task = asyncio.create_task(_daily_log_purge())
@@ -372,26 +312,21 @@ async def log_requests(request: Request, call_next):
     start = time.time()
     response = await call_next(request)
     duration_ms = (time.time() - start) * 1000
-    try:
-        auth_header = request.headers.get("authorization", "")
-        user_email = ""
-        if auth_header.startswith("Bearer "):
-            from app.auth import decode_token
-            try:
-                user_email = decode_token(auth_header.removeprefix("Bearer "))
-            except Exception:
-                pass
-        get_ch().write_api_log(
-            level="INFO",
-            event_type="http.request",
-            owner=user_email,
-            path=request.url.path,
-            method=request.method,
-            status_code=response.status_code,
-            duration_ms=round(duration_ms, 2),
-        )
-    except Exception:
-        pass
+    auth_header = request.headers.get("authorization", "")  # extract the auth header to identify the caller
+    user_email = ""
+    if auth_header.startswith("Bearer "):  # only decode when the header has the expected scheme
+        from app.auth import decode_token
+        try:
+            user_email = decode_token(auth_header.removeprefix("Bearer "))  # JWT decode; silently ignore invalid tokens
+        except Exception:
+            pass
+    get_logger().request(  # AppLogger.request() swallows all exceptions internally
+        owner=user_email,
+        path=request.url.path,
+        method=request.method,
+        status_code=response.status_code,
+        duration_ms=duration_ms,
+    )
     return response
 
 

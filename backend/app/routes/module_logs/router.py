@@ -3,7 +3,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 
-from app.database import get_ch
+from app.database import get_ch, get_logger
 from app.deps import token_dep, admin_dep
 from app.routes.module_logs.schemas import LogPayload
 from app.routes.module_logs.utils import _get_scope
@@ -19,7 +19,7 @@ async def write_module_log(
 ):
     """Write a structured event log entry for a module to ClickHouse."""
     scope = _get_scope(module_id)  # resolve module_id to the federation scope; raises 404 if not found
-    get_ch().write_module_log(scope, user_email, payload.event_type, payload.details)  # write to the module_logs table
+    get_logger().module(payload.event_type, scope, name="", owner=user_email, details=payload.details)  # write through the centralised logger
     return {"ok": True}  # simple confirmation envelope
 
 

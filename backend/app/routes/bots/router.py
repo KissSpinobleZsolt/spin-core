@@ -2,9 +2,9 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.database import get_pg, get_ch
+from app.database import get_pg, get_logger
 from app.deps import token_dep, admin_dep
-from app.events import LogLevel, BotEvent, lifecycle_message
+from app.events import BotEvent
 from app.routes.bots.schemas import BotPayload, BotOut
 
 router = APIRouter(prefix="/api/bots", tags=["bots"])  # mounts all bot CRUD endpoints under /api/bots
@@ -47,13 +47,9 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         created_by=admin_email,  # record which admin created this bot
         config_schema=payload.config_schema,
     )
-    ch = get_ch()
-    ch.write_bot_log(  # log the creation event to ClickHouse for audit trail
-        bot.name, admin_email, BotEvent.INIT,
+    get_logger().bot(  # log the creation event for audit trail
+        BotEvent.INIT, bot.name, admin_email,
         {"bot_id": bot.id},
-        level=LogLevel.INFO,
-        name=bot.name,
-        message=lifecycle_message(BotEvent.INIT, bot.name),
     )
     return BotOut(**bot.__dict__)  # convert the BotRecord to the response schema
 
@@ -109,12 +105,9 @@ def update_bot(bot_id: str, payload: BotPayload, email: str = Depends(admin_dep)
         event = BotEvent.DEACTIVATE  # bot is being disabled
     else:
         event = BotEvent.UPDATE  # configuration changed without toggling active state
-    get_ch().write_bot_log(  # log the outcome event to ClickHouse
-        bot.name, email, event,
+    get_logger().bot(  # log the outcome event; message auto-generated from event slug
+        event, bot.name, email,
         {"bot_id": bot_id},
-        level=LogLevel.INFO,
-        name=bot.name,
-        message=lifecycle_message(event, bot.name),
     )
     return BotOut(**bot.__dict__)  # return the updated bot to the caller
 
@@ -124,13 +117,10 @@ def delete_bot(bot_id: str, email: str = Depends(admin_dep)):
     """Permanently delete a bot by ID (admin only)."""
     pg = get_pg()
     # Read before delete — bot name is needed for the log entry and is unreachable after deletion
-    bot = pg.get_bot_by_id(bot_id)
+    bot = pg.get_bot_by_id(bot_id)  # read before delete — name is unavailable after deletion
     if not bot or not pg.delete_bot(bot_id):
         raise HTTPException(status_code=404, detail="Bot not found")
-    get_ch().write_bot_log(  # log the deletion event before the bot record is gone
-        bot.name, email, BotEvent.DELETE,
+    get_logger().bot(  # log deletion; bot row is already gone at this point
+        BotEvent.DELETE, bot.name, email,
         {"bot_id": bot_id},
-        level=LogLevel.INFO,
-        name=bot.name,
-        message=lifecycle_message(BotEvent.DELETE, bot.name),
     )

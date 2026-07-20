@@ -48,7 +48,7 @@ export function DockerTab() {
       </Card>
 
       <Card>
-        <SectionTitle>Environment Variables</SectionTitle>
+        <SectionTitle>Environment Variables (Default setupt.)</SectionTitle>
         <p style={s.hint}>
           Set in the <code style={s.code}>backend</code> service under{' '}
           <code style={s.code}>environment:</code> in docker-compose.yml.

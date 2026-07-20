@@ -320,7 +320,7 @@ function FederationTab({
                         description: d.description ?? '',
                         remote_url:  d.remote_url  ?? '',
                         scope:       d.scope       ?? '',
-                        component:   d.component   ?? './App',  // default component path matches the hello-world module convention
+                        component:   d.component   ?? './App',  // MF container protocol default — matches webpack.config.js exposes entry
                         route:       d.route       ?? '',
                         icon:        d.icon        ?? '🧩',
                         enabled:     true,  // new modules default to enabled so they appear in the sidebar immediately

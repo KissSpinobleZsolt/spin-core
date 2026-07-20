@@ -36,6 +36,18 @@
         "enabled": true,
         "roles": [],
         "presets": {"i18n": {}, "layout": {}, "settings": {}}
+      },
+      {
+        "name": "Spin Docs",
+        "description": "Platform architecture diagrams and developer documentation",
+        "remote_url": "http://localhost:3001/remoteEntry.js",
+        "scope": "spinDocs",
+        "component": "./App",
+        "route": "spin-docs",
+        "icon": "📚",
+        "enabled": true,
+        "roles": ["system"],
+        "presets": {"i18n": {}, "layout": {}, "settings": {}}
       }
     ]
   },
