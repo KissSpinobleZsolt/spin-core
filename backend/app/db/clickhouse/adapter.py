@@ -12,7 +12,7 @@ from app.queries.ch_inserts import (
 )
 from app.queries.ch_selects import (
     CH_TEST_CONNECTION,
-    CH_BOT_NAMES_WITH_LOGS, CH_COMPONENT_NAMES_WITH_LOGS, CH_PAGE_ROUTES_WITH_LOGS,
+    CH_BOT_NAMES_WITH_LOGS, CH_PAGE_ROUTES_WITH_LOGS,
     CH_NOTIFICATIONS_SINCE,
     CH_PAGINATED_COUNT, CH_PAGINATED_ROWS,
     CH_SUMMARY_COUNT, CH_SUMMARY_ROWS,
@@ -401,11 +401,6 @@ class ClickHouseLogAdapter:
         """Return bot_names that already have at least one entry in bot_logs."""
         rows = self._client.execute(CH_BOT_NAMES_WITH_LOGS)  # runs DISTINCT query; returns list of 1-tuples
         return {r[0] for r in rows}  # extract first element of each tuple into a set
-
-    def get_component_names_with_logs(self) -> set[str]:
-        """Return component names that already have a component.init entry in module_logs (scope='system')."""
-        rows = self._client.execute(CH_COMPONENT_NAMES_WITH_LOGS)  # queries module_logs WHERE scope='system' AND event_type='component.init'
-        return {r[0] for r in rows}  # extract the name column from each row tuple
 
     def get_page_routes_with_logs(self) -> set[str]:
         """Return page routes that already have a page.init entry in module_logs (scope='system')."""

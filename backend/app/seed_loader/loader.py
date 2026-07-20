@@ -45,13 +45,10 @@ def load_seed() -> SeedData:
     default_theme: Literal["dark", "light"] = "light" if theme_raw == "light" else "dark"  # clamp to valid values; any unknown string becomes "dark"
     modules: list[dict] = settings.get("modules", [])  # legacy module list stored under the settings key
 
-    ui_components: list[dict] = raw.get("ui_components", [])  # optional top-level section for UI component docs
-
     return SeedData(  # all sections collected; return the fully-populated SeedData to the caller
         dashboard_content=dashboard_content,
         bot_types=bot_types,
         bots=bots,
         default_theme=default_theme,
         modules=modules,
-        ui_components=ui_components,
     )

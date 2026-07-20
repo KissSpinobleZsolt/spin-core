@@ -1,13 +1,6 @@
 import { useState, useEffect } from 'react';
+import { UI_COMPONENTS } from '../../data/uiComponents'; // static component catalogue — no API call needed
 import { ComponentCard } from './ComponentCard'; // docs card per UI component
-
-// Inject spin keyframe once into the document head for the loading spinner.
-if (typeof document !== 'undefined' && !document.getElementById('spin-docs-spinner-keyframe')) {
-  const style = document.createElement('style');
-  style.id = 'spin-docs-spinner-keyframe';
-  style.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
-  document.head.appendChild(style);
-}
 
 // Scroll-spy hook: returns the id of the currently visible section.
 function useActiveSection(ids) {
@@ -28,24 +21,10 @@ function useActiveSection(ids) {
   return active;
 }
 
-// Full-page UI component reference: fetch from /api/ui-components, search, scroll-spy.
+// Full-page UI component reference driven from a static data file — no API call or loading state.
 export function UISection() {
-  const [components, setComponents] = useState([]); // fetched component docs list
-  const [loading, setLoading] = useState(true);     // true while first fetch is in-flight
-  const [error, setError] = useState(null);         // error message string or null
+  const components = UI_COMPONENTS; // static import; always available, no fetch latency
   const [query, setQuery] = useState('');           // controlled search input value
-
-  // Fetch component docs from the backend on mount.
-  useEffect(() => {
-    fetch('/api/ui-components') // relative URL resolves to the host frontend's origin
-      .then(r => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}: ${r.statusText}`);
-        return r.json();
-      })
-      .then(data => setComponents(data))
-      .catch(err => setError(err.message))
-      .finally(() => setLoading(false));
-  }, []);
 
   const ids = components.map(d => d.name.toLowerCase()); // anchor ids for scroll-spy
   const active = useActiveSection(ids);
@@ -64,69 +43,50 @@ export function UISection() {
       <div style={s.headerRow}>
         <div>
           <h1 style={s.title}>🧩 UI Components</h1>
-          {!loading && !error && (
-            <p style={s.subtitle}>
-              {components.length} components · <span style={{ color: '#f87171' }}>*</span> required prop
-            </p>
-          )}
+          <p style={s.subtitle}>
+            {components.length} components · <span style={{ color: '#f87171' }}>*</span> required prop
+          </p>
         </div>
         <input
           style={s.input}
           placeholder="Search components…"
           value={query}
           onChange={e => setQuery(e.target.value)} // controlled input
-          disabled={loading} // disable while loading
         />
       </div>
 
       {/* Body */}
       <div style={s.body}>
-        {loading && (
-          <div style={s.center}>
-            <div style={s.spinner} /> {/* CSS spinner via border trick */}
-            <p style={s.loadingText}>Loading components…</p>
-          </div>
-        )}
+        <div style={s.layout}>
+          {!searching && components.length > 0 && ( // hide sidebar during search
+            <nav style={s.sidebar}>
+              <p style={s.navLabel}>Components</p>
+              <ul style={s.navList}>
+                {components.map(d => {
+                  const id = d.name.toLowerCase(); // anchor id derived from component name
+                  return (
+                    <li key={id}>
+                      <a
+                        href={`#${id}`}
+                        style={{ ...s.navLink, ...(active === id ? s.navLinkActive : {}) }}
+                      >
+                        <span style={{ ...s.navDot, ...(active === id ? s.navDotActive : {}) }} />
+                        {d.name}
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+            </nav>
+          )}
 
-        {error && !loading && (
-          <div style={s.errorBanner}>
-            <strong style={{ color: '#f87171' }}>Error:</strong>{' '}
-            <span style={{ color: '#fca5a5' }}>{error}</span>
+          <div style={s.cards}>
+            {filtered.length === 0
+              ? <p style={s.empty}>No components match "{query}"</p>
+              : filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />) // one card per component
+            }
           </div>
-        )}
-
-        {!loading && !error && (
-          <div style={s.layout}>
-            {!searching && components.length > 0 && ( // hide sidebar during search
-              <nav style={s.sidebar}>
-                <p style={s.navLabel}>Components</p>
-                <ul style={s.navList}>
-                  {components.map(d => {
-                    const id = d.name.toLowerCase(); // anchor id derived from component name
-                    return (
-                      <li key={id}>
-                        <a
-                          href={`#${id}`}
-                          style={{ ...s.navLink, ...(active === id ? s.navLinkActive : {}) }}
-                        >
-                          <span style={{ ...s.navDot, ...(active === id ? s.navDotActive : {}) }} />
-                          {d.name}
-                        </a>
-                      </li>
-                    );
-                  })}
-                </ul>
-              </nav>
-            )}
-
-            <div style={s.cards}>
-              {filtered.length === 0
-                ? <p style={s.empty}>No components match "{query}"</p>
-                : filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />) // one card per component
-              }
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   );
@@ -176,38 +136,6 @@ const s = {
     flex: 1,
     overflow: 'hidden',
     padding: '20px 32px',
-  },
-  center: {
-    alignItems: 'center',
-    display: 'flex',
-    flex: 1,
-    flexDirection: 'column',
-    gap: '12px',
-    justifyContent: 'center',
-  },
-  spinner: {
-    animation: 'spin 0.8s linear infinite',
-    border: '3px solid #334155',    // slate-700 track
-    borderTop: '3px solid #60a5fa', // blue-400 head
-    borderRadius: '50%',
-    height: '32px',
-    width: '32px',
-  },
-  loadingText: {
-    color: '#64748b',
-    fontSize: '13px',
-    margin: 0,
-  },
-  errorBanner: {
-    background: 'rgba(185, 28, 28, 0.15)', // red tint
-    border: '1px solid rgba(248, 113, 113, 0.3)',
-    borderRadius: '8px',
-    color: '#fca5a5',        // red-300
-    flex: 1,
-    fontSize: '13px',
-    height: 'fit-content',
-    lineHeight: 1.5,
-    padding: '12px 16px',
   },
   layout: {
     display: 'flex',

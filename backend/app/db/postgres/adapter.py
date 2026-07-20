@@ -7,7 +7,7 @@ from sqlalchemy.orm import sessionmaker
 from app.db.interface import UserRecord, BotRecord
 from app.db.postgres.orm import (
     Base, UserRow, PageRow, BotTypeRow, BotRow, TranslationRow,
-    ModuleRow, ModuleDocumentRow, PageRegistryRow, UIComponentRow,
+    ModuleRow, ModuleDocumentRow, PageRegistryRow,
 )
 from app.db.postgres.utils import _deep_merge
 from app.queries.pg_migrations import PG_MIGRATION_STMTS
@@ -698,50 +698,3 @@ class PostgresAdapter:
                 db.add(row)    # stage the insert
                 db.commit()    # persist; no refresh needed since caller doesn't use the returned row
 
-    # ── UI Components ────────────────────────────────────────────────────────
-
-    def _ui_component_row_to_dict(self, row: UIComponentRow) -> dict:
-        """Convert a UIComponentRow ORM instance to a plain dictionary."""
-        return {
-            "id": row.id,
-            "name": row.name,
-            "export": row.export,
-            "file": row.file,
-            "description": row.description,
-            "props": row.props or [],  # guard against NULL; callers always expect a list
-            "notes": row.notes,
-            "sort_order": row.sort_order,
-        }
-
-    def get_ui_components(self) -> list[dict]:
-        """Return all UI component docs ordered by sort_order then name."""
-        with self._session_ctx() as db:
-            rows = db.query(UIComponentRow).order_by(UIComponentRow.sort_order, UIComponentRow.name).all()  # primary: sort_order, secondary: name for ties
-            return [self._ui_component_row_to_dict(r) for r in rows]  # convert ORM rows to plain dicts
-
-    def upsert_ui_component(self, data: dict) -> dict:
-        """Insert or update a UI component entry by name and return the resulting dict."""
-        with self._session_ctx() as db:
-            row = db.query(UIComponentRow).filter(UIComponentRow.name == data["name"]).first()  # unique-name lookup to decide insert vs update
-            if not row:
-                row = UIComponentRow(
-                    id=str(uuid.uuid4()),                  # generate a fresh UUID for the new entry
-                    name=data["name"],
-                    export=data.get("export", data["name"]),  # default export name equals component name
-                    file=data.get("file", ""),
-                    description=data.get("description", ""),
-                    props=data.get("props", []),
-                    notes=data.get("notes"),
-                    sort_order=data.get("sort_order", 0),
-                )
-                db.add(row)  # stage the insert
-            else:
-                row.export = data.get("export", row.export)              # update only fields present in the payload
-                row.file = data.get("file", row.file)
-                row.description = data.get("description", row.description)
-                row.props = data.get("props", row.props)
-                row.notes = data.get("notes", row.notes)
-                row.sort_order = data.get("sort_order", row.sort_order)
-            db.commit()      # persist the insert or update
-            db.refresh(row)  # reload server-set fields
-            return self._ui_component_row_to_dict(row)  # return the final state to the caller

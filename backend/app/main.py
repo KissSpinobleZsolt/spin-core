@@ -10,13 +10,13 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.database import init_db, get_pg, get_ch, init_logger, get_logger
-from app.events import LogLevel, BotEvent, ComponentEvent, ModuleEvent, PageEvent, UserEvent
+from app.events import LogLevel, BotEvent, ModuleEvent, PageEvent, UserEvent
 from app.model_tracker import run_sequential_trackers
 from app.seed_loader import load_seed
 from app.settings import SETTINGS_PATH, AppSettings, ThemeConfig, read_settings, read_legacy_modules, write_settings
 from app.state import get_settings, set_settings
 
-from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications, ui_components
+from app.routes import auth, dashboard, settings, logs, module_data, module_logs, bot_logs, i18n as i18n_router, health, chat, model_status, bots, plugin_proxy, pages, notifications
 from app.routes.model_status.utils import _required_models
 
 
@@ -142,9 +142,6 @@ async def lifespan(app: FastAPI):
     for bt in seed.bot_types:
         pg.upsert_bot_type(bt)
 
-    for uc in seed.ui_components:
-        pg.upsert_ui_component(uc)
-
     # Seed default bots on first run
     if not pg.get_bots(admin=True):
         import dataclasses
@@ -201,18 +198,6 @@ async def lifespan(app: FastAPI):
                 )
     except Exception as exc:
         print(f"[spin-core] Failed to write startup bot.init logs: {exc}", file=sys.stderr)
-
-    # Backfill component.init for UI components with no CH history
-    try:
-        components_with_logs = ch.get_component_names_with_logs()  # set of component names with existing CH entries
-        for comp in pg.get_ui_components():
-            if comp["name"] not in components_with_logs:  # component has never been logged — write init event
-                get_logger().module(
-                    ComponentEvent.INIT, "system", comp["name"], "system",
-                    {"component": comp["name"], "file": comp["file"], "source": "startup"},
-                )
-    except Exception as exc:
-        print(f"[spin-core] Failed to write startup component.init logs: {exc}", file=sys.stderr)
 
     # Write user.init for the admin only if the account was seeded during this startup
     if admin_created and admin_email:
@@ -345,4 +330,3 @@ app.include_router(bots.router)
 app.include_router(plugin_proxy.router)
 app.include_router(pages.router)
 app.include_router(notifications.router)
-app.include_router(ui_components.router)

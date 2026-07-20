@@ -26,12 +26,6 @@ class ModuleEvent:  # event-type slug constants for module lifecycle log entries
     INFO       = "module.info"       # generic informational entry; caller supplies the message directly
 
 
-class ComponentEvent:  # event-type slug constants for UI component log entries
-    INIT   = "component.init"   # UI component first inserted into the ui_components table
-    UPDATE = "component.update" # component definition (props, notes, description) updated
-    DELETE = "component.delete" # component removed from the ui_components registry
-
-
 class PageEvent:  # event-type slug constants for page registry log entries
     INIT   = "page.init"   # page route first seeded into page_registry
     UPDATE = "page.update" # page config (title, roles, skeleton, enabled) updated by an admin
