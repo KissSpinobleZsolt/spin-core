@@ -174,7 +174,7 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 | `POST` | `/api/settings/modules/{id}/reset-i18n` | Re-merge the i18n snapshot stored in `module.presets.i18n` back into the translations table |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
-| `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag |
+| `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag. Modules defined in `data/seed.json` are always appended to the results (with `source_url: "seed"`) so built-in modules remain re-discoverable even when their server is offline or the module was deleted from the DB. |
 
 **Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`), `backend_url` (nullable — URL of the module's own backend service; enables the plugin proxy).
 

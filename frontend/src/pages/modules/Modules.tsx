@@ -9,6 +9,7 @@ import { Toggle } from '@components/ui/toggle'
 import { Tabs } from '@components/ui/tabs'
 import { ErrorBanner } from '@components/ui/ErrorBanner'
 import { PageTitle } from '@components/ui/PageTitle'
+import { Table } from '@components/ui/Table' // shared data table
 import type { ModalState } from './ModalState.type'
 import { ModuleModal } from './ModuleModal'
 import { ModuleLogsDrawer } from './ModuleLogsDrawer'
@@ -17,14 +18,14 @@ type TabKey = 'native' | 'federation'
 
 // Static tab definitions — labels displayed by the Tabs component
 const TABS = [
-  { key: 'native',      label: 'Native pages' },   // platform pages seeded from page_registry at startup
   { key: 'federation',  label: 'Federation' },      // Webpack Module Federation remote modules
+  { key: 'native',      label: 'Native pages' },   // platform pages seeded from page_registry at startup
 ]
 
 // Modules admin page — tabbed view of native platform pages and federated MF modules
 export default function Modules() {
   const { modules, refreshModules } = useSettings()                              // live federation module list from SettingsContext
-  const [activeTab, setActiveTab]   = useState<TabKey>('native')                // which tab is visible; defaults to native
+  const [activeTab, setActiveTab]   = useState<TabKey>('federation')                // which tab is visible; defaults to native
   const [modal, setModal]           = useState<ModalState>(null)                // add/edit modal discriminant (null = closed)
   const [error, setError]           = useState<string | null>(null)             // last API error message to surface in ErrorBanner
   const [discovered, setDiscovered] = useState<DiscoveredModule[] | null>(null) // registry scan results; null = panel hidden
@@ -163,52 +164,56 @@ interface NativePagesTabProps {
 function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
   const navigate = useNavigate()
 
-  if (pages.length === 0)
-    return <p className="text-sm text-slate-500">No native pages found.</p>  // shown while useGet resolves or if seed was skipped
-
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-            <th className="pb-2 pr-4">Page</th>
-            <th className="pb-2 pr-4">Route</th>
-            <th className="pb-2 pr-4">Component key</th>  {/* router key used to lazy-load the matching page component */}
-            <th className="pb-2 pr-4">Roles</th>
-            <th className="pb-2 w-px">Enabled</th>
-            <th className="pb-2 w-px"></th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-          {pages.map(page => (
-            <tr key={page.id}>
-              <td className="py-2 pr-4 font-medium text-slate-800 dark:text-white">
-                {page.title}
-              </td>
-              <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">
-                /{page.route || ''}  {/* dashboard route is the empty string — prefix slash makes it readable */}
-              </td>
-              <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">
-                {page.component_key ?? '—'}  {/* null for federation pages that don't use a component_key */}
-              </td>
-              <td className="py-2 pr-4">
-                <div className="flex gap-1 flex-wrap">
-                  {page.roles.map(r => (
-                    <Badge key={r} variant="neutral">{r}</Badge>  // one badge per role; neutral colour avoids semantic noise
-                  ))}
-                </div>
-              </td>
-              <td className="py-2 w-px">
-                <Toggle checked={page.enabled} onChange={() => onToggle(page)} />  {/* calls PATCH /api/pages/config to flip enabled */}
-              </td>
-              <td className="py-2 w-px">
-                <Btn variant="secondary" onClick={() => navigate(`/${page.route}`)}>▶</Btn>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <Table<PageConfig>
+      rows={pages}
+      rowKey={page => page.id}
+      empty={<p className="text-sm text-slate-500">No native pages found.</p>}
+      columns={[
+        {
+          key: 'page',
+          header: 'Page',
+          className: 'font-medium text-slate-800 dark:text-white',
+          cell: page => page.title,
+        },
+        {
+          key: 'route',
+          header: 'Route',
+          className: 'font-mono text-slate-500 dark:text-slate-400',
+          cell: page => `/${page.route || ''}`, // dashboard route is the empty string — prefix slash makes it readable
+        },
+        {
+          key: 'component_key',
+          header: 'Component key',
+          className: 'font-mono text-slate-500 dark:text-slate-400',
+          cell: page => page.component_key ?? '—', // null for federation pages that don't use a component_key
+        },
+        {
+          key: 'roles',
+          header: 'Roles',
+          cell: page => (
+            <div className="flex gap-1 flex-wrap">
+              {page.roles.map(r => (
+                <Badge key={r} variant="neutral">{r}</Badge> // one badge per role; neutral colour avoids semantic noise
+              ))}
+            </div>
+          ),
+        },
+        {
+          key: 'enabled',
+          header: 'Enabled',
+          headerClassName: 'w-px',
+          className: 'w-px',
+          cell: page => <Toggle checked={page.enabled} onChange={() => onToggle(page)} />, // PATCH /api/pages/config to flip enabled
+        },
+        {
+          key: 'navigate',
+          headerClassName: 'w-px',
+          className: 'w-px',
+          cell: page => <Btn variant="secondary" onClick={() => navigate(`/${page.route}`)}>▶</Btn>,
+        },
+      ]}
+    />
   )
 }
 
@@ -238,62 +243,76 @@ function FederationTab({
 
   return (
     <>
-      {modules.length === 0 ? (
-        <p className="text-sm text-slate-500">No federation modules configured yet.</p>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                <th className="pb-2 pr-4">Module</th>
-                <th className="pb-2 pr-4">Root slug</th>
-                <th className="pb-2 pr-4">Scope</th>
-                <th className="pb-2 pr-4">Roles</th>
-                <th className="pb-2 pr-4 w-px">Enabled</th>
-                <th className="pb-2 w-px"></th>
-                <th className="pb-2 w-px"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {modules.map(m => (
-                <tr key={m.id}>
-                  <td className="py-2 pr-4">
-                    <span className="mr-2">{m.icon}</span>
-                    <span className="font-medium text-slate-800 dark:text-white">{m.name}</span>
-                    {m.description && (
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">{m.route}</td>
-                  <td className="py-2 pr-4 font-mono text-slate-500 dark:text-slate-400">{m.scope}</td>
-                  <td className="py-2 pr-4">
-                    <div className="flex gap-1 flex-wrap">
-                      {m.roles.map(r => (
-                        <Badge key={r} variant="neutral">{r}</Badge>  // one badge per role
-                      ))}
-                    </div>
-                  </td>
-                  <td className="py-2 pr-4 w-px">
-                    <Toggle checked={m.enabled} onChange={() => onToggle(m)} />
-                  </td>
-                      <td className="py-2 w-px whitespace-nowrap">
-                    <div className="flex gap-2">
-                      <Btn variant="secondary" onClick={() => onLogs(m)}>Logs</Btn>
-                      <Btn variant="secondary" onClick={() => onEdit(m)}>Edit</Btn>
-                      <Btn variant="danger"    onClick={() => onDelete(m.id)}>Delete</Btn>
-                    </div>
-                  </td>
-                  <td className="py-2 w-px">
-                    {m.route && (
-                      <Btn variant="secondary" onClick={() => navigate(`/modules/${m.id}`)}>▶</Btn>
-                    )}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <Table<ModuleConfig>
+        rows={modules}
+        rowKey={m => m.id}
+        empty={<p className="text-sm text-slate-500">No federation modules configured yet.</p>}
+        columns={[
+          {
+            key: 'module',
+            header: 'Module',
+            cell: m => (
+              <>
+                <span className="mr-2">{m.icon}</span>
+                <span className="font-medium text-slate-800 dark:text-white">{m.name}</span>
+                {m.description && (
+                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
+                )}
+              </>
+            ),
+          },
+          {
+            key: 'route',
+            header: 'Root slug',
+            className: 'font-mono text-slate-500 dark:text-slate-400',
+            cell: m => m.route,
+          },
+          {
+            key: 'scope',
+            header: 'Scope',
+            className: 'font-mono text-slate-500 dark:text-slate-400',
+            cell: m => m.scope,
+          },
+          {
+            key: 'roles',
+            header: 'Roles',
+            cell: m => (
+              <div className="flex gap-1 flex-wrap">
+                {m.roles.map(r => (
+                  <Badge key={r} variant="neutral">{r}</Badge> // one badge per role
+                ))}
+              </div>
+            ),
+          },
+          {
+            key: 'enabled',
+            header: 'Enabled',
+            headerClassName: 'w-px',
+            className: 'w-px',
+            cell: m => <Toggle checked={m.enabled} onChange={() => onToggle(m)} />,
+          },
+          {
+            key: 'actions',
+            headerClassName: 'w-px',
+            className: 'w-px whitespace-nowrap',
+            cell: m => (
+              <div className="flex gap-2">
+                <Btn variant="secondary" onClick={() => onLogs(m)}>Logs</Btn>
+                <Btn variant="secondary" onClick={() => onEdit(m)}>Edit</Btn>
+                <Btn variant="danger"    onClick={() => onDelete(m.id)}>Delete</Btn>
+              </div>
+            ),
+          },
+          {
+            key: 'navigate',
+            headerClassName: 'w-px',
+            className: 'w-px',
+            cell: m => m.route ? (
+              <Btn variant="secondary" onClick={() => navigate(`/modules/${m.id}`)}>▶</Btn>
+            ) : null,
+          },
+        ]}
+      />
 
       <div className="flex gap-2 flex-wrap">
         <Btn onClick={onAdd}>+ Add module</Btn>

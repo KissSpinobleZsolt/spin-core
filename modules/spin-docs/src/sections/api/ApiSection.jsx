@@ -79,10 +79,10 @@ export function ApiSection() {
           </nav>
         )}
 
-        <div style={s.cards}>
+        <div style={{ ...s.cards , height: 'fit-content'}}>
           {filtered.length === 0
             ? <p style={s.empty}>No endpoints match "{query}"</p>
-            : filtered.map(g => <GroupCard key={g.id} group={g} />) // one card per group
+            : filtered.map(g => <GroupCard key={g.id} group={g}/>)
           }
         </div>
       </div>

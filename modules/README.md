@@ -57,7 +57,7 @@ The host never rebuilds when modules change — it loads them live from their ru
 
 Modules are registered in **Admin → Modules** (`/admin/modules`). Two ways:
 
-**Automatic (scan):** Click **🔍 Scan for modules**. The backend fetches `manifest.json` from each URL in `MODULE_REGISTRY_URLS` and returns a list. New modules show an **Add** button pre-filled from the manifest.
+**Automatic (scan):** Click **🔍 Scan for modules**. The backend fetches `manifest.json` from each URL in `MODULE_REGISTRY_URLS` and returns a list. New modules show an **Add** button pre-filled from the manifest. Modules defined in `data/seed.json` are always included in the results even when their server is not running — so built-in modules that were deleted remain re-discoverable without needing their dev server up.
 
 **Manual:** Click **+ Add Module** and fill in:
 
@@ -158,7 +158,19 @@ externals: {
 
 Bundling a second React alongside the host causes `Invalid hook call` / `Cannot read properties of null (reading 'useState')`.
 
-The host sets `window.React` and `window.ReactDOM` before injecting each remote script. For standalone testing (running the remote at its own port), add the React UMD scripts to `public/index.html` — they set the same globals automatically.
+**Version:** remotes must use the same React major version as the host (**React 19**). A React 18 remote loaded into a React 19 host causes `TypeError` crashes because `__SECRET_INTERNALS_DO_NOT_USE_OR_YOU_WILL_BE_FIRED` changed structure between major versions. `react/jsx-runtime` does not need to be listed as an external — it can be bundled from the remote's own `node_modules` as long as the version matches.
+
+The host sets `window.React` and `window.ReactDOM` before injecting each remote script. For standalone testing (running the remote at its own port), add the React 19 UMD scripts to `public/index.html` — they set the same globals automatically.
+
+**`publicPath` in dev mode:** use an explicit URL instead of `'auto'` when the remote is injected cross-origin from the spin-core host. `publicPath: 'auto'` relies on `document.currentScript` which is unreliable for async cross-origin script injection and causes lazy chunks to be fetched from the wrong host (localhost:3000 instead of the module's port).
+
+```js
+// webpack.config.js — spin-docs pattern
+const isProduction = process.env.NODE_ENV === 'production';
+output: {
+  publicPath: isProduction ? 'auto' : 'http://localhost:<YOUR_PORT>/',
+}
+```
 
 ## Building a new module
 
@@ -169,7 +181,9 @@ Use `modules/spin-docs/` as a minimal reference — it is a frontend-only webpac
    - Change `name` (scope), `output.uniqueName`, and `exposes` entry.
    - Keep the `externals` block unchanged.
    - Set `devServer.port` to a free port.
+   - Set `publicPath` to an explicit `http://localhost:<PORT>/` in dev mode (see React singleton contract above).
 3. Update `public/manifest.json` with your module's metadata.
-4. Run standalone: `npm install && npm start`.
-5. Register via Admin → Modules → Scan, or manually.
-6. Add a service entry to `docker-compose.yml` (build + port mapping + healthcheck).
+4. Set React 19 in `package.json` (`"react": "^19.0.0"`, `"react-dom": "^19.0.0"`), then `npm install`.
+5. Run standalone: `npm start`.
+6. Register via Admin → Modules → Scan, or manually.
+7. Add a service entry to `docker-compose.yml` (build + port mapping + healthcheck).

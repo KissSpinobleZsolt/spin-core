@@ -8,6 +8,7 @@ from app.database import get_pg, get_logger
 from app.deps import admin_dep
 from app.events import ModuleEvent, BotEvent
 from app.schemas import ModuleInput
+from app.seed_loader import load_seed
 from app.settings import write_settings
 from app.state import get_settings
 from app.routes.settings.schemas import ThemePayload, DiscoveredModule
@@ -155,4 +156,32 @@ async def discover_modules(_: str = Depends(admin_dep)):
             return None  # probe failed; exclude this URL from the results rather than surface an error
 
     results = await asyncio.gather(*[fetch_one(u) for u in base_urls])  # fan-out all probes in parallel
-    return [r for r in results if r is not None]  # filter out None entries from failed probes
+    discovered = [r for r in results if r is not None]  # filter out None entries from failed probes
+
+    # Always include seed modules so deleted ones remain re-discoverable without a running server.
+    discovered_scopes = {r["scope"] for r in discovered if r.get("scope")}  # scopes already found via URL probes
+    for m in load_seed().modules:
+        scope = m.get("scope")
+        remote_url = m.get("remote_url") or m.get("remote_entry", "")
+        if not scope or scope == "system" or not remote_url:  # skip virtual or URL-less entries
+            continue
+        if scope in discovered_scopes:  # already surfaced via a live URL probe; don't duplicate
+            continue
+        already = scope in registered_scopes
+        existing = registered_scopes_full.get(scope) if already else None
+        discovered.append(DiscoveredModule(
+            source_url="seed",  # distinguishes built-in seed entries from live URL probes
+            name=m.get("name"),
+            scope=scope,
+            component=m.get("component", "./App"),
+            route=m.get("route"),
+            icon=m.get("icon"),
+            roles=m.get("roles"),
+            description=m.get("description"),
+            remote_url=remote_url,
+            already_registered=already,
+            module_id=existing["id"] if existing else None,
+            enabled=existing["enabled"] if existing else None,
+        ).model_dump())
+
+    return discovered

@@ -80,7 +80,7 @@ export function UISection() {
             </nav>
           )}
 
-          <div style={s.cards}>
+         <div style={{ ...s.cards , height: 'fit-content'}}>
             {filtered.length === 0
               ? <p style={s.empty}>No components match "{query}"</p>
               : filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />) // one card per component

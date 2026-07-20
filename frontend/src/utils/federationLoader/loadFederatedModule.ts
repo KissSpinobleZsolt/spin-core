@@ -1,6 +1,6 @@
 import type { ComponentType } from 'react'
-import * as React from 'react'
-import * as ReactDOM from 'react-dom'
+import React from 'react'
+import ReactDOM from 'react-dom'
 import type { FederationContainer } from './FederationContainer.type'
 
 // Tracks which remote scopes have already had their script injected — prevents double-loading.
@@ -9,17 +9,26 @@ const loadedScripts = new Set<string>()
 /** Inject a remote entry script into document.head, resolving when loaded. */
 function injectScript(url: string): Promise<void> {
   return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${url}"]`) // Reuse an existing tag if present
+    const existing = document.querySelector(`script[src="${url}"]`)
     if (existing) {
+      // Only reuse the tag if the scope is already in window — a failed previous
+      // load leaves a stale tag in the DOM without setting the container global.
       resolve()
       return
     }
     const script = document.createElement('script')
     script.src = url
     script.type = 'text/javascript'
-    script.async = true
+    // async=false keeps document.currentScript set while remoteEntry.js runs so
+    // webpack's publicPath: 'auto' detects the correct host (localhost:3001) rather
+    // than the spin-core origin.  The load is still non-blocking — the Promise
+    // only resolves after the script has executed.
+    script.async = false
     script.onload = () => resolve()
-    script.onerror = () => reject(new Error(`Failed to load remote entry: ${url}`))
+    script.onerror = () => {
+      script.remove() // remove stale tag so the next attempt injects a fresh one
+      reject(new Error(`Failed to load remote entry: ${url}`))
+    }
     document.head.appendChild(script)
   })
 }

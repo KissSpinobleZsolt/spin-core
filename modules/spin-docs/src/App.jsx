@@ -23,16 +23,16 @@ const DIAGRAM_TABS = [
 export default function App() {
   const [section, setSection]       = useState('diagrams');           // top-level nav section
   const [diagTab, setDiagTab]       = useState('backend');            // BE / FE toggle within Diagrams
-  const [selectedId, setSelectedId] = useState(BE_DIAGRAMS[0]?.id ?? null); // active diagram id
+  const [selectedId, setSelectedId] = useState(BE_DIAGRAMS?.[0]?.id ?? null); // active diagram id — optional chain guards stale-dist builds
 
   // Derive the active diagram list and selected entry from current state
-  const diagrams     = diagTab === 'backend' ? BE_DIAGRAMS : FE_DIAGRAMS;
+  const diagrams     = diagTab === 'backend' ? (BE_DIAGRAMS ?? []) : (FE_DIAGRAMS ?? []); // ?? [] guards stale-dist edge case
   const selectedDiag = diagrams.find(d => d.id === selectedId) ?? diagrams[0];
 
   // Switch diagram tab and reset the selected diagram to the first in the new list
   function switchDiagTab(tab) {
     setDiagTab(tab);
-    const list = tab === 'backend' ? BE_DIAGRAMS : FE_DIAGRAMS; // pick the correct list
+    const list = tab === 'backend' ? (BE_DIAGRAMS ?? []) : (FE_DIAGRAMS ?? []); // pick the correct list
     setSelectedId(list[0]?.id ?? null); // reset selection to first diagram
   }
 

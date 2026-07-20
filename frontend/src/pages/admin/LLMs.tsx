@@ -1,11 +1,12 @@
 import { useState } from 'react'
 import { useGet } from '@hooks'
-import { apiService, type InstalledModelsData } from '@services'
+import { apiService, type InstalledModelsData, type InstalledModel } from '@services'
 import { Btn } from '@components/ui/button'
 import { Spinner } from '@components/ui/spinner'
 import { ErrorBanner } from '@components/ui/ErrorBanner'
 import { PageTitle } from '@components/ui/PageTitle'
 import { AdminPageShell } from '@components/layout/adminPageShell'
+import { Table } from '@components/ui/Table' // shared data table
 import { fmtBytes } from '@utils'
 
 export default function LLMs() {
@@ -95,48 +96,58 @@ export default function LLMs() {
           </div>
         )}
 
-        {data?.ollama === 'ok' && data.models.length === 0 && (
-          <p className="text-sm text-slate-500">No models installed yet.</p>
-        )}
-
-        {data?.ollama === 'ok' && data.models.length > 0 && (
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                  <th className="pb-2 pr-4">Model</th>
-                  <th className="pb-2 pr-4">Family</th>
-                  <th className="pb-2 pr-4">Params</th>
-                  <th className="pb-2 pr-4">Quantization</th>
-                  <th className="pb-2 pr-4 text-right">Size</th>
-                  <th className="pb-2"></th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-                {data.models.map(m => (
-                  <tr key={m.name}>
-                    <td className="py-2 pr-4 font-mono font-medium text-slate-800 dark:text-white">{m.name}</td>
-                    <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.family ?? '—'}</td>
-                    <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.parameter_size ?? '—'}</td>
-                    <td className="py-2 pr-4 text-slate-500 dark:text-slate-400">{m.quantization ?? '—'}</td>
-                    <td className="py-2 pr-4 text-right text-slate-500 dark:text-slate-400">
-                      {m.size_bytes != null ? fmtBytes(m.size_bytes) : '—'}
-                    </td>
-                    <td className="py-2">
-                      <Btn
-                        variant="danger"
-                        className="px-2.5 py-1 text-xs"
-                        onClick={() => handleDelete(m.name)}
-                        disabled={deletingModel === m.name}
-                      >
-                        {deletingModel === m.name ? 'Deleting…' : 'Delete'}
-                      </Btn>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {data?.ollama === 'ok' && (
+          <Table<InstalledModel>
+            rows={data.models}
+            rowKey={m => m.name}
+            empty={<p className="text-sm text-slate-500">No models installed yet.</p>}
+            columns={[
+              {
+                key: 'model',
+                header: 'Model',
+                className: 'font-mono font-medium text-slate-800 dark:text-white',
+                cell: m => m.name,
+              },
+              {
+                key: 'family',
+                header: 'Family',
+                className: 'text-slate-500 dark:text-slate-400',
+                cell: m => m.family ?? '—',
+              },
+              {
+                key: 'params',
+                header: 'Params',
+                className: 'text-slate-500 dark:text-slate-400',
+                cell: m => m.parameter_size ?? '—',
+              },
+              {
+                key: 'quantization',
+                header: 'Quantization',
+                className: 'text-slate-500 dark:text-slate-400',
+                cell: m => m.quantization ?? '—',
+              },
+              {
+                key: 'size',
+                header: 'Size',
+                className: 'text-right text-slate-500 dark:text-slate-400',
+                headerClassName: 'text-right',
+                cell: m => m.size_bytes != null ? fmtBytes(m.size_bytes) : '—',
+              },
+              {
+                key: 'actions',
+                cell: m => (
+                  <Btn
+                    variant="danger"
+                    className="px-2.5 py-1 text-xs"
+                    onClick={() => handleDelete(m.name)}
+                    disabled={deletingModel === m.name}
+                  >
+                    {deletingModel === m.name ? 'Deleting…' : 'Delete'}
+                  </Btn>
+                ),
+              },
+            ]}
+          />
         )}
 
         <div className="flex justify-end">
