@@ -138,6 +138,18 @@ exposes: {
 
 Leave the `externals` block **untouched**. React must remain external so the module shares the host's `window.React` instance. Bundling a second copy of React will cause hook errors at runtime.
 
+**React version:** use **React 19** (`"react": "^19.0.0"`, `"react-dom": "^19.0.0"` in `package.json`). The host runs React 19 — a React 18 remote causes `TypeError` crashes because the internal shared-internals structure changed between major versions.
+
+**`publicPath`:** set an explicit URL in dev mode instead of `'auto'`. When the remote is injected cross-origin from the spin-core host, `publicPath: 'auto'` resolves lazy chunks against the host origin (port 3000) instead of the module server, causing chunk-load failures.
+
+```js
+// webpack.config.js
+const isProduction = process.env.NODE_ENV === 'production';
+output: {
+  publicPath: isProduction ? 'auto' : 'http://localhost:<YOUR_PORT>/',
+}
+```
+
 ### 3. Update `public/manifest.json`
 
 ```json

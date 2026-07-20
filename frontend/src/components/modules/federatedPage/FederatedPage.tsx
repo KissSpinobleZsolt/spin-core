@@ -39,7 +39,7 @@ export function FederatedPage() {
   }
 
   if (error) {
-    return <ModuleErrorFallback name={mod.name} />
+    return <ModuleErrorFallback name={mod.name} error={error} />
   }
 
   if (!RemoteComponent) {

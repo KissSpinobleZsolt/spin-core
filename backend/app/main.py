@@ -43,6 +43,10 @@ _MODULE_HEALTH_INTERVAL_SECONDS = 30
 # Scopes disabled automatically by the health checker (not by an admin),
 # so they can be re-enabled automatically when the container comes back.
 _auto_disabled_scopes: set[str] = set()
+# Scopes that have responded successfully at least once since startup.
+# The health checker only auto-disables a module that was previously healthy,
+# so a module enabled by an admin but not yet deployed is never touched.
+_ever_healthy_scopes: set[str] = set()
 
 
 async def _module_health_checker() -> None:
@@ -65,6 +69,7 @@ async def _module_health_checker() -> None:
                     try:
                         resp = await client.get(manifest_url)
                         resp.raise_for_status()
+                        _ever_healthy_scopes.add(scope)  # record first confirmed reachability
                         # Only re-enable if the checker itself disabled it; admin-disabled modules stay off.
                         if not enabled and scope in _auto_disabled_scopes:
                             get_pg().update_module(m["id"], {"enabled": True})  # re-enable the module row in Postgres
@@ -75,7 +80,9 @@ async def _module_health_checker() -> None:
                                 details={"source": "health-checker"},
                             )
                     except Exception:
-                        if enabled:
+                        # Only auto-disable a module that was previously healthy — this prevents the
+                        # checker from reverting an admin toggle on a module that isn't deployed yet.
+                        if enabled and scope in _ever_healthy_scopes:
                             get_pg().update_module(m["id"], {"enabled": False})  # mark the module offline in Postgres
                             _auto_disabled_scopes.add(scope)  # track so the checker can re-enable it automatically
                             print(f"[spin-core] Module offline, auto-disabled: {scope}", file=sys.stderr)

@@ -1,35 +1,26 @@
 import { Pulse } from './Pulse'
+import { Table, type TableColumn } from '@components/ui/Table' // shared data table
 
 /** Skeleton placeholder for table-layout pages. */
 export function TableSkeleton({ columns = 5, rows = 5 }: { columns?: number; rows?: number }) {
+  // Build column definitions — each renders animated Pulse placeholders as header and cell
+  const colDefs: TableColumn<number>[] = Array.from({ length: columns }, (_, i) => ({
+    key: String(i),
+    header: <Pulse className="h-3 w-16" />,
+    cell: () => <Pulse className={`h-4 ${i === 0 ? 'w-32' : i === columns - 1 ? 'w-20' : 'w-24'}`} />, // vary width so columns look distinct
+  }))
+
+  const skeletonRows = Array.from({ length: rows }, (_, i) => i) // numeric indices as placeholder row data
+
   return (
     <div className="max-w-5xl space-y-6">
       <Pulse className="h-8 w-48" />
       <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-slate-200 dark:border-slate-700">
-                {Array.from({ length: columns }).map((_, i) => (
-                  <th key={i} className="pb-2 pr-4 text-left">
-                    <Pulse className="h-3 w-16" />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-200 dark:divide-slate-700">
-              {Array.from({ length: rows }).map((_, r) => (
-                <tr key={r}>
-                  {Array.from({ length: columns }).map((_, c) => (
-                    <td key={c} className="py-3 pr-4">
-                      <Pulse className={`h-4 ${c === 0 ? 'w-32' : c === columns - 1 ? 'w-20' : 'w-24'}`} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+        <Table<number>
+          columns={colDefs}
+          rows={skeletonRows}
+          rowKey={(_, i) => i}
+        />
         <Pulse className="h-9 w-28" />
       </div>
     </div>

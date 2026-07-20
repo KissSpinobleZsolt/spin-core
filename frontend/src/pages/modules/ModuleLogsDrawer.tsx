@@ -4,6 +4,7 @@ import TimeRangeFilter, { defaultTimeRange, type TimeRange } from '@components/t
 import { Btn } from '@components/ui/button'
 import { StatCard } from '@components/ui/statCard'
 import { Spinner } from '@components/ui/spinner'
+import { Table } from '@components/ui/Table' // shared data table
 import { PAGE_SIZE } from './PAGE_SIZE.constant'
 import { LevelBadge } from './LevelBadge'
 
@@ -80,36 +81,41 @@ export function ModuleLogsDrawer({ module: mod, onClose }: { module: ModuleConfi
           ) : logs.length === 0 ? (
             <p className="text-sm text-slate-500 text-center mt-8">No log entries found for this period.</p>
           ) : (
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="text-left text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
-                  <th className="pb-2 pr-3">Time</th>
-                  <th className="pb-2 pr-3">Level</th>
-                  <th className="pb-2 pr-3">Message</th>
-                  <th className="pb-2">Owner</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                {logs.map((entry, i) => (
-                  <tr key={i}>
-                    <td className="py-1.5 pr-3 text-slate-400 whitespace-nowrap font-mono">
-                      {new Date(entry.event_time).toLocaleString()} {/* format ISO timestamp to locale string */}
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      <LevelBadge level={entry.level} />
-                    </td>
-                    <td className="py-1.5 pr-3">
-                      <p className="text-slate-700 dark:text-slate-200">{entry.message || entry.event_type}</p> {/* prefer message, fall back to event_type */}
+            <Table<ModuleLogEntry>
+              compact // text-xs, px-4 py-2 cells, header background, row hover
+              rows={logs}
+              rowKey={(_, i) => i}
+              columns={[
+                {
+                  key: 'time',
+                  header: 'Time',
+                  className: 'text-slate-400 whitespace-nowrap font-mono', // timestamp styling
+                  cell: entry => new Date(entry.event_time).toLocaleString(), // format ISO timestamp to locale string
+                },
+                {
+                  key: 'level',
+                  header: 'Level',
+                  cell: entry => <LevelBadge level={entry.level} />,
+                },
+                {
+                  key: 'message',
+                  header: 'Message',
+                  cell: entry => (
+                    <>
+                      <p className="text-slate-700 dark:text-slate-200">{entry.message || entry.event_type}</p>
                       {entry.name    && <p className="text-slate-400 font-mono mt-0.5">{entry.name}</p>}
-                      {entry.message && <p className="text-slate-400 font-mono mt-0.5">{entry.event_type}</p>} {/* show event_type as secondary line when message is present */}
-                    </td>
-                    <td className="py-1.5 text-slate-500 dark:text-slate-400 truncate max-w-[120px]">
-                      {entry.owner || '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      {entry.message && <p className="text-slate-400 font-mono mt-0.5">{entry.event_type}</p>}
+                    </>
+                  ),
+                },
+                {
+                  key: 'owner',
+                  header: 'Owner',
+                  className: 'text-slate-500 dark:text-slate-400 truncate max-w-[120px]', // truncate long owner strings
+                  cell: entry => entry.owner || '—',
+                },
+              ]}
+            />
           )}
         </div>
 

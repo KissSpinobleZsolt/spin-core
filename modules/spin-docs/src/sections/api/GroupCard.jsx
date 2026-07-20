@@ -35,6 +35,7 @@ const s = {
     border: '1px solid #334155', // slate-700
     borderRadius: '12px',
     overflow: 'hidden',
+    height: 'stretch'
   },
   cardHeader: {
     borderBottom: '1px solid #334155',
