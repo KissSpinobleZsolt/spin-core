@@ -1,41 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { GROUPS } from './GROUPS'; // all API endpoint groups
 import { GroupCard } from './GroupCard'; // card for one group
 
-// Watches IntersectionObserver on section IDs and returns the currently visible one.
-function useActiveSection(ids) {
-  const [active, setActive] = useState(ids[0] ?? null); // start on first group
-  useEffect(() => {
-    const els = ids.map(id => document.getElementById(id)).filter(Boolean); // resolve to DOM nodes
-    const obs = new IntersectionObserver(
-      entries => {
-        const hit = entries.find(e => e.isIntersecting); // first visible section wins
-        if (hit) setActive(hit.target.id);
-      },
-      { rootMargin: '-10% 0px -80% 0px', threshold: 0 }, // trigger when top 10–20% is in view
-    );
-    els.forEach(el => obs.observe(el));
-    return () => obs.disconnect(); // clean up on unmount or ids change
-  }, [ids.join(',')]); // re-attach when the group list changes (e.g. search clears)
-  return active;
-}
-
-// Full API reference with left sidebar scroll-spy and search filtering.
+// Full API reference with left sidebar nav and search filtering.
 export function ApiSection() {
-  const [query, setQuery] = useState(''); // controlled search input
-  const ids = GROUPS.map(g => g.id); // group anchor ids for the scroll-spy
-  const active = useActiveSection(ids);
+  const [query, setQuery] = useState('');                    // controlled search input
+  const [selected, setSelected] = useState(GROUPS[0]?.id);  // active group id
 
   const searching = query.trim() !== ''; // true when user typed a non-empty query
-  const filtered = searching
-    ? GROUPS.filter(g =>
-        g.title.toLowerCase().includes(query.toLowerCase()) || // match group title
-        g.endpoints.some(ep =>
-          ep.path.toLowerCase().includes(query.toLowerCase()) || // match endpoint path
-          ep.description.toLowerCase().includes(query.toLowerCase()), // match description
-        ),
-      )
-    : GROUPS; // show all when no query
+  const searchResults = GROUPS.filter(g =>
+    g.title.toLowerCase().includes(query.toLowerCase()) || // match group title
+    g.endpoints.some(ep =>
+      ep.path.toLowerCase().includes(query.toLowerCase()) || // match endpoint path
+      ep.description.toLowerCase().includes(query.toLowerCase()), // match description
+    ),
+  );
+
+  // When searching show all matches; otherwise show only the selected group's card.
+  const visible = searching
+    ? searchResults
+    : GROUPS.filter(g => g.id === selected);
 
   return (
     <div style={s.root}>
@@ -58,7 +42,7 @@ export function ApiSection() {
         />
       </div>
 
-      {/* Body: left nav + scrollable cards */}
+      {/* Body: left nav + card panel */}
       <div style={s.body}>
         {!searching && ( // hide sidebar when a search query is active
           <nav style={s.sidebar}>
@@ -66,23 +50,23 @@ export function ApiSection() {
             <ul style={s.navList}>
               {GROUPS.map(g => (
                 <li key={g.id}>
-                  <a
-                    href={`#${g.id}`}
-                    style={{ ...s.navLink, ...(active === g.id ? s.navLinkActive : {}) }}
+                  <button
+                    onClick={() => setSelected(g.id)} // select this group; card updates instantly
+                    style={{ ...s.navLink, ...(selected === g.id ? s.navLinkActive : {}) }}
                   >
-                    <span style={{ ...s.navDot, ...(active === g.id ? s.navDotActive : {}) }} />
+                    <span style={{ ...s.navDot, ...(selected === g.id ? s.navDotActive : {}) }} />
                     {g.title}
-                  </a>
+                  </button>
                 </li>
               ))}
             </ul>
           </nav>
         )}
 
-        <div style={{ ...s.cards , height: 'fit-content'}}>
-          {filtered.length === 0
+        <div style={{ ...s.cards, height: 'fit-content' }}>
+          {visible.length === 0
             ? <p style={s.empty}>No endpoints match "{query}"</p>
-            : filtered.map(g => <GroupCard key={g.id} group={g}/>)
+            : visible.map(g => <GroupCard key={g.id} group={g} />)
           }
         </div>
       </div>
@@ -169,14 +153,18 @@ const s = {
   },
   navLink: {
     alignItems: 'center',
+    background: 'none',
+    border: 'none',
     borderRadius: '6px',
     color: '#94a3b8',        // slate-400
+    cursor: 'pointer',
     display: 'flex',
     fontSize: '12px',
     gap: '8px',
     padding: '6px 8px',
-    textDecoration: 'none',
+    textAlign: 'left',
     transition: 'all 0.15s',
+    width: '100%',
   },
   navLinkActive: {
     background: 'rgba(59, 130, 246, 0.15)', // blue tint

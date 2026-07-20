@@ -1,41 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { UI_COMPONENTS } from '../../data/uiComponents'; // static component catalogue — no API call needed
 import { ComponentCard } from './ComponentCard'; // docs card per UI component
-
-// Scroll-spy hook: returns the id of the currently visible section.
-function useActiveSection(ids) {
-  const [active, setActive] = useState(ids[0] ?? null); // default to first component
-  useEffect(() => {
-    if (ids.length === 0) return;
-    const els = ids.map(id => document.getElementById(id)).filter(Boolean); // resolve anchor divs
-    const obs = new IntersectionObserver(
-      entries => {
-        const hit = entries.find(e => e.isIntersecting); // first visible anchor wins
-        if (hit) setActive(hit.target.id);
-      },
-      { rootMargin: '-10% 0px -80% 0px', threshold: 0 },
-    );
-    els.forEach(el => obs.observe(el));
-    return () => obs.disconnect(); // clean up observer on re-render
-  }, [ids.join(',')]);
-  return active;
-}
 
 // Full-page UI component reference driven from a static data file — no API call or loading state.
 export function UISection() {
   const components = UI_COMPONENTS; // static import; always available, no fetch latency
-  const [query, setQuery] = useState('');           // controlled search input value
-
-  const ids = components.map(d => d.name.toLowerCase()); // anchor ids for scroll-spy
-  const active = useActiveSection(ids);
+  const [query, setQuery] = useState('');                                    // controlled search input
+  const [selected, setSelected] = useState(components[0]?.name ?? null);    // active component name
 
   const searching = query.trim() !== ''; // true when user has typed a non-empty query
-  const filtered = searching
-    ? components.filter(d =>
-        d.name.toLowerCase().includes(query.toLowerCase()) || // match name
-        d.description.toLowerCase().includes(query.toLowerCase()), // match description
-      )
-    : components; // show all when no query
+  const searchResults = components.filter(d =>
+    d.name.toLowerCase().includes(query.toLowerCase()) || // match name
+    d.description.toLowerCase().includes(query.toLowerCase()), // match description
+  );
+
+  // When searching show all matches; otherwise show only the selected component's card.
+  const visible = searching
+    ? searchResults
+    : components.filter(d => d.name === selected);
 
   return (
     <div style={s.root}>
@@ -62,28 +44,25 @@ export function UISection() {
             <nav style={s.sidebar}>
               <p style={s.navLabel}>Components</p>
               <ul style={s.navList}>
-                {components.map(d => {
-                  const id = d.name.toLowerCase(); // anchor id derived from component name
-                  return (
-                    <li key={id}>
-                      <a
-                        href={`#${id}`}
-                        style={{ ...s.navLink, ...(active === id ? s.navLinkActive : {}) }}
-                      >
-                        <span style={{ ...s.navDot, ...(active === id ? s.navDotActive : {}) }} />
-                        {d.name}
-                      </a>
-                    </li>
-                  );
-                })}
+                {components.map(d => (
+                  <li key={d.name}>
+                    <button
+                      onClick={() => setSelected(d.name)} // select this component; card updates instantly
+                      style={{ ...s.navLink, ...(selected === d.name ? s.navLinkActive : {}) }}
+                    >
+                      <span style={{ ...s.navDot, ...(selected === d.name ? s.navDotActive : {}) }} />
+                      {d.name}
+                    </button>
+                  </li>
+                ))}
               </ul>
             </nav>
           )}
 
-         <div style={{ ...s.cards , height: 'fit-content'}}>
-            {filtered.length === 0
+          <div style={{ ...s.cards, height: 'fit-content' }}>
+            {visible.length === 0
               ? <p style={s.empty}>No components match "{query}"</p>
-              : filtered.map(doc => <ComponentCard key={doc.name} doc={doc} />) // one card per component
+              : visible.map(doc => <ComponentCard key={doc.name} doc={doc} />)
             }
           </div>
         </div>
@@ -168,14 +147,18 @@ const s = {
   },
   navLink: {
     alignItems: 'center',
+    background: 'none',
+    border: 'none',
     borderRadius: '6px',
     color: '#94a3b8',        // slate-400
+    cursor: 'pointer',
     display: 'flex',
     fontSize: '12px',
     gap: '8px',
     padding: '6px 8px',
-    textDecoration: 'none',
+    textAlign: 'left',
     transition: 'all 0.15s',
+    width: '100%',
   },
   navLinkActive: {
     background: 'rgba(59, 130, 246, 0.15)', // blue tint
