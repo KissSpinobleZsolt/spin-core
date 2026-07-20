@@ -234,6 +234,16 @@ async def lifespan(app: FastAPI):
         "subscription": "system",
     })
 
+    _STALE_PAGE_ROUTES = [  # routes that existed in older seeds but have no FE router entry
+        "admin/components",
+        "admin/layouts",
+        "admin/docs/ui",
+        "admin/docs/api",
+        "admin/docs/deployment",
+    ]
+    for stale_route in _STALE_PAGE_ROUTES:
+        pg.delete_page_registry(stale_route)  # safe no-op if already gone
+
     _PAGE_REGISTRY_SEED = [
         ("", {"title": "Dashboard", "component_key": "Dashboard", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
         ("logs", {"title": "Logs", "component_key": "Logs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 8}}),
@@ -244,11 +254,6 @@ async def lifespan(app: FastAPI):
         ("admin/users", {"title": "Users", "component_key": "Users", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 5}}),
         ("admin/modules", {"title": "Modules", "component_key": "Modules", "roles": ["admin"], "skeleton": {"type": "table", "columns": 4, "rows": 4}}),
         ("admin/status", {"title": "Status", "component_key": "Status", "roles": ["admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 1}}),
-        ("admin/components", {"title": "Components", "component_key": "Components", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 8}}),
-        ("admin/layouts", {"title": "Layouts", "component_key": "Layouts", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 6}}),
-        ("admin/docs/ui", {"title": "UI Docs", "component_key": "DocsUI", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
-        ("admin/docs/api", {"title": "API Docs", "component_key": "DocsApi", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
-        ("admin/docs/deployment", {"title": "Deployment Docs", "component_key": "DocsDeployment", "roles": ["admin"], "skeleton": {"type": "doc", "rows": 10}}),
     ]
     try:
         pages_with_logs = ch.get_page_routes_with_logs()  # set of routes that already have a page.init log

@@ -675,6 +675,16 @@ class PostgresAdapter:
             db.refresh(row)  # reload the row to pick up any server-set values
             return self._page_registry_row_to_dict(row)  # return the updated config to the caller
 
+    def delete_page_registry(self, route: str) -> bool:
+        """Delete a page_registry row by route. Returns True if a row was deleted."""
+        with self._session_ctx() as db:
+            row = db.query(PageRegistryRow).filter(PageRegistryRow.route == route).first()
+            if not row:
+                return False
+            db.delete(row)  # remove the stale row permanently
+            db.commit()
+            return True
+
     def seed_page_registry(self, route: str, data: dict) -> None:
         """Insert a page_registry entry only if the route does not already exist.
 

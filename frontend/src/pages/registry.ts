@@ -12,5 +12,4 @@ export const PAGE_REGISTRY: Record<string, LazyExoticComponent<ComponentType<obj
   Users:        lazy(() => import('./admin/Users')),    // user management (flat file)
   Modules:      lazy(() => import('./modules')),        // MF module management
   Status:       lazy(() => import('./status')),         // platform health status
-  Layouts:      lazy(() => import('./layouts')),        // layout component demos
 }

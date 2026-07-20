@@ -27,10 +27,6 @@ React 19 SPA for the spin-core platform.
 | `/logs` | Logs | Admin | ClickHouse event log viewer + "Purge expired logs" admin button |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
 | `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
-| `/admin/layouts` | Layouts | Admin | Page layout management |
-| `/admin/docs/ui` | UI docs | Admin | Component reference with props tables, import paths, and a sticky scroll-tracked sidebar |
-| `/admin/docs/api` | API docs | Admin | Full API endpoint reference with method/auth legend, search, and sticky scroll-tracked sidebar |
-| `/admin/docs/deployment` | Deployment docs | Admin | Docker Compose and Kubernetes deployment guide |
 | `/modules/:moduleId` | Federated module | Yes | Webpack container protocol |
 
 All authenticated routes redirect to `/login` if no token is present. The admin user is seeded by the backend from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars — there is no setup wizard.
@@ -217,7 +213,7 @@ All reusable primitives live in `src/components/ui/`. Always import from there �
 | `src/hooks/chatLogs/` | `useChatLogs(timeRange)` → `{ logs, … }` |
 | `src/hooks/userLogs/` | `useUserLogs(timeRange)` → `{ logs, … }` |
 | `src/hooks/translations/` | `TranslationsProvider`, `useTranslationsContext()`, `LANGS`, `Lang` |
-| `src/services/uiComponents/uiComponentsService.ts` | `getComponents()` — fetches `GET /api/ui-components`; `updateComponent(name, data)` — `PUT /api/ui-components/{name}` |
+
 
 ## First-visit modals
 
