@@ -87,22 +87,24 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
   "description": "Short description shown in the discovery panel.",
   "remote_entry": "http://localhost:3001/remoteEntry.js",
   "backend_url": "http://my-module-backend:8000",
-  "i18n": {
-    "en": { "myModule": { "title": "My Module" } },
-    "ro": { "myModule": { "title": "Modulul meu" } }
-  },
-  "bots": [
-    {
-      "name": "My Bot",
-      "type": "communicator",
-      "description": "Answers questions about this module.",
-      "model": "",
-      "system_prompt": "You are a helpful assistant for My Module.",
-      "icon": "🤖",
-      "active": true,
-      "restricted": "user"
-    }
-  ]
+  "configurations": {
+    "i18n": {
+      "en": { "myModule": { "title": "My Module" } },
+      "ro": { "myModule": { "title": "Modulul meu" } }
+    },
+    "bots": [
+      {
+        "name": "My Bot",
+        "type": "communicator",
+        "description": "Answers questions about this module.",
+        "model": "",
+        "system_prompt": "You are a helpful assistant for My Module.",
+        "icon": "🤖",
+        "active": true,
+        "restricted": "user"
+      }
+    ]
+  }
 }
 ```
 

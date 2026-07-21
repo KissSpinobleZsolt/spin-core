@@ -2,39 +2,39 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 secretGenerator:
-  - name: spin-core-secrets
-    envs:
-      - .env
-    options:
-      disableNameSuffixHash: true
+- envs:
+  - .env
+  name: spin-core-secrets
+  options:
+    disableNameSuffixHash: true
 
 # newTag: latest is the static default; k8s-deploy.sh overrides it with the git SHA at deploy time via kustomize edit set image
 images:
-  - name: ghcr.io/kissspinoblezsolt/spin-core-backend
-    newTag: latest
-  - name: ghcr.io/kissspinoblezsolt/spin-core-frontend
-    newTag: latest
-  - name: ghcr.io/kissspinoblezsolt/spin-core-spin-docs
-    newTag: latest
+- name: ghcr.io/kissspinoblezsolt/spin-core-backend
+  newTag: 6af3182
+- name: ghcr.io/kissspinoblezsolt/spin-core-frontend
+  newTag: 6af3182
+- name: ghcr.io/kissspinoblezsolt/spin-core-spin-docs
+  newTag: 6af3182
 
 resources:
-  - namespace.yaml
-  - configmap.yaml
-  - seed-data-cm.yaml
-  - app-data-pvc.yaml
-  - postgres/pvc.yaml
-  - postgres/service.yaml
-  - postgres/statefulset.yaml
-  - clickhouse/pvc.yaml
-  - clickhouse/service.yaml
-  - clickhouse/statefulset.yaml
-  - ollama/pvc.yaml
-  - ollama/service.yaml
-  - ollama/deployment.yaml
-  - ollama/model-downloader-job.yaml
-  - backend/service.yaml
-  - backend/deployment.yaml
-  - spin-docs/service.yaml
-  - spin-docs/deployment.yaml
-  - frontend/service.yaml
-  - frontend/deployment.yaml
+- namespace.yaml
+- configmap.yaml
+- seed-data-cm.yaml
+- app-data-pvc.yaml
+- postgres/pvc.yaml
+- postgres/service.yaml
+- postgres/statefulset.yaml
+- clickhouse/pvc.yaml
+- clickhouse/service.yaml
+- clickhouse/statefulset.yaml
+- ollama/pvc.yaml
+- ollama/service.yaml
+- ollama/deployment.yaml
+- ollama/model-downloader-job.yaml
+- backend/service.yaml
+- backend/deployment.yaml
+- spin-docs/service.yaml
+- spin-docs/deployment.yaml
+- frontend/service.yaml
+- frontend/deployment.yaml
