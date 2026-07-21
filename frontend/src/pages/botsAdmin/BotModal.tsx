@@ -14,7 +14,7 @@ import { Modal } from '@components/ui/modal' // modal wrapper
 import { Toggle } from '@components/ui/toggle' // active toggle
 import { ErrorBanner } from '@components/ui/ErrorBanner' // save error
 import { BOT_TYPES, CUSTOM_ICONS } from '@constants/botConstants' // type options + icon picker
-import { Select } from './Select' // local dropdown wrapper
+import { Select } from '@components/ui/Select' // local dropdown wrapper
 import { BLANK } from './BLANK.constant' // empty form defaults
 
 export function BotModal({ // create / edit bot form inside a modal
@@ -113,7 +113,7 @@ export function BotModal({ // create / edit bot form inside a modal
           <div className="flex items-center gap-2">
             <span className="text-xl leading-none">{form.type === 'custom' ? form.icon : (currentBotType?.icon ?? form.icon)}</span>
             <div className="flex-1">
-              <Select value={form.type} onChange={handleTypeChange}>
+              <Select value={form.type} onChange={handleTypeChange} className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500">
                 {BOT_TYPES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
               </Select>
             </div>
@@ -159,6 +159,7 @@ export function BotModal({ // create / edit bot form inside a modal
             // (e.g. an Ollama tag) are not accidentally sent to a cloud API.
             model: '',
           }))}
+          className="w-full px-3 py-2 rounded-lg bg-slate-100 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 text-slate-800 dark:text-white focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
         >
           {(Object.entries(PROVIDER_LABELS) as [LLMProvider, string][]).map(([id, label]) => (
             <option key={id} value={id}>{label}</option>

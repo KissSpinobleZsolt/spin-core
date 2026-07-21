@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useModules, useRefreshModules } from '../../hooks/modules'
+import { useModules, useRefreshModules } from '@hooks/modules'
 import type { SettingsContextValue } from './SettingsContextValue.type'
 
 // SettingsProvider is now a no-op passthrough — module data is fetched via TanStack Query (useModules).

@@ -1,6 +1,6 @@
 import { RouterProvider } from 'react-router-dom'
 import { router } from './router'
-import { CookieConsentModal } from '../components/cookieConsent'
+import { CookieConsentModal } from '@components/cookieConsent'
 
 // i18n and theme initialisation moved to Layout — both now only run after the user is authenticated
 export default function App() {

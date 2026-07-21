@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react'
 import { useSuspenseQuery } from '@tanstack/react-query'
 import { i18nService } from '@services'
-import { reloadTranslations } from '../../i18n/i18nSync'
+import { reloadTranslations } from '@i18n/i18nSync'
 import { flatten, unflatten } from '@utils'
 import type { Lang } from './Lang.type'
 

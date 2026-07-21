@@ -3,7 +3,7 @@ import { useAuthStore } from '@store'
 import { settingsService } from '@services'
 import type { ModuleConfig } from '@services'
 import type { ReachabilityMap } from '@context'
-import { probeModule } from '../../context/settings/probeModule'
+import { probeModule } from '@context/settings/probeModule'
 
 export interface ModulesData {
   modules: ModuleConfig[]

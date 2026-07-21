@@ -3,6 +3,7 @@ import { botConfigService, type BotEntity, type BotTeam } from '@services' // en
 import { Toggle } from '@components/ui/toggle' // active/inactive toggle
 import { Btn } from '@components/ui/button' // add button
 import { Spinner } from '@components/ui/spinner' // loading indicator
+import { Select } from '@components/ui/Select'
 
 export function WatchlistSection({ // manages watched symbols per team
   entities,
@@ -96,13 +97,13 @@ export function WatchlistSection({ // manages watched symbols per team
           placeholder="Ticker (e.g. AAPL)"
           className="flex-1 text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600 px-3 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
         />
-        <select
+        <Select
           value={addTeamId}
-          onChange={(e) => setAddTeamId(e.target.value)}
+          onChange={setAddTeamId}
           className="text-sm rounded-lg bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-white border border-slate-200 dark:border-slate-600 px-2 py-2 focus:outline-none focus:ring-1 focus:ring-blue-500"
         >
           {teams.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-        </select>
+        </Select>
         <Btn onClick={handleAdd} disabled={adding || !addSymbol.trim()} className="px-4 py-2 text-sm shrink-0">
           {adding ? <Spinner size="sm" /> : '+ Add'}
         </Btn>

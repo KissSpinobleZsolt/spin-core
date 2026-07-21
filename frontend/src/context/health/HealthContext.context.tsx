@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react'
-import { useHealthQuery } from '../../hooks/health'
+import { useHealthQuery } from '@hooks/health'
 import type { HealthState } from './HealthState.type'
 
 const DEFAULT: HealthState = { api: true, postgres: true, clickhouse: true, checkedAt: null }

@@ -14,6 +14,7 @@ import { PageTitle } from '@components/ui/PageTitle'
 import { Table, type TableColumn } from '@components/ui/Table'
 import { BOT_TYPES } from '@constants/botConstants'
 import { BotModal } from './BotModal'  // used only for the "+ Add bot" flow
+import { Select } from '@components/ui/Select'
 
 export default function BotsAdmin() {
   const [searchParams, setSearchParams] = useSearchParams()  // ?new param for add modal, ?module for filter
@@ -135,16 +136,16 @@ export default function BotsAdmin() {
           {allModules.length > 0 && (
             <div className="flex items-center gap-3">
               <label className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Filter by module</label>
-              <select
+              <Select
                 value={moduleFilter}
-                onChange={e => setModuleFilter(e.target.value)}
+                onChange={setModuleFilter}
                 className="text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">All bots</option>
                 {allModules.map(m => (
                   <option key={m.id} value={m.id}>{m.icon} {m.name}</option>
                 ))}
-              </select>
+              </Select>
               {moduleFilter && (
                 <button
                   type="button"

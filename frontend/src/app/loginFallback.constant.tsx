@@ -1,4 +1,4 @@
-import { Spinner } from '../components/ui/spinner'
+import { Spinner } from '@components/ui/spinner'
 
 // Stable JSX node — module-scope so React never recreates it between renders
 export const loginFallback = (

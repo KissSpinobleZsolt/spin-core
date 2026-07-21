@@ -1,9 +1,9 @@
 import { Suspense } from 'react'
 import { createBrowserRouter } from 'react-router-dom'
 import Layout from '@components/layout/Layout' // root layout with sidebar + header
-import { AuthGuard } from '../../components/guards/AuthGuard' // redirects unauthenticated users to /login
-import { RoleGuard } from '../../components/guards/roleGuard' // restricts child routes to admin role
-import { FederatedPage } from '../../components/modules/federatedPage' // Webpack module federation loader
+import { AuthGuard } from '@components/guards/AuthGuard' // redirects unauthenticated users to /login
+import { RoleGuard } from '@components/guards/roleGuard' // restricts child routes to admin role
+import { FederatedPage } from '@components/modules/federatedPage' // Webpack module federation loader
 import { PageLoader } from '@components/layout/PageLoader' // suspense wrapper for lazy-loaded pages
 import { loginFallback } from '../loginFallback.constant' // stable spinner shown during route lazy-load
 import {
