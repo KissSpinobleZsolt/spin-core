@@ -138,38 +138,6 @@ services:
       CLICKHOUSE_DB: core
     restart: unless-stopped
 
-  bots-trader-platform:
-    build: ./modules/bots-trader-platform
-    ports:
-      - "3004:80"
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1/"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-    depends_on:
-      bots-trader-platform-backend:
-        condition: service_started
-    restart: unless-stopped
-
-  bots-trader-platform-backend:
-    build: ./modules/bots-trader-platform/backend
-    ports:
-      - "8004:8000"
-    environment:
-      JWT_SECRET_KEY: change-me-in-production
-      POSTGRES_URL: postgresql://core-postgres:core-postgres@postgres:5432/core-postgres
-      OLLAMA_URL: http://ollama:11434
-      CORE_BACKEND_URL: http://backend:8000
-      REDDIT_CLIENT_ID: ""
-      REDDIT_CLIENT_SECRET: ""
-      REDDIT_USER_AGENT: "bots-trader-platform/0.1"
-    depends_on:
-      postgres:
-        condition: service_healthy
-      ollama:
-        condition: service_healthy
-    restart: unless-stopped
  # ── Spin Docs module (architecture diagrams + dev docs, system role only) ────────────
   spin-docs:
     build: ./modules/spin-docs
