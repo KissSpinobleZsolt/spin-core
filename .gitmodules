@@ -4,3 +4,6 @@
 [submodule "modules/AnomaScan"]
 	path = modules/AnomaScan
 	url = https://github.com/KissSpinobleZsolt/spi-module-anomascan.git
+[submodule "modules/spin-docs"]
+	path = modules/spin-docs
+	url = https://github.com/KissSpinobleZsolt/spin-module-spin-docs.git

@@ -20,7 +20,7 @@ done
 
 # Default: restart all named services (databases + backend + frontend)
 if [[ ${#SERVICES[@]} -eq 0 ]]; then
-  SERVICES=(postgres clickhouse ollama backend hello-world frontend-dev)
+  SERVICES=(postgres clickhouse ollama backend spin-docs frontend-dev)
 fi
 
 if [[ $REBUILD -eq 1 ]]; then

@@ -7,7 +7,7 @@ IMAGE_TAG="${IMAGE_TAG:-$(git rev-parse --short HEAD)}"
 SERVICES=(
   "backend:./backend"
   "frontend:./frontend"
-  "hello-world:./modules/hello-world"
+  "spin-docs:./modules/spin-docs"
 )
 
 for entry in "${SERVICES[@]}"; do
