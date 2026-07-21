@@ -16,12 +16,14 @@ export function PageLoaderProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const route = pathname.replace(/^\//, '') // Strip leading slash to match backend route key format
 
-  // Fires for every authenticated route including ones not using PageLoader;
-  // 404s from non-registered routes are cached by TQ (retry:false) and silently ignored by those pages.
+  // Detail routes (admin/<resource>/<id-or-slug>) never have page_registry entries — skip the fetch.
+  const segments = route.split('/')
+  const isDetailRoute = segments.length >= 3 && segments[0] === 'admin'
+
   const { data: config = null, isLoading, isError } = useGet<PageConfig>(
     ['page-config', route],
     () => pagesService.getPageConfig(route),
-    { staleTime: 5 * 60 * 1000, retry: false },
+    { staleTime: 5 * 60 * 1000, retry: false, enabled: !isDetailRoute },
   )
 
   return (

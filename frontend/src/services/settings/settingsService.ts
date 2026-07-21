@@ -29,4 +29,9 @@ export const settingsService = {
   async resetModuleI18n(id: string): Promise<void> {
     await apiService.post(`${urlBuilder(id)}/reset-i18n`, {}) // POST to restore module's default i18n keys
   },
+
+  async reseedBots(id: string): Promise<{ bots_seeded: number; message: string }> {
+    // With configuration_raw stored on the module, the backend uses the snapshot directly — no body needed
+    return apiService.post(`${urlBuilder(id)}/reseed-bots`, {})
+  },
 }

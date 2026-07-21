@@ -19,9 +19,9 @@ _NAV_PUBLIC = [
 
 # Admin-only pages appended when the requesting user has the ``admin`` role.
 _NAV_ADMIN = [
-    ("/logs",           "Logs",         "HTTP and chat log viewer"),
+    ("/admin/logs",     "Logs",         "HTTP and chat log viewer"),
     ("/translations",   "Translations", "live i18n string editor"),
-    ("/bots-admin",     "Bot Admin",    "create and manage bots"),
+    ("/admin/bots",     "Bot Admin",    "create and manage bots"),
     ("/admin/llms",     "LLM Models",   "Ollama model management"),
     ("/admin/users",    "Users",        "user management"),
     ("/admin/modules",  "Modules",      "micro-frontend registration and logs"),

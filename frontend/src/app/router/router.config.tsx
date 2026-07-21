@@ -8,7 +8,7 @@ import { PageLoader } from '@components/layout/PageLoader' // suspense wrapper f
 import { loginFallback } from '../loginFallback.constant' // stable spinner shown during route lazy-load
 import {
   Dashboard, Login, Translations, Bots, Chat,
-  LLMs, Users, Modules, Status, NotFound,
+  LLMs, Users, Modules, ModuleDetail, BotDetail, Status, NotFound,
 } from './lazyPages.constant' // all code-split page components
 
 export const router = createBrowserRouter([
@@ -26,7 +26,7 @@ export const router = createBrowserRouter([
         children: [
           { index: true, element: <Dashboard /> }, // default child route
           {
-            path: 'logs',
+            path: 'admin/logs',
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <PageLoader />
@@ -42,10 +42,18 @@ export const router = createBrowserRouter([
             ),
           },
           {
-            path: 'bots-admin',
+            path: 'admin/bots',
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <PageLoader />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/bots/:id',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <BotDetail />
               </RoleGuard>
             ),
           },
@@ -74,6 +82,14 @@ export const router = createBrowserRouter([
             element: (
               <RoleGuard requiredRoles={['admin']}>
                 <Modules />
+              </RoleGuard>
+            ),
+          },
+          {
+            path: 'admin/modules/:scope',
+            element: (
+              <RoleGuard requiredRoles={['admin']}>
+                <ModuleDetail />
               </RoleGuard>
             ),
           },

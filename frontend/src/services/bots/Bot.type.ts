@@ -20,5 +20,12 @@ export interface Bot {
   created_by: string
   /** Declarative config page schema from the module manifest; empty object for non-custom bots. */
   config_schema: BotConfigSchema
-  created_at: string | null
+  /** Current responsible party; 'system' for seeded bots. */
+  owner: string
+  /** Email of the admin who last edited this bot; null until first explicit edit. */
+  updated_by: string | null
+  /** Server-set creation timestamp; renamed from created_at. */
+  created_on: string | null
+  /** Null until the first explicit edit. */
+  updated_on: string | null
 }

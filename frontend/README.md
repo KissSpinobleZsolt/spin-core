@@ -24,9 +24,9 @@ React 19 SPA for the spin-core platform.
 | `/admin/users` | Users | Admin | User listing (stub) |
 | `/admin/modules` | Modules | Admin | Module CRUD — register (with i18n translations + manifest auto-fill), edit, delete, toggle, scan for new modules, view per-module log drawer |
 | `/admin/status` | Status | Admin | Live overview — app health, DB status, installed LLMs, modules, active bots with clickable navigation |
-| `/logs` | Logs | Admin | ClickHouse event log viewer + "Purge expired logs" admin button |
+| `/admin/logs` | Logs | Admin | ClickHouse event log viewer + "Purge expired logs" admin button |
 | `/translations` | Translations | Admin | Live i18n editor (EN + RO side-by-side) |
-| `/bots-admin` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable |
+| `/admin/bots` | Bots (admin) | Admin | Bot CRUD — create, edit, delete, enable/disable; supports `?module=<id>` URL param to pre-filter by module |
 | `/modules/:moduleId` | Federated module | Yes | Webpack container protocol |
 
 All authenticated routes redirect to `/login` if no token is present. The admin user is seeded by the backend from `ADMIN_EMAIL` / `ADMIN_PASSWORD` env vars — there is no setup wizard.
@@ -141,7 +141,7 @@ The platform ships with a built-in bot system — no Module Federation required.
 
 **`ModuleBotPanel`** (`src/components/modules/moduleBotPanel/`) — a floating violet panel (`fixed bottom-6 left-6`) rendered inside every `FederatedPage`. On mount it fetches `GET /api/bots?module_id=<id>` and renders a bot selector + streaming chat scoped to that module. Passes `module_id` to `POST /api/chat` so the backend injects the module's name and description into the bot's system prompt. Returns `null` and is invisible when no active bots are assigned to the module.
 
-**`/bots-admin`** (`src/pages/botsAdmin/`) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
+**`/admin/bots`** (`src/pages/botsAdmin/`) — admin-only CRUD page. Fields per bot: name, icon, description, type (communicator / custom), **provider** (`ollama` / `anthropic` / `openai` — determines the LLM backend), model (free-text with provider-aware hints), system prompt, enabled toggle, and role access. Supports `?module=<id>` to pre-filter the table by module. A default "AI Assistant" bot (provider: `ollama`) is seeded on first backend startup.
 
 ### Module presets
 

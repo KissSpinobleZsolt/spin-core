@@ -27,6 +27,8 @@ interface TableProps<T> {
   className?: string
   /** Compact mode: text-xs, px-4 py-2 cells, thead background, row hover. Suited for dense data tables like logs. */
   compact?: boolean
+  /** When provided, renders a full-width expansion row directly below each data row. Return null/undefined to render nothing for a given row. */
+  renderExpansion?: (row: T) => ReactNode
 }
 
 /**
@@ -39,7 +41,7 @@ interface TableProps<T> {
  * The last column receives no right padding so action buttons sit flush with the edge.
  * Pass `empty` to control what appears when there are no rows.
  */
-export function Table<T>({ columns, rows, rowKey, empty, className = '', compact = false }: TableProps<T>) {
+export function Table<T>({ columns, rows, rowKey, empty, className = '', compact = false, renderExpansion }: TableProps<T>) {
   if (rows.length === 0) {
     return empty ? <>{empty}</> : null
   }
@@ -66,18 +68,30 @@ export function Table<T>({ columns, rows, rowKey, empty, className = '', compact
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100 dark:divide-slate-700">
-          {rows.map((row, idx) => (
-            <tr key={rowKey(row, idx)} className={rowHover}>
-              {columns.map((col, i) => (
-                <td
-                  key={col.key}
-                  className={`${cellPad} ${!compact && i < lastIdx ? 'pr-4' : ''} ${col.className ?? ''}`}
-                >
-                  {col.cell(row)}
-                </td>
-              ))}
-            </tr>
-          ))}
+          {rows.map((row, idx) => {
+            const expansion = renderExpansion ? renderExpansion(row) : null  // null means no expansion for this row
+            return (
+              <>
+                <tr key={rowKey(row, idx)} className={rowHover}>
+                  {columns.map((col, i) => (
+                    <td
+                      key={col.key}
+                      className={`${cellPad} ${!compact && i < lastIdx ? 'pr-4' : ''} ${col.className ?? ''}`}
+                    >
+                      {col.cell(row)}
+                    </td>
+                  ))}
+                </tr>
+                {expansion && (  // expansion row spans all columns; no divider needed since it visually belongs to the row above
+                  <tr key={`${rowKey(row, idx)}-expansion`}>
+                    <td colSpan={columns.length} className="p-0">
+                      {expansion}
+                    </td>
+                  </tr>
+                )}
+              </>
+            )
+          })}
         </tbody>
       </table>
     </div>

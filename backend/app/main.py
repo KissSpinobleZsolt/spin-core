@@ -247,16 +247,18 @@ async def lifespan(app: FastAPI):
         "admin/docs/ui",
         "admin/docs/api",
         "admin/docs/deployment",
+        "logs",         # renamed to admin/logs
+        "bots-admin",   # renamed to admin/bots
     ]
     for stale_route in _STALE_PAGE_ROUTES:
         pg.delete_page_registry(stale_route)  # safe no-op if already gone
 
     _PAGE_REGISTRY_SEED = [
         ("", {"title": "Dashboard", "component_key": "Dashboard", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
-        ("logs", {"title": "Logs", "component_key": "Logs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 8}}),
+        ("admin/logs", {"title": "Logs", "component_key": "Logs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 8}}),
         ("translations", {"title": "Translations", "component_key": "Translations", "roles": ["admin"], "skeleton": {"type": "table", "columns": 3, "rows": 6}}),
         ("bots", {"title": "Bots", "component_key": "Bots", "roles": ["user", "admin"], "skeleton": {"type": "cards", "columns": 3, "rows": 2}}),
-        ("bots-admin", {"title": "Bots Admin", "component_key": "BotsAdmin", "roles": ["admin"], "skeleton": {"type": "table", "columns": 7, "rows": 5}}),
+        ("admin/bots", {"title": "Bots Admin", "component_key": "BotsAdmin", "roles": ["admin"], "skeleton": {"type": "table", "columns": 7, "rows": 5}}),
         ("admin/llms", {"title": "LLMs", "component_key": "LLMs", "roles": ["admin"], "skeleton": {"type": "table", "columns": 4, "rows": 4}}),
         ("admin/users", {"title": "Users", "component_key": "Users", "roles": ["admin"], "skeleton": {"type": "table", "columns": 5, "rows": 5}}),
         ("admin/modules", {"title": "Modules", "component_key": "Modules", "roles": ["admin"], "skeleton": {"type": "table", "columns": 4, "rows": 4}}),
