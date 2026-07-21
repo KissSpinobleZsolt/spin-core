@@ -364,11 +364,11 @@ function FederationTab({
                   <p className="text-xs font-mono text-slate-400 truncate mt-0.5">{d.remote_url}</p>
                 </div>
                 {d.already_registered && d.enabled ? (
-                  <Badge variant="success">Registered</Badge>  // already in DB and active — nothing to do
+                  <Badge variant="success">Registered</Badge>
                 ) : d.already_registered && !d.enabled ? (
                   <div className="flex gap-2 items-center">
                     <Badge variant="neutral">Inactive</Badge>
-                    <Btn onClick={() => onEnableDiscovered(d)}>Enable</Btn>  // in DB but disabled — allow one-click re-enable
+                    <Btn onClick={() => onEnableDiscovered(d)}>Enable</Btn> 
                   </div>
                 ) : (
                   // Clicking Add fetches the manifest in the browser and registers the module as inactive
