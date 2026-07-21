@@ -1,0 +1,42 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: anomascan-backend
+  namespace: spin-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: anomascan-backend
+  template:
+    metadata:
+      labels:
+        app: anomascan-backend
+    spec:
+      containers:
+        - name: anomascan-backend
+          image: ghcr.io/kissspinoblezsolt/spin-core-anomascan-backend:latest
+          imagePullPolicy: Always  # deploy script overrides to SHA at apply time
+          ports:
+            - containerPort: 8000
+          env:
+            - name: JWT_SECRET_KEY  # shared with core — must match spin-core-secrets
+              valueFrom:
+                secretKeyRef:
+                  name: spin-core-secrets
+                  key: JWT_SECRET_KEY
+            - name: YOLO_MODELS_DIR  # mounted volume for YOLO weight files
+              value: /app/vision-models
+          volumeMounts:
+            - name: yolo-models
+              mountPath: /app/vision-models
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
+      volumes:
+        - name: yolo-models
+          persistentVolumeClaim:
+            claimName: anomascan-yolo-pvc

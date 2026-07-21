@@ -15,7 +15,7 @@ echo "→ Deploying tag ${IMAGE_TAG} to namespace ${NAMESPACE}..."
   kustomize edit set image \
     "ghcr.io/kissspinoblezsolt/spin-core-backend:${IMAGE_TAG}" \
     "ghcr.io/kissspinoblezsolt/spin-core-frontend:${IMAGE_TAG}" \
-    "ghcr.io/kissspinoblezsolt/spin-core-hello-world:${IMAGE_TAG}"
+    "ghcr.io/kissspinoblezsolt/spin-core-spin-docs:${IMAGE_TAG}"
 )
 
 kubectl apply -k k8s/
@@ -26,7 +26,7 @@ git checkout k8s/kustomization.yaml
 echo "→ Waiting for rollouts..."
 kubectl rollout status deployment/backend    -n "${NAMESPACE}" --timeout=120s
 kubectl rollout status deployment/frontend   -n "${NAMESPACE}" --timeout=60s
-kubectl rollout status deployment/hello-world -n "${NAMESPACE}" --timeout=60s
+kubectl rollout status deployment/spin-docs   -n "${NAMESPACE}" --timeout=60s
 
 echo ""
 echo "Deploy complete — tag ${IMAGE_TAG} is live in ${NAMESPACE}."

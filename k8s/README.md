@@ -94,11 +94,20 @@ Subsequent deploys are instant — the volume persists between restarts.
 
 ## NodePort assignments
 
+### Core
+
 | Service | NodePort |
 |---------|----------|
 | `frontend` | 30080 |
 | `backend` | 30800 |
 | `spin-docs` | 30001 |
+
+### Modules (deployed independently — see below)
+
+| Service | NodePort |
+|---------|----------|
+| `cloud-insight-ai` | 30002 |
+| `anomascan` | 30003 |
 
 ## Configuration
 
@@ -108,11 +117,54 @@ Non-secret configuration (URLs, paths) is in `configmap.yaml`. The Ollama URL is
 OLLAMA_URL: http://ollama.spin-core.svc.cluster.local:11434
 ```
 
+## Module deployments
+
+Non-core modules (AnomaScan, cloud-insight-ai) live in `k8s/modules/` and are deployed independently. Each has its own Kustomize overlay so it can be built, pushed, and deployed without touching core.
+
+### 1. Build and push module images
+
+```bash
+bash scripts/module-push.sh anomascan
+bash scripts/module-push.sh cloud-insight-ai
+```
+
+Each module has a frontend MF remote (Nginx) and a FastAPI backend. Both images are built and pushed under the `ghcr.io/kissspinoblezsolt/spin-core-*` registry.
+
+### 2. Deploy a module
+
+```bash
+bash scripts/module-deploy.sh anomascan
+bash scripts/module-deploy.sh cloud-insight-ai
+```
+
+The deploy script:
+1. Stamps the image SHA into the module's `kustomization.yaml`
+2. Applies the module's manifests (`kubectl apply -k k8s/modules/<name>/`)
+3. Waits for frontend and backend rollouts
+4. Appends the module's in-cluster URL to `MODULE_REGISTRY_URLS` in `spin-core-config` (idempotent)
+5. Restarts the core backend so it auto-discovers the new module from its `manifest.json`
+
+Combined one-liner:
+
+```bash
+IMAGE_TAG=abc1234 bash scripts/module-push.sh anomascan && \
+IMAGE_TAG=abc1234 bash scripts/module-deploy.sh anomascan
+```
+
+### Module service topology
+
+| Module | Frontend NodePort | Backend (ClusterIP) |
+|--------|-------------------|---------------------|
+| `anomascan` | 30003 | `anomascan-backend:8000` |
+| `cloud-insight-ai` | 30002 | `cloud-insight-ai-backend:8000` |
+
+Module backends are ClusterIP only — browsers never access them directly. All plugin traffic flows through the core backend proxy at `/api/plugin/{scope}/…`.
+
 ## Directory structure
 
 ```
 k8s/
-├── kustomization.yaml        # Kustomize entry point — secretGenerator + images + resource list
+├── kustomization.yaml        # Core Kustomize entry — secretGenerator + images + resource list
 ├── namespace.yaml
 ├── configmap.yaml            # Non-secret env vars (URLs, paths, model names)
 ├── seed-data-cm.yaml         # First-run seed data (bot_types, bots, modules, theme) — keep in sync with data/seed.json
@@ -128,7 +180,10 @@ k8s/
 │   └── model-downloader-job.yaml  # Job: pulls models via OLLAMA_HOST, then exits
 ├── backend/                  # Deployment + Service (NodePort 30800)
 ├── frontend/                 # Deployment + Service (NodePort 30080)
-└── spin-docs/                # Deployment + Service (NodePort 30001)
+├── spin-docs/                # Deployment + Service (NodePort 30001)
+└── modules/                  # Per-module overlays — deployed independently via module-deploy.sh
+    ├── anomascan/            # Frontend (NodePort 30003) + backend (ClusterIP) + YOLO models PVC
+    └── cloud-insight-ai/     # Frontend (NodePort 30002) + backend (ClusterIP)
 ```
 
 ## Day-to-day operations

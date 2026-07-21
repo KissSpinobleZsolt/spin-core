@@ -4,11 +4,11 @@ Module Federation remotes for the spin-core platform. Each module is an independ
 
 ## Available modules
 
-External modules live in their own GitHub repositories and are wired into spin-core as git submodules. The `spin-docs` module is bundled directly in this repository.
+All modules live in their own GitHub repositories and are wired into spin-core as git submodules.
 
 | Module | Repo | Frontend port | Backend port | Scope | Description |
 |--------|------|--------------|--------------|-------|-------------|
-| [spin-docs](spin-docs/) | *(bundled)* | 3001 | — | `spinDocs` | Architecture diagrams + developer docs (system role) |
+| [spin-docs](spin-docs/) | [spin-module-spin-docs](https://github.com/KissSpinobleZsolt/spin-module-spin-docs) | 3001 | — | `spinDocs` | Architecture diagrams + developer docs (system role) |
 | [CloudInsight AI](cloud-insight-ai/README.md) | [spi-module-cloud-insight-ai](https://github.com/KissSpinobleZsolt/spi-module-cloud-insight-ai) | 3002 | 8002 | `cloudInsightAI` | Data source upload, processing, and management |
 | [AnomaScan](AnomaScan/README.md) | [spi-module-anomascan](https://github.com/KissSpinobleZsolt/spi-module-anomascan) | 3003 | 8003 | `anomaScan` | YOLO object detection and model fine-tuning |
 
@@ -22,7 +22,7 @@ bash scripts/setup-workspace.sh
 
 **Working on a submodule module:**
 ```bash
-cd modules/cloud-insight-ai   # full git repo — push/PR against the upstream repo
+cd modules/spin-docs          # full git repo — push/PR against the upstream repo
 git checkout -b feat/my-thing
 # ... make changes, then:
 git push origin feat/my-thing
@@ -30,11 +30,11 @@ git push origin feat/my-thing
 
 **Bumping a module version in spin-core (after a module PR is merged):**
 ```bash
-cd modules/cloud-insight-ai
+cd modules/spin-docs
 git pull origin main
 cd ../..
-git add modules/cloud-insight-ai
-git commit -m "chore: bump cloud-insight-ai submodule to <sha>"
+git add modules/spin-docs
+git commit -m "chore: bump spin-docs submodule to <sha>"
 ```
 
 > The AI assistant (chatbot) is no longer a Module Federation remote. It is now a native part of the core app — see the bot system at `/bots` and `/bots-admin`, and the floating `ChatBubble` in the layout.
