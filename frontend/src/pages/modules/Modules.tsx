@@ -9,28 +9,27 @@ import { Toggle } from '@components/ui/toggle'
 import { Tabs } from '@components/ui/tabs'
 import { ErrorBanner } from '@components/ui/ErrorBanner'
 import { PageTitle } from '@components/ui/PageTitle'
-import { Table } from '@components/ui/Table' // shared data table
+import { Table } from '@components/ui/Table'
 import type { ModalState } from './ModalState.type'
 import { ModuleModal } from './ModuleModal'
-import { ModuleLogsDrawer } from './ModuleLogsDrawer'
 
 type TabKey = 'native' | 'federation'
 
 // Static tab definitions — labels displayed by the Tabs component
 const TABS = [
-  { key: 'federation',  label: 'Federation' },      // Webpack Module Federation remote modules
-  { key: 'native',      label: 'Native pages' },   // platform pages seeded from page_registry at startup
+  { key: 'federation', label: 'Federation' },   // Webpack Module Federation remote modules
+  { key: 'native',     label: 'Native pages' }, // platform pages seeded from page_registry at startup
 ]
 
 // Modules admin page — tabbed view of native platform pages and federated MF modules
 export default function Modules() {
-  const { modules, refreshModules } = useSettings()                              // live federation module list from SettingsContext
-  const [activeTab, setActiveTab]   = useState<TabKey>('federation')                // which tab is visible; defaults to native
-  const [modal, setModal]           = useState<ModalState>(null)                // add/edit modal discriminant (null = closed)
-  const [error, setError]           = useState<string | null>(null)             // last API error message to surface in ErrorBanner
-  const [discovered, setDiscovered] = useState<DiscoveredModule[] | null>(null) // registry scan results; null = panel hidden
-  const [scanning, setScanning]     = useState(false)                           // true while the scan API call is in flight
-  const [logsModule, setLogsModule] = useState<ModuleConfig | null>(null)       // module whose logs drawer is open
+  const { modules, refreshModules } = useSettings()                               // live federation module list from SettingsContext
+  const [activeTab, setActiveTab]       = useState<TabKey>('federation')          // which tab is visible
+  const [modal, setModal]               = useState<ModalState>(null)              // add modal discriminant (null = closed)
+  const [error, setError]               = useState<string | null>(null)           // last API error message to surface in ErrorBanner
+  const [discovered, setDiscovered]     = useState<DiscoveredModule[] | null>(null) // registry scan results; null = panel hidden
+  const [scanning, setScanning]         = useState(false)                         // true while the scan API call is in flight
+  const [addingDiscoveredUrl, setAddingDiscoveredUrl] = useState<string | null>(null) // source_url currently being auto-registered
 
   const { data: nativePages = [], refetch: refetchPages } = useGet<PageConfig[]>(
     ['pages'],
@@ -46,24 +45,70 @@ export default function Modules() {
   async function handleSave(data: Omit<ModuleConfig, 'id'>) {
     try {
       if (modal === 'add' || (modal !== null && typeof modal === 'object' && 'prefill' in modal)) {
-        await settingsService.createModule(data)                                 // create from blank form or pre-filled manifest data
+        const result = await settingsService.createModule(data) as ModuleConfig & { bots_seeded?: number; manifest_warning?: string | null }
+        // Surface a warning when the backend could not reach the manifest (bots/i18n not seeded)
+        if (result.manifest_warning) {
+          setError(`Module saved, but manifest fetch failed — bots and i18n were not seeded. Use "Reseed bots" once the module server is running. (${result.manifest_warning})`)
+        }
       } else if (modal !== null && typeof modal === 'object' && 'id' in modal) {
-        await settingsService.updateModule(modal.id, data)                      // update an existing module; modal.id is the DB uuid
+        await settingsService.updateModule(modal.id, data)  // update an existing module; modal.id is the DB uuid
       }
-      await refreshModules()  // re-fetch so SettingsContext reflects the new state immediately
+      await refreshModules()
       setModal(null)
     } catch (err) {
       setError(String(err))
     }
   }
 
-  async function handleDelete(id: string) {
-    if (!confirm('Delete this module?')) return                                  // native confirm blocks UX until the user decides
+  /** Fetch manifest from the browser and directly register the module as inactive — no modal confirmation step. */
+  async function handleAddDiscovered(d: DiscoveredModule) {
+    setAddingDiscoveredUrl(d.source_url)
+    setError(null)
     try {
-      await settingsService.deleteModule(id)
+      // Derive manifest URL from remote_url (browser-accessible localhost:PORT), not source_url (Docker-internal hostname).
+      const manifestBase = d.remote_url?.replace(/\/remoteEntry\.js$/, '').replace(/\/$/, '')
+      const manifestUrl = manifestBase ? `${manifestBase}/manifest.json` : null
+
+      let manifest: Record<string, unknown> | null = null
+      if (manifestUrl) {
+        try {
+          const res = await fetch(manifestUrl)  // browser fetch where localhost is the host machine
+          if (res.ok) manifest = await res.json() as Record<string, unknown>
+        } catch {
+          // manifest unreachable in browser — backend will try its own fetch using remote_url
+        }
+      }
+
+      const result = await settingsService.createModule({
+        name:        d.name        ?? '',
+        description: d.description ?? '',
+        remote_url:  d.remote_url  ?? '',
+        scope:       d.scope       ?? '',
+        component:   d.component   ?? './App',
+        route:       d.route       ?? '',
+        icon:        d.icon        ?? '🧩',
+        enabled:     false,                         // registered as inactive; admin enables via the toggle
+        roles:       d.roles       ?? ['user', 'admin'],
+        presets:     { i18n: {}, layout: {}, settings: {} },
+        configuration_raw: manifest,               // forward the full manifest snapshot to the backend
+      }) as ModuleConfig & { bots_seeded?: number; manifest_warning?: string | null }
+
       await refreshModules()
+      // Optimistically mark as already_registered so the Add button disappears
+      setDiscovered(prev => prev ? prev.map(x =>
+        x.source_url === d.source_url ? { ...x, already_registered: true, module_id: result.id, enabled: false } : x
+      ) : prev)
+
+      if (result.manifest_warning) {
+        setError(`Module registered (inactive). Manifest warning: ${result.manifest_warning}`)
+      } else {
+        const botCount = result.bots_seeded ?? 0
+        setError(`✓ "${result.name}" registered as inactive.${botCount > 0 ? ` ${botCount} bot(s) seeded.` : ''}`)
+      }
     } catch (err) {
       setError(String(err))
+    } finally {
+      setAddingDiscoveredUrl(null)
     }
   }
 
@@ -79,20 +124,22 @@ export default function Modules() {
   async function handlePageToggle(page: PageConfig) {
     try {
       await pagesService.patchPageConfig(page.route, { enabled: !page.enabled })  // PATCH so only enabled changes
-      await refetchPages()  // invalidate the useGet cache so the toggle reflects immediately
+      await refetchPages()
     } catch (err) {
       setError(String(err))
     }
   }
 
   async function handleEnableDiscovered(d: DiscoveredModule) {
-    if (!d.module_id) return                                                     // guard: already_registered must have a module_id set
+    if (!d.module_id) return  // guard: already_registered must have a module_id set
     try {
       const existing = modules.find(m => m.id === d.module_id)
-      if (!existing) return  // bail if SettingsContext hasn't loaded the module yet
-      await settingsService.updateModule(d.module_id, { ...existing, enabled: true })  // re-enable without changing any other fields
+      if (!existing) return
+      await settingsService.updateModule(d.module_id, { ...existing, enabled: true })
       await refreshModules()
-      setDiscovered(prev => prev ? prev.map(x => x.source_url === d.source_url ? { ...x, enabled: true } : x) : prev)  // optimistic panel update so the Enable button disappears immediately
+      setDiscovered(prev => prev ? prev.map(x =>
+        x.source_url === d.source_url ? { ...x, enabled: true } : x
+      ) : prev)  // optimistic panel update so the Enable button disappears immediately
     } catch (err) {
       setError(String(err))
     }
@@ -107,7 +154,7 @@ export default function Modules() {
           <Tabs
             tabs={TABS}
             active={activeTab}
-            onChange={key => { setActiveTab(key as TabKey); setError(null) }}  // clear error when switching tabs so stale messages don't bleed across
+            onChange={key => { setActiveTab(key as TabKey); setError(null) }}  // clear error when switching tabs
           />
         </div>
 
@@ -123,38 +170,29 @@ export default function Modules() {
               modules={modules}
               discovered={discovered}
               scanning={scanning}
+              addingDiscoveredUrl={addingDiscoveredUrl}
               onAdd={() => setModal('add')}
-              onEdit={m => setModal(m)}
-              onDelete={handleDelete}
               onToggle={handleToggle}
-              onLogs={m => setLogsModule(m)}
               onScan={scanModules}
               onClearDiscovered={() => setDiscovered(null)}
               onEnableDiscovered={handleEnableDiscovered}
-              onAddDiscovered={prefill => setModal({ prefill })}
+              onAddDiscovered={handleAddDiscovered}
             />
           )}
         </div>
       </div>
 
-      {modal && (
+      {modal === 'add' && (
         <ModuleModal
-          initial={modal === 'add' ? undefined : 'prefill' in modal ? modal.prefill : modal}
-          moduleId={modal !== 'add' && typeof modal === 'object' && 'id' in modal ? modal.id : undefined}
-          title={modal !== 'add' && typeof modal === 'object' && 'prefill' in modal ? 'Add module' : undefined}
           onSave={handleSave}
           onClose={() => setModal(null)}
         />
-      )}
-
-      {logsModule && (
-        <ModuleLogsDrawer module={logsModule} onClose={() => setLogsModule(null)} />
       )}
     </div>
   )
 }
 
-// ── Native pages tab ─────────────────────────────────────────────────────────
+// ── Native pages tab ──────────────────────────────────────────────────────────
 
 interface NativePagesTabProps {
   pages: PageConfig[]
@@ -180,13 +218,13 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
           key: 'route',
           header: 'Route',
           className: 'font-mono text-slate-500 dark:text-slate-400',
-          cell: page => `/${page.route || ''}`, // dashboard route is the empty string — prefix slash makes it readable
+          cell: page => `/${page.route || ''}`,  // dashboard route is the empty string — prefix slash makes it readable
         },
         {
           key: 'component_key',
           header: 'Component key',
           className: 'font-mono text-slate-500 dark:text-slate-400',
-          cell: page => page.component_key ?? '—', // null for federation pages that don't use a component_key
+          cell: page => page.component_key ?? '—',  // null for federation pages
         },
         {
           key: 'roles',
@@ -194,7 +232,7 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
           cell: page => (
             <div className="flex gap-1 flex-wrap">
               {page.roles.map(r => (
-                <Badge key={r} variant="neutral">{r}</Badge> // one badge per role; neutral colour avoids semantic noise
+                <Badge key={r} variant="neutral">{r}</Badge>
               ))}
             </div>
           ),
@@ -204,7 +242,7 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
           header: 'Enabled',
           headerClassName: 'w-px',
           className: 'w-px',
-          cell: page => <Toggle checked={page.enabled} onChange={() => onToggle(page)} />, // PATCH /api/pages/config to flip enabled
+          cell: page => <Toggle checked={page.enabled} onChange={() => onToggle(page)} />,
         },
         {
           key: 'navigate',
@@ -217,27 +255,24 @@ function NativePagesTab({ pages, onToggle }: NativePagesTabProps) {
   )
 }
 
-// ── Federation tab ───────────────────────────────────────────────────────────
+// ── Federation tab ────────────────────────────────────────────────────────────
 
 interface FederationTabProps {
   modules: ModuleConfig[]
   discovered: DiscoveredModule[] | null
   scanning: boolean
+  addingDiscoveredUrl: string | null
   onAdd: () => void
-  onEdit: (m: ModuleConfig) => void
-  onDelete: (id: string) => void
   onToggle: (m: ModuleConfig) => void
-  onLogs: (m: ModuleConfig) => void
   onScan: () => void
   onClearDiscovered: () => void
   onEnableDiscovered: (d: DiscoveredModule) => void
-  onAddDiscovered: (prefill: Omit<ModuleConfig, 'id'>) => void
+  onAddDiscovered: (d: DiscoveredModule) => Promise<void>
 }
 
 function FederationTab({
-  modules, discovered, scanning,
-  onAdd, onEdit, onDelete, onToggle, onLogs,
-  onScan, onClearDiscovered, onEnableDiscovered, onAddDiscovered,
+  modules, discovered, scanning, addingDiscoveredUrl,
+  onAdd, onToggle, onScan, onClearDiscovered, onEnableDiscovered, onAddDiscovered,
 }: FederationTabProps) {
   const navigate = useNavigate()
 
@@ -249,29 +284,15 @@ function FederationTab({
         empty={<p className="text-sm text-slate-500">No federation modules configured yet.</p>}
         columns={[
           {
-            key: 'module',
-            header: 'Module',
+            key: 'scope',
+            header: 'Scope',
             cell: m => (
               <>
                 <span className="mr-2">{m.icon}</span>
                 <span className="font-medium text-slate-800 dark:text-white">{m.name}</span>
-                {m.description && (
-                  <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">{m.description}</p>
-                )}
+                <p className="font-mono text-xs text-slate-400 dark:text-slate-500 mt-0.5">{m.scope}</p>
               </>
             ),
-          },
-          {
-            key: 'route',
-            header: 'Root slug',
-            className: 'font-mono text-slate-500 dark:text-slate-400',
-            cell: m => m.route,
-          },
-          {
-            key: 'scope',
-            header: 'Scope',
-            className: 'font-mono text-slate-500 dark:text-slate-400',
-            cell: m => m.scope,
           },
           {
             key: 'roles',
@@ -279,7 +300,7 @@ function FederationTab({
             cell: m => (
               <div className="flex gap-1 flex-wrap">
                 {m.roles.map(r => (
-                  <Badge key={r} variant="neutral">{r}</Badge> // one badge per role
+                  <Badge key={r} variant="neutral">{r}</Badge>
                 ))}
               </div>
             ),
@@ -297,19 +318,12 @@ function FederationTab({
             className: 'w-px whitespace-nowrap',
             cell: m => (
               <div className="flex gap-2">
-                <Btn variant="secondary" onClick={() => onLogs(m)}>Logs</Btn>
-                <Btn variant="secondary" onClick={() => onEdit(m)}>Edit</Btn>
-                <Btn variant="danger"    onClick={() => onDelete(m.id)}>Delete</Btn>
+                <Btn variant="secondary" onClick={() => navigate(`/admin/modules/${m.scope}`)}>Edit</Btn>
+                {m.route && (
+                  <Btn variant="secondary" onClick={() => navigate(`/modules/${m.id}`)}>▶</Btn>
+                )}
               </div>
             ),
-          },
-          {
-            key: 'navigate',
-            headerClassName: 'w-px',
-            className: 'w-px',
-            cell: m => m.route ? (
-              <Btn variant="secondary" onClick={() => navigate(`/modules/${m.id}`)}>▶</Btn>
-            ) : null,
           },
         ]}
       />
@@ -321,14 +335,14 @@ function FederationTab({
         </Btn>
       </div>
 
-      {discovered !== null && (  // panel only appears after at least one scan; null hides it entirely
+      {discovered !== null && (  // panel only appears after at least one scan
         <div className="mt-2 space-y-3">
           <div className="flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-700 dark:text-slate-300">Discovered modules</h3>
             <button
               type="button"
               className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-              onClick={onClearDiscovered}  // reset to null so the panel disappears until the next scan
+              onClick={onClearDiscovered}
             >
               ✕ Clear
             </button>
@@ -338,7 +352,7 @@ function FederationTab({
           ) : (
             discovered.map(d => (
               <div
-                key={d.source_url}  // source_url is stable and unique per registry entry
+                key={d.source_url}
                 className="flex items-center gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-700"
               >
                 <span className="text-2xl shrink-0">{d.icon ?? '🧩'}</span>
@@ -352,25 +366,17 @@ function FederationTab({
                 {d.already_registered && d.enabled ? (
                   <Badge variant="success">Registered</Badge>  // already in DB and active — nothing to do
                 ) : d.already_registered && !d.enabled ? (
-                  <Btn onClick={() => onEnableDiscovered(d)}>Enable</Btn>  // in DB but disabled — allow one-click re-enable
+                  <div className="flex gap-2 items-center">
+                    <Badge variant="neutral">Inactive</Badge>
+                    <Btn onClick={() => onEnableDiscovered(d)}>Enable</Btn>  // in DB but disabled — allow one-click re-enable
+                  </div>
                 ) : (
+                  // Clicking Add fetches the manifest in the browser and registers the module as inactive
                   <Btn
-                    onClick={() =>
-                      onAddDiscovered({  // pre-fill the Add modal from manifest data; admin adjusts remote_url for env-specific URLs
-                        name:        d.name        ?? '',
-                        description: d.description ?? '',
-                        remote_url:  d.remote_url  ?? '',
-                        scope:       d.scope       ?? '',
-                        component:   d.component   ?? './App',  // MF container protocol default — matches webpack.config.js exposes entry
-                        route:       d.route       ?? '',
-                        icon:        d.icon        ?? '🧩',
-                        enabled:     true,  // new modules default to enabled so they appear in the sidebar immediately
-                        roles:       d.roles       ?? ['user', 'admin'],  // fall back to both roles when manifest omits them
-                        presets:     { i18n: {}, layout: {}, settings: {} },  // empty presets; populated from manifest on save
-                      })
-                    }
+                    disabled={addingDiscoveredUrl === d.source_url}
+                    onClick={() => onAddDiscovered(d)}
                   >
-                    Add
+                    {addingDiscoveredUrl === d.source_url ? '…' : 'Add'}
                   </Btn>
                 )}
               </div>

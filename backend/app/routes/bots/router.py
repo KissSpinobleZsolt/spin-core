@@ -46,6 +46,7 @@ def create_bot(payload: BotPayload, admin_email: str = Depends(admin_dep)):
         modules=payload.modules,
         created_by=admin_email,  # record which admin created this bot
         config_schema=payload.config_schema,
+        owner=admin_email,  # owner mirrors creator at creation time
     )
     get_logger().bot(  # log the creation event for audit trail
         BotEvent.INIT, bot.name, admin_email,
@@ -96,6 +97,7 @@ def update_bot(bot_id: str, payload: BotPayload, email: str = Depends(admin_dep)
         restricted=payload.restricted,
         modules=payload.modules,
         config_schema=payload.config_schema,
+        updated_by=email,  # stamp editor email on the row
     )
     if not bot:
         raise HTTPException(status_code=404, detail="Bot not found")  # guard against race condition between read and update

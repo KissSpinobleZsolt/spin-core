@@ -1,24 +1,25 @@
-import { useState } from 'react' // modal open + error state
-import { useSearchParams } from 'react-router-dom' // modal routing via ?new / ?edit / ?logs
+import { useState } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import {
   botsService, type Bot, type BotPayload, type BotType,
   settingsService, type ModuleConfig,
-} from '@services' // CRUD services
-import { useGet } from '@hooks' // data fetching
-import { Btn } from '@components/ui/button' // action buttons
-import { Badge } from '@components/ui/badge' // type badge in table
-import { Toggle } from '@components/ui/toggle' // active toggle in table
-import { Spinner } from '@components/ui/spinner' // loading indicator
-import { ErrorBanner } from '@components/ui/ErrorBanner' // error message
-import { PageTitle } from '@components/ui/PageTitle' // page heading
-import { Table, type TableColumn } from '@components/ui/Table' // data table
-import { BOT_TYPES } from '@constants/botConstants' // type label map
-import { BotModal } from './BotModal' // add/edit form modal
-import { BotLogsDrawer } from './BotLogsDrawer' // logs slide-in drawer
+} from '@services'
+import { useGet } from '@hooks'
+import { Btn } from '@components/ui/button'
+import { Badge } from '@components/ui/badge'
+import { Toggle } from '@components/ui/toggle'
+import { Spinner } from '@components/ui/spinner'
+import { ErrorBanner } from '@components/ui/ErrorBanner'
+import { PageTitle } from '@components/ui/PageTitle'
+import { Table, type TableColumn } from '@components/ui/Table'
+import { BOT_TYPES } from '@constants/botConstants'
+import { BotModal } from './BotModal'  // used only for the "+ Add bot" flow
 
-export default function BotsAdmin() { // admin page for managing all bots
-  const [searchParams, setSearchParams] = useSearchParams() // ?new / ?edit=id / ?logs=id
+export default function BotsAdmin() {
+  const [searchParams, setSearchParams] = useSearchParams()  // ?new param for add modal, ?module for filter
   const [error, setError] = useState<string | null>(null)
+  const [moduleFilter, setModuleFilter] = useState<string>(() => searchParams.get('module') ?? '')  // pre-filter from "View bots" link
+  const navigate = useNavigate()
 
   const { data: bots = [], isLoading, isError, refetch } = useGet<Bot[]>(
     ['bots-admin'],
@@ -34,51 +35,33 @@ export default function BotsAdmin() { // admin page for managing all bots
     ['modules-list'],
     () => settingsService.getModules(),
   )
-  const installedModules = allModules.filter(m => m.enabled) // only enabled modules shown in picker
+  const installedModules = allModules.filter(m => m.enabled)  // only enabled modules shown in add-bot picker
 
-  const isAdding = searchParams.has('new') // true when ?new param present
-  const editBotId = searchParams.get('edit') // bot id to edit, or null
-  const logsBotId = searchParams.get('logs') // bot id for logs drawer, or null
-  const editBot = bots.find(b => b.id === editBotId)
-  const logsBot = bots.find(b => b.id === logsBotId)
+  const filteredBots = moduleFilter
+    ? bots.filter(b => b.modules.includes(moduleFilter))
+    : bots
 
-  function closeModal() { // remove ?new / ?edit from URL
+  const isAdding = searchParams.has('new')  // true when ?new present
+
+  function closeModal() {
     const next = new URLSearchParams(searchParams)
     next.delete('new')
-    next.delete('edit')
     setSearchParams(next, { replace: true })
   }
 
-  function closeLogs() { // remove ?logs from URL
-    const next = new URLSearchParams(searchParams)
-    next.delete('logs')
-    setSearchParams(next, { replace: true })
-  }
-
-  async function handleSave(payload: BotPayload) { // create or update depending on modal mode
-    if (isAdding) {
-      await botsService.createBot(payload)
-    } else if (editBot) {
-      await botsService.updateBot(editBot.id, payload)
-    }
-    await refetch()
-    closeModal()
-  }
-
-  async function handleDelete(bot: Bot) { // confirm then delete and refresh
-    if (!confirm(`Delete "${bot.name}"?`)) return
+  async function handleCreate(payload: BotPayload) {
     try {
-      await botsService.deleteBot(bot.id)
+      await botsService.createBot(payload)
       await refetch()
+      closeModal()
     } catch (err) {
       setError(String(err))
     }
   }
 
-  async function handleToggle(bot: Bot) { // flip active flag and save immediately
+  async function handleToggle(bot: Bot) {  // inline active flip; full edits go to the detail page
     try {
-      // Spread the full bot into BotPayload; created_by and created_at are server-only.
-      const { id, created_by, created_at, ...payload } = bot
+      const { id, created_by, created_on, owner, updated_by, updated_on, ...payload } = bot
       await botsService.updateBot(id, { ...payload, active: !bot.active })
       await refetch()
     } catch (err) {
@@ -94,13 +77,18 @@ export default function BotsAdmin() { // admin page for managing all bots
         <>
           <span className="mr-2">{bot.icon}</span>
           <span className="font-medium text-slate-800 dark:text-white">{bot.name}</span>
-          {bot.description && (
-            <span className="ml-2 text-slate-400 dark:text-slate-500 text-xs truncate max-w-[160px] inline-block align-middle">
-              {bot.description}
-            </span>
-          )}
         </>
       ),
+    },
+    {
+      key: 'module',
+      header: 'Module',
+      cell: bot => {
+        const mod = allModules.find(m => bot.modules.includes(m.id))
+        return mod
+          ? <Badge variant="info">{mod.icon} {mod.name}</Badge>
+          : <span className="text-slate-400 dark:text-slate-500 text-xs italic">global</span>
+      },
     },
     {
       key: 'type',
@@ -109,32 +97,6 @@ export default function BotsAdmin() { // admin page for managing all bots
         <Badge variant={bot.type === 'communicator' ? 'info' : 'neutral'}>
           {BOT_TYPES.find(t => t.value === bot.type)?.label ?? bot.type}
         </Badge>
-      ),
-    },
-    {
-      key: 'provider',
-      header: 'Provider',
-      className: 'text-xs',
-      cell: bot => (
-        <Badge variant={bot.provider === 'anthropic' ? 'warn' : bot.provider === 'openai' ? 'success' : 'neutral'}>
-          {bot.provider ?? 'ollama'}
-        </Badge>
-      ),
-    },
-    {
-      key: 'model',
-      header: 'Model',
-      className: 'font-mono text-slate-500 dark:text-slate-400 text-xs',
-      cell: bot => bot.model || <span className="italic">default</span>,
-    },
-    {
-      key: 'created_by',
-      header: 'Created by',
-      className: 'text-slate-500 dark:text-slate-400 text-xs',
-      cell: bot => (
-        <span className="truncate max-w-[140px] block">
-          {bot.created_by || <span className="italic">system</span>}
-        </span>
       ),
     },
     {
@@ -152,9 +114,8 @@ export default function BotsAdmin() { // admin page for managing all bots
       className: 'w-px whitespace-nowrap',
       cell: bot => (
         <div className="flex gap-2">
-          <Btn variant="secondary" onClick={() => setSearchParams({ logs: bot.id })}>Logs</Btn>
-          <Btn variant="secondary" onClick={() => setSearchParams({ edit: bot.id })}>Edit</Btn>
-          <Btn variant="danger" onClick={() => handleDelete(bot)}>Delete</Btn>
+          <Btn variant="secondary" onClick={() => navigate(`/admin/bots/${bot.id}`)}>Edit</Btn>
+          <Btn variant="secondary" onClick={() => navigate(`/bots/${bot.id}`)}>Chat</Btn>
         </div>
       ),
     },
@@ -170,27 +131,54 @@ export default function BotsAdmin() { // admin page for managing all bots
 
       {!isLoading && !isError && (
         <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 p-6 space-y-4">
+
+          {allModules.length > 0 && (
+            <div className="flex items-center gap-3">
+              <label className="text-sm text-slate-500 dark:text-slate-400 shrink-0">Filter by module</label>
+              <select
+                value={moduleFilter}
+                onChange={e => setModuleFilter(e.target.value)}
+                className="text-sm rounded-lg border border-slate-200 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">All bots</option>
+                {allModules.map(m => (
+                  <option key={m.id} value={m.id}>{m.icon} {m.name}</option>
+                ))}
+              </select>
+              {moduleFilter && (
+                <button
+                  type="button"
+                  className="text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+                  onClick={() => setModuleFilter('')}
+                >
+                  ✕ Clear
+                </button>
+              )}
+            </div>
+          )}
+
           <Table
             columns={columns}
-            rows={bots}
+            rows={filteredBots}
             rowKey={bot => bot.id}
-            empty={<p className="text-sm text-slate-500 dark:text-slate-400">No bots configured yet.</p>}
+            empty={
+              moduleFilter
+                ? <p className="text-sm text-slate-500 dark:text-slate-400">No bots for this module yet. Use "Reseed bots" on the Modules page.</p>
+                : <p className="text-sm text-slate-500 dark:text-slate-400">No bots configured yet.</p>
+            }
           />
           <Btn onClick={() => setSearchParams({ new: '1' })}>+ Add bot</Btn>
         </div>
       )}
 
-      {(isAdding || editBot) && (
+      {isAdding && (
         <BotModal
-          initial={editBot}
           botTypes={botTypes}
           installedModules={installedModules}
-          onSave={handleSave}
+          onSave={handleCreate}
           onClose={closeModal}
         />
       )}
-
-      {logsBot && <BotLogsDrawer bot={logsBot} onClose={closeLogs} />}
     </div>
   )
 }

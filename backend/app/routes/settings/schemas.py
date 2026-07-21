@@ -9,6 +9,12 @@ class ThemePayload(BaseModel):
     theme: Literal["dark", "light"]  # the new platform default theme; constrained to the two valid values
 
 
+class ReseedBotsPayload(BaseModel):
+    """Optional request body for the reseed-bots endpoint."""
+
+    bots: Optional[list[dict]] = None  # bot definitions pre-fetched by the browser; skips the server-side manifest fetch when provided
+
+
 class DiscoveredModule(BaseModel):
     """Metadata returned when probing a remote module registry URL."""
 

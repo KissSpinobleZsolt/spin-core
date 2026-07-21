@@ -26,7 +26,7 @@ export default function Sidebar() {
 
   const NAV_ITEMS = [
     {
-      label: systemModule?.name ?? t('nav.dashboard'),
+      label: t('nav.dashboard'),
       to: '/',
       end: true,
       icon: dashboardIcon,
@@ -164,7 +164,7 @@ export default function Sidebar() {
                 collapsed={collapsed}
               />
               <NavItem
-                to="/bots-admin"
+                to="/admin/bots"
                 icon={
                   <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -205,7 +205,7 @@ export default function Sidebar() {
                   collapsed={collapsed}
                 />
                 <NavItem
-                  to="/logs"
+                  to="/admin/logs"
                   icon={
                     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}

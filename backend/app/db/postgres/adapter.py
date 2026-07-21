@@ -66,8 +66,10 @@ class PostgresAdapter:
         hashed_password: str,
         roles: list[str],
         default_theme: str,
+        created_by: str = "system",  # email of the admin who created this user, or 'system' for seeded users
     ) -> UserRecord:
         """Insert a new user row and return the resulting UserRecord."""
+        owner = created_by or "system"  # owner mirrors created_by at creation time
         with self._session_ctx() as db:
             row = UserRow(
                 email=email,
@@ -75,10 +77,18 @@ class PostgresAdapter:
                 hashed_password=hashed_password,
                 roles=roles,
                 default_theme=default_theme,
+                owner=owner,
+                created_by=owner,
             )
             db.add(row)    # stage the new row for insert
             db.commit()    # flush and commit; auto-increment id is assigned by the DB
-            return UserRecord(email=email, name=name, hashed_password=hashed_password, roles=roles, default_theme=default_theme)  # construct from local vars; avoids a round-trip refresh
+            db.refresh(row)  # reload server-set fields (created_on)
+            return UserRecord(
+                email=email, name=name, hashed_password=hashed_password,
+                roles=roles, default_theme=default_theme,
+                owner=owner, created_by=owner,
+                created_on=row.created_on,
+            )
 
     def update_user_theme(self, email: str, theme: str) -> None:
         """Update the stored default_theme preference for a user by email."""
@@ -104,12 +114,16 @@ class PostgresAdapter:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()  # look up the page by its logical key
             return row.content if row else None  # return the raw content string or None if the key is absent
 
-    def upsert_page(self, key: str, content: str) -> None:
+    def upsert_page(self, key: str, content: str, updated_by: str | None = None) -> None:
         """Insert or update the page_responses row for the given key."""
+        from datetime import datetime
         with self._session_ctx() as db:
             row = db.query(PageRow).filter(PageRow.page_key == key).first()  # check for an existing row before deciding insert vs update
             if row:
                 row.content = content  # update in-place; SQLAlchemy tracks the change
+                if updated_by:
+                    row.updated_by = updated_by
+                    row.updated_on = datetime.utcnow()
             else:
                 db.add(PageRow(page_key=key, content=content))  # no existing row; insert a new one
             db.commit()  # flush the change to the DB
@@ -139,9 +153,11 @@ class PostgresAdapter:
             restricted=row.restricted or "user",
             modules=list(row.modules or []),
             created_by=row.created_by or "",
-            # Same guard as `provider` above — pre-migration rows may have NULL before the ALTER TABLE commits.
             config_schema=dict(row.config_schema) if row.config_schema else {},
-            created_at=row.created_at,
+            owner=row.owner or "system",
+            updated_by=row.updated_by or None,
+            created_on=row.created_on,   # renamed from created_at via pg_migrations
+            updated_on=row.updated_on,   # None until first explicit edit
         )
 
     def _bot_type_row_to_dict(self, row: BotTypeRow) -> dict:
@@ -157,6 +173,11 @@ class PostgresAdapter:
             "output_format": row.output_format or "markdown",
             "default_model": row.default_model or "",
             "context_strategy": row.context_strategy or "conversational",
+            "owner": row.owner or "system",
+            "created_by": row.created_by or "system",
+            "updated_by": row.updated_by,
+            "created_on": row.created_on,
+            "updated_on": row.updated_on,
         }
 
     def get_bots(self, admin: bool = False, user_roles: list[str] | None = None) -> list[BotRecord]:
@@ -165,7 +186,7 @@ class PostgresAdapter:
             q = db.query(BotRow)
             if not admin:
                 q = q.filter(BotRow.active == True)  # non-admins only see bots with active=True
-            rows = q.order_by(BotRow.created_at).all()  # stable chronological order
+            rows = q.order_by(BotRow.created_on).all()  # stable chronological order
             if admin:
                 return [self._bot_row_to_record(r) for r in rows]  # admins see every bot regardless of restricted flag
             result = []
@@ -181,7 +202,7 @@ class PostgresAdapter:
             rows = (
                 db.query(BotRow)
                 .filter(BotRow.active == True, BotRow.modules.contains([module_id]))  # Postgres ARRAY @> operator checks membership
-                .order_by(BotRow.created_at)  # stable chronological order
+                .order_by(BotRow.created_on)  # stable chronological order
                 .all()
             )
             result = []
@@ -230,6 +251,7 @@ class PostgresAdapter:
                 modules=[module_id],
                 created_by=created_by,
                 config_schema=bot.get("config_schema") or {},
+                owner=created_by or "system",  # owner mirrors creator; 'system' for manifest-seeded bots
             )
             new_bots.append(record)  # track for log emission by the caller
             print(f"[spin-core] Provisioned bot '{name}' for module {module_id}", file=sys.stderr)  # log to stderr so it appears in Docker logs
@@ -243,6 +265,8 @@ class PostgresAdapter:
 
     def upsert_bot_type(self, data: dict) -> dict:
         """Insert or update a bot type by name and return the resulting dict."""
+        from datetime import datetime
+        owner = data.get("owner") or data.get("created_by") or "system"  # owner mirrors creator for seed rows
         with self._session_ctx() as db:
             row = db.query(BotTypeRow).filter(BotTypeRow.name == data["name"]).first()
             if not row:
@@ -257,6 +281,8 @@ class PostgresAdapter:
                     output_format=data.get("output_format", "markdown"),
                     default_model=data.get("default_model", ""),
                     context_strategy=data.get("context_strategy", "conversational"),
+                    owner=owner,
+                    created_by=owner,
                 )
                 db.add(row)
             else:
@@ -268,6 +294,9 @@ class PostgresAdapter:
                 row.output_format = data.get("output_format", row.output_format)
                 row.default_model = data.get("default_model", row.default_model)
                 row.context_strategy = data.get("context_strategy", row.context_strategy)
+                if data.get("updated_by"):
+                    row.updated_by = data["updated_by"]
+                    row.updated_on = datetime.utcnow()
             db.commit()
             db.refresh(row)
             return self._bot_type_row_to_dict(row)
@@ -292,8 +321,10 @@ class PostgresAdapter:
         modules: list[str],
         created_by: str = "",
         config_schema: dict | None = None,
+        owner: str = "",  # defaults to created_by when empty; 'system' for seeded bots
     ) -> BotRecord:
         """Insert a new bot row and return the resulting BotRecord."""
+        effective_owner = owner or created_by or "system"  # owner = creator at creation time
         with self._session_ctx() as db:
             row = BotRow(
                 id=str(uuid.uuid4()),  # generate a fresh UUID as the primary key
@@ -311,10 +342,11 @@ class PostgresAdapter:
                 modules=modules,
                 created_by=created_by,
                 config_schema=config_schema or {},  # default to empty dict if caller passes None
+                owner=effective_owner,
             )
             db.add(row)     # stage the insert
             db.commit()     # persist to the DB
-            db.refresh(row)  # reload server-set fields (created_at, updated_at)
+            db.refresh(row)  # reload server-set fields (created_on, updated_on)
             return self._bot_row_to_record(row)  # convert to the database-agnostic BotRecord
 
     def update_bot(
@@ -331,8 +363,10 @@ class PostgresAdapter:
         restricted: str,
         modules: list[str],
         config_schema: dict | None = None,
+        updated_by: str = "",  # email of the admin performing the update
     ) -> BotRecord | None:
         """Update an existing bot by ID and return the updated BotRecord, or None if not found."""
+        from datetime import datetime
         with self._session_ctx() as db:
             row = db.query(BotRow).filter(BotRow.id == bot_id).first()  # locate the row to update
             if not row:
@@ -351,8 +385,11 @@ class PostgresAdapter:
             # must not silently clobber the manifest-seeded schema.
             if config_schema is not None:  # None means "leave existing schema unchanged"
                 row.config_schema = config_schema
+            if updated_by:
+                row.updated_by = updated_by
+                row.updated_on = datetime.utcnow()  # explicit write; not relying solely on onupdate
             db.commit()      # persist all mutations
-            db.refresh(row)  # reload server-set fields (updated_at)
+            db.refresh(row)  # reload server-set fields (updated_on)
             return self._bot_row_to_record(row)  # convert to the database-agnostic BotRecord
 
     def delete_bot(self, bot_id: str) -> bool:
@@ -385,6 +422,12 @@ class PostgresAdapter:
             "presets": row.presets or {"i18n": {}, "layout": {}, "settings": {}},
             "backend_url": row.backend_url or None,
             "subscription": row.subscription or "",
+            "configuration_raw": row.configuration_raw,  # None when no manifest was fetched at registration time
+            "owner": row.owner or "system",
+            "created_by": row.created_by or "system",
+            "updated_by": row.updated_by,
+            "created_on": row.created_on,
+            "updated_on": row.updated_on,
         }
 
     def get_modules(self, enabled_only: bool = False, user_roles: list[str] | None = None) -> list[dict]:
@@ -423,6 +466,8 @@ class PostgresAdapter:
 
     def upsert_module(self, data: dict) -> dict:
         """Insert or update by scope — used for seeding and migration."""
+        from datetime import datetime
+        owner = data.get("owner") or data.get("created_by") or "system"  # owner mirrors creator for seed rows
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.scope == data["scope"]).first()
             if row:
@@ -439,6 +484,11 @@ class PostgresAdapter:
                     row.backend_url = data["backend_url"] or None
                 if "subscription" in data:
                     row.subscription = data["subscription"]
+                if "configuration_raw" in data:
+                    row.configuration_raw = data["configuration_raw"] or None
+                if data.get("updated_by"):
+                    row.updated_by = data["updated_by"]
+                    row.updated_on = datetime.utcnow()
             else:
                 row = ModuleRow(
                     id=data.get("id") or str(uuid.uuid4()),
@@ -455,6 +505,9 @@ class PostgresAdapter:
                     presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
                     backend_url=data.get("backend_url") or None,
                     subscription=data.get("subscription", ""),
+                    configuration_raw=data.get("configuration_raw") or None,  # manifest snapshot; None for seed modules
+                    owner=owner,
+                    created_by=owner,
                 )
                 db.add(row)
             db.commit()
@@ -463,6 +516,7 @@ class PostgresAdapter:
 
     def create_module(self, data: dict) -> dict:
         """Insert a new module row and return its dict representation."""
+        owner = data.get("owner") or data.get("created_by") or "system"  # owner = creator at creation time
         with self._session_ctx() as db:
             row = ModuleRow(
                 id=str(uuid.uuid4()),
@@ -478,14 +532,18 @@ class PostgresAdapter:
                 presets=data.get("presets", {"i18n": {}, "layout": {}, "settings": {}}),
                 backend_url=data.get("backend_url") or None,
                 subscription=data.get("subscription", ""),
+                configuration_raw=data.get("configuration_raw") or None,  # full manifest snapshot; None when not provided
+                owner=owner,
+                created_by=owner,
             )
             db.add(row)
             db.commit()
             db.refresh(row)
             return self._module_row_to_dict(row)
 
-    def update_module(self, module_id: str, data: dict) -> dict | None:
+    def update_module(self, module_id: str, data: dict, updated_by: str = "") -> dict | None:
         """Update a module by ID and return the updated dict, or None if not found."""
+        from datetime import datetime
         with self._session_ctx() as db:
             row = db.query(ModuleRow).filter(ModuleRow.id == module_id).first()
             if not row:
@@ -501,6 +559,12 @@ class PostgresAdapter:
             row.presets = data.get("presets", row.presets)
             if "backend_url" in data:
                 row.backend_url = data["backend_url"] or None
+            if "configuration_raw" in data:
+                row.configuration_raw = data["configuration_raw"] or None  # explicit None clears the snapshot
+            effective_updater = updated_by or data.get("updated_by", "")
+            if effective_updater:
+                row.updated_by = effective_updater
+                row.updated_on = datetime.utcnow()
             db.commit()
             db.refresh(row)
             return self._module_row_to_dict(row)
@@ -542,9 +606,9 @@ class PostgresAdapter:
             row = db.query(TranslationRow).filter(TranslationRow.lang == lang).first()  # check for an existing row
             if row:
                 row.data = data                        # replace the full JSON blob
-                row.updated_at = datetime.utcnow()    # bump the timestamp for version tracking
+                row.updated_on = datetime.utcnow()    # bump the timestamp for version tracking
             else:
-                db.add(TranslationRow(lang=lang, data=data, updated_at=datetime.utcnow()))  # first-time insert for this language
+                db.add(TranslationRow(lang=lang, data=data, updated_on=datetime.utcnow()))  # first-time insert for this language
             db.commit()  # persist the change
 
     def merge_i18n_data(self, lang: str, defaults: dict) -> None:
@@ -555,9 +619,9 @@ class PostgresAdapter:
     def get_i18n_versions(self) -> dict[str, str]:
         """Return a mapping of language code to ISO-formatted last-updated timestamp."""
         with self._session_ctx() as db:
-            rows = db.query(TranslationRow.lang, TranslationRow.updated_at).all()  # select only two columns; avoids loading the large data JSON
+            rows = db.query(TranslationRow.lang, TranslationRow.updated_on).all()  # select only two columns; avoids loading the large data JSON
             return {
-                r.lang: r.updated_at.isoformat() if r.updated_at else ""  # empty string for rows with no timestamp
+                r.lang: r.updated_on.isoformat() if r.updated_on else ""  # empty string for rows with no timestamp
                 for r in rows
             }
 
@@ -704,6 +768,8 @@ class PostgresAdapter:
                     roles=data.get("roles", []),
                     skeleton=data.get("skeleton", {}),
                     enabled=data.get("enabled", True),
+                    owner="system",      # all registry entries are system-seeded at startup
+                    created_by="system",
                 )
                 db.add(row)    # stage the insert
                 db.commit()    # persist; no refresh needed since caller doesn't use the returned row

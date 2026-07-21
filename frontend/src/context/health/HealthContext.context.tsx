@@ -1,31 +1,17 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { healthService } from '@services'
+import type { ReactNode } from 'react'
+import { useHealthQuery } from '../../hooks/health'
 import type { HealthState } from './HealthState.type'
 
-/** Default health state before the first check completes. */
-const DEFAULT: HealthState = {
-  api: true,
-  postgres: true,
-  clickhouse: true,
-  checkedAt: null,
-}
+const DEFAULT: HealthState = { api: true, postgres: true, clickhouse: true, checkedAt: null }
 
-const HealthContext = createContext<HealthState>(DEFAULT)
-
-/** Runs a background health-check worker and provides real-time service status. */
+// HealthProvider is now a no-op passthrough — health is fetched via TanStack Query (useHealthQuery).
+// Kept so AuthGuard import doesn't break during the transition.
 export function HealthProvider({ children }: { children: ReactNode }) {
-  const [health, setHealth] = useState<HealthState>(DEFAULT)
-
-  useEffect(() => {
-    return healthService.startWorker(payload => {
-      setHealth({ ...payload, checkedAt: new Date() })
-    })
-  }, [])
-
-  return <HealthContext.Provider value={health}>{children}</HealthContext.Provider>
+  return <>{children}</>
 }
 
-/** Returns the latest service health state; must be inside HealthProvider. */
+/** Returns the latest service health state. Delegates to useHealthQuery. */
 export function useHealth(): HealthState {
-  return useContext(HealthContext)
+  const { data } = useHealthQuery()
+  return data ? { ...data, checkedAt: new Date() } : DEFAULT
 }

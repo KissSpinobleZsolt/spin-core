@@ -2,9 +2,9 @@
 export const ROUTE_KEYS: Record<string, string> = {
   '/': 'nav.dashboard',
   '/bots': 'nav.bots',
-  '/logs': 'nav.logs',
+  '/admin/logs': 'nav.logs',
   '/translations': 'nav.translations',
-  '/bots-admin': 'nav.botsAdmin',
+  '/admin/bots': 'nav.botsAdmin',
   '/admin/llms': 'nav.llms',
   '/admin/users': 'nav.users',
   '/admin/modules': 'nav.modules',

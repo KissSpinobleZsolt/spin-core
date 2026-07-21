@@ -1,12 +1,12 @@
-import { useThemeStore } from '@store'
+import { useUIStore } from '@store'
 import type { ThemeContextValue } from './ThemeContextValue.type'
 
-// ThemeProvider removed — theme state is now a Zustand store (src/store/theme.store.ts).
-// useTheme() is kept here as a thin adapter so existing consumers (Header, etc.) need no changes.
+// ThemeProvider removed — theme state lives in useUIStore (ui.store.ts).
+// useTheme() is kept as a thin adapter so existing consumers need no changes.
 
 /** Returns the current theme and a setter that persists to localStorage and the backend. */
 export function useTheme(): ThemeContextValue {
-  const theme = useThemeStore(s => s.theme)        // subscribe to theme slice only; re-renders when theme changes
-  const setTheme = useThemeStore(s => s.setTheme)  // stable function reference; subscribing separately avoids an object allocation per render
+  const theme = useUIStore(s => s.theme)
+  const setTheme = useUIStore(s => s.setTheme)
   return { theme, setTheme }
 }

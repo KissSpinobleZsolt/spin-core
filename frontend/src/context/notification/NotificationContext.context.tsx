@@ -1,48 +1,17 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
-import { notificationService } from '@services'
-import { useAuth } from '../auth'
+import type { ReactNode } from 'react'
+import { useNotificationStore } from '@store'
 import type { NotificationContextValue } from './NotificationContextValue.type'
-import { MAX_BUFFERED } from './MAX_BUFFERED.constant'
 
-const NotificationContext = createContext<NotificationContextValue>({
-  notifications: [],
-  unreadCount: 0,
-  markAllRead: () => {},
-})
-
+// NotificationProvider is now a no-op passthrough — state lives in useNotificationStore (Zustand).
+// The WebSocket is opened by useBootstrap() in AuthGuard after login.
 export function NotificationProvider({ children }: { children: ReactNode }) {
-  const { user } = useAuth()
-  const [notifications, setNotifications] = useState<NotificationContextValue['notifications']>([])
-  const [unreadCount, setUnreadCount] = useState(0)
-
-  useEffect(() => {
-    if (!user) return
-
-    const token = localStorage.getItem('token') ?? ''
-    notificationService.connect(token)
-
-    const unsub = notificationService.subscribe((batch) => {
-      setNotifications(prev => [...batch, ...prev].slice(0, MAX_BUFFERED)) // Cap list to avoid unbounded growth
-      setUnreadCount(c => c + batch.length)
-    })
-
-    return () => {
-      unsub()
-      notificationService.disconnect()
-    }
-  }, [user])
-
-  function markAllRead() {
-    setUnreadCount(0)
-  }
-
-  return (
-    <NotificationContext.Provider value={{ notifications, unreadCount, markAllRead }}>
-      {children}
-    </NotificationContext.Provider>
-  )
+  return <>{children}</>
 }
 
+/** Returns notification list, unread count, and markAllRead action. Delegates to useNotificationStore. */
 export function useNotifications(): NotificationContextValue {
-  return useContext(NotificationContext)
+  const notifications = useNotificationStore(s => s.notifications)
+  const unreadCount = useNotificationStore(s => s.unreadCount)
+  const markAllRead = useNotificationStore(s => s.markAllRead)
+  return { notifications, unreadCount, markAllRead }
 }

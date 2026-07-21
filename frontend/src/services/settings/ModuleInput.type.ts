@@ -13,4 +13,5 @@ export interface ModuleInput {
   roles: string[]
   presets: ModulePresets
   backend_url?: string
+  configuration_raw?: Record<string, unknown> | null  // full manifest forwarded at registration; stored as snapshot
 }

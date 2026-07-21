@@ -107,7 +107,7 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Modules (discovery) | `MODULE_REGISTRY_URLS` is set | new scopes inserted; existing admin edits never overwritten |
 | Module i18n (discovery / manual create) | manifest contains `i18n` key | stored in `module.presets.i18n` snapshot; merged into `translations` table immediately |
 | Module bots (discovery) | new scope registered via discovery and manifest contains `bots` | `[spin-core] Provisioned bot '…' for module …` (idempotent — name+module_id guard) |
-| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning + i18n merge; best-effort (failure does not fail the create response) |
+| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning + i18n merge; failure does not fail the create response but `manifest_warning` is set in the response body so the frontend can surface it. Use `POST /api/settings/modules/{id}/reseed-bots` to retry. |
 | Bot ClickHouse tables | bot provisioned from manifest (discovery or manual create) | `bot_logs` table ensured (shared table; `bot_name` column scopes rows per bot); also ensured for all existing bots at every startup |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
@@ -172,11 +172,12 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 | `GET` | `/api/settings/modules` | List registered modules (from PostgreSQL) |
 | `POST` | `/api/settings/modules` | Create a module (provisions ClickHouse log tables; fetches manifest to auto-create module bots, load `i18n`, and set `backend_url`) |
 | `POST` | `/api/settings/modules/{id}/reset-i18n` | Re-merge the i18n snapshot stored in `module.presets.i18n` back into the translations table |
+| `POST` | `/api/settings/modules/{id}/reseed-bots` | Re-fetch the module's `manifest.json` and seed any bots declared in it; skips already-provisioned bots (idempotent). Returns `{ bots_seeded, message }`. Raises 502 if the manifest is unreachable. |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
 | `DELETE` | `/api/settings/modules/{id}` | Delete a module |
 | `GET` | `/api/settings/modules/discover` | Scan `MODULE_REGISTRY_URLS` for `manifest.json` — returns discovered modules with `already_registered` flag. Modules defined in `data/seed.json` are always appended to the results (with `source_url: "seed"`) so built-in modules remain re-discoverable even when their server is offline or the module was deleted from the DB. |
 
-**Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`), `backend_url` (nullable — URL of the module's own backend service; enables the plugin proxy).
+**Module fields** (stored in `modules` table): `id`, `name`, `description`, `remote_url`, `scope` (unique), `component`, `route`, `icon`, `enabled`, `roles`, `presets` (JSON — `{i18n, layout, settings}`), `backend_url` (nullable — URL of the module's own backend service; enables the plugin proxy), `configuration_raw` (nullable JSON — full `manifest.json` snapshot stored at registration time; used by the config panel and reseed endpoint without re-fetching).
 
 ### Logs (admin)
 
