@@ -50,7 +50,7 @@ export default function BotDetail() {
 
   async function handleSave(payload: BotPayload) {
     try {
-      await botsService.updateBot(bot.id, payload)
+      await botsService.updateBot(bot!.id, payload)
       await refetch()
       setEditOpen(false)
     } catch (err) {
@@ -59,9 +59,9 @@ export default function BotDetail() {
   }
 
   async function handleDelete() {
-    if (!confirm(`Delete "${bot.name}"? This cannot be undone.`)) return
+    if (!confirm(`Delete "${bot!.name}"? This cannot be undone.`)) return
     try {
-      await botsService.deleteBot(bot.id)
+      await botsService.deleteBot(bot!.id)
       navigate('/admin/bots')
     } catch (err) {
       setError(String(err))
@@ -70,8 +70,8 @@ export default function BotDetail() {
 
   async function handleToggle() {
     try {
-      const { id: _id, created_by, created_on, owner, updated_by, updated_on, ...payload } = bot
-      await botsService.updateBot(bot.id, { ...payload, active: !bot.active })
+      const { id: _id, created_by, created_on, owner, updated_by, updated_on, ...payload } = bot!
+      await botsService.updateBot(bot!.id, { ...payload, active: !bot!.active })
       await refetch()
     } catch (err) {
       setError(String(err))
