@@ -49,6 +49,43 @@ bash scripts/k8s-deploy.sh     # apply manifests + wait for rollouts
 IMAGE_TAG=abc1234 bash scripts/k8s-deploy.sh
 ```
 
+## `module-push.sh`
+
+Builds and pushes Docker images for a non-core module (MF remote frontend + FastAPI backend).
+Run this before `module-deploy.sh` whenever module source changes.
+
+```bash
+bash scripts/module-push.sh anomascan
+bash scripts/module-push.sh cloud-insight-ai
+
+# Override the tag
+IMAGE_TAG=v1.2.3 bash scripts/module-push.sh anomascan
+```
+
+Pushes two images per component to `ghcr.io/kissspinoblezsolt/spin-core-<module>` and
+`ghcr.io/kissspinoblezsolt/spin-core-<module>-backend`, each tagged with `:<sha>` and `:latest`.
+Skips the backend image if the module has no `backend/` subdirectory.
+
+## `module-deploy.sh`
+
+Deploys a non-core module to Kubernetes and registers it with the core platform.
+Core must already be running (`k8s-deploy.sh` completed) before deploying modules.
+
+```bash
+bash scripts/module-deploy.sh anomascan
+bash scripts/module-deploy.sh cloud-insight-ai
+
+# One-liner: build, push, and deploy
+IMAGE_TAG=abc1234 bash scripts/module-push.sh anomascan && \
+IMAGE_TAG=abc1234 bash scripts/module-deploy.sh anomascan
+```
+
+What it does:
+1. Stamps the SHA tag into `k8s/modules/<name>/kustomization.yaml` and applies the manifests
+2. Waits for frontend and backend deployment rollouts
+3. Appends the module's in-cluster URL to `MODULE_REGISTRY_URLS` in `spin-core-config` (idempotent)
+4. Restarts the core backend so it auto-discovers the module from its `manifest.json`
+
 ## `generate-docs.sh`
 
 Generates API reference documentation for both the frontend and backend.

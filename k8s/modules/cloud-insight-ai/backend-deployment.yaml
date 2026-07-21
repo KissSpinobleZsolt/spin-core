@@ -1,0 +1,33 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloud-insight-ai-backend
+  namespace: spin-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cloud-insight-ai-backend
+  template:
+    metadata:
+      labels:
+        app: cloud-insight-ai-backend
+    spec:
+      containers:
+        - name: cloud-insight-ai-backend
+          image: ghcr.io/kissspinoblezsolt/spin-core-cloud-insight-ai-backend:latest
+          imagePullPolicy: Always  # deploy script overrides to SHA at apply time
+          ports:
+            - containerPort: 8000
+          env:
+            - name: JWT_SECRET_KEY  # shared with core — must match spin-core-secrets
+              valueFrom:
+                secretKeyRef:
+                  name: spin-core-secrets
+                  key: JWT_SECRET_KEY
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 5
