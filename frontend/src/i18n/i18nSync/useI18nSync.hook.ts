@@ -1,6 +1,6 @@
 import { useEffect, useRef } from 'react'
 import i18n from '../index'
-import { useHealth, useAuth } from '@context'
+import { useHealth } from '@context'
 import { useI18nStore } from '@store'
 import { reloadTranslations } from './reloadTranslations'
 
@@ -9,10 +9,9 @@ export function useI18nSync(): boolean {
   const setReady = useI18nStore(s => s.setReady)  // stable reference — never changes across renders
   const health = useHealth()
   const lastVersionRef = useRef<string | undefined>(undefined)  // tracks last seen translation version to detect bumps
-  const { user } = useAuth()
-  const prevUserRef = useRef(user)  // captures previous user to detect the null→non-null login transition
 
-  // Initial translation load; also subscribes to languageChanged so bundle reloads on language switch
+  // Initial translation load; Layout only mounts when authenticated so this fetch always has a token.
+  // Also subscribes to languageChanged so the bundle reloads on language switch.
   useEffect(() => {
     reloadTranslations(i18n.language)  // fetch the active language bundle on first mount
       .then(() => setReady(true))  // unblock Layout once the bundle arrives
@@ -38,15 +37,6 @@ export function useI18nSync(): boolean {
     }
     lastVersionRef.current = version  // update baseline so the next tick compares against the new version
   }, [health.translations, ready])
-
-  // Reload after login — the pre-auth fetch returned 401; retry once the token is available
-  useEffect(() => {
-    const prev = prevUserRef.current
-    prevUserRef.current = user  // advance the ref before the conditional so re-renders don't retrigger
-    if (user && !prev) {
-      reloadTranslations(i18n.language)  // null→non-null transition: fetch the authenticated bundle
-    }
-  }, [user])
 
   return ready
 }

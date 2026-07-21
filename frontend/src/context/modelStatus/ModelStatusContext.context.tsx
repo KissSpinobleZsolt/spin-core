@@ -1,20 +1,17 @@
-import { createContext, useContext, type ReactNode } from 'react'
-import { useModelStatus } from '@hooks'
+import type { ReactNode } from 'react'
+import { useModelStatusStore } from '@store'
 import type { ModelStatusContextValue } from './ModelStatusContextValue.type'
 
-const ModelStatusContext = createContext<ModelStatusContextValue>({
-  status: null,
-  dismissed: false,
-  dismiss: () => {},
-})
-
-/** Wraps useModelStatus and exposes model pull progress to the component tree. */
+// ModelStatusProvider is now a no-op passthrough — state lives in useModelStatusStore (Zustand).
+// The SSE connection is opened by useBootstrap() in AuthGuard after login.
 export function ModelStatusProvider({ children }: { children: ReactNode }) {
-  const value = useModelStatus()
-  return <ModelStatusContext.Provider value={value}>{children}</ModelStatusContext.Provider>
+  return <>{children}</>
 }
 
-/** Returns the current model status payload, dismissal state, and a dismiss callback. */
+/** Returns Ollama model download progress. Delegates to useModelStatusStore. */
 export function useModelStatusContext(): ModelStatusContextValue {
-  return useContext(ModelStatusContext)
+  const status = useModelStatusStore(s => s.status)
+  const dismissed = useModelStatusStore(s => s.dismissed)
+  const dismiss = useModelStatusStore(s => s.dismiss)
+  return { status, dismissed, dismiss }
 }

@@ -1,33 +1,13 @@
-import { createContext, useContext, useState, type ReactNode } from 'react'
-import { authService, type AuthCredentials } from '@services'
-import type { AuthContextValue } from './AuthContextValue.type'
+import type { ReactNode } from 'react'
+import { useAuthStore } from '@store'
 
-const AuthContext = createContext<AuthContextValue | null>(null)
-
-/** Provides the authenticated user and login/logout actions to the component tree. */
+// AuthProvider is now a no-op passthrough — auth state lives in useAuthStore (Zustand).
+// Kept so main.tsx import doesn't break during the transition.
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState(() => authService.getStoredUser()) // Restore session from localStorage on mount
-
-  async function login(credentials: AuthCredentials) {
-    const u = await authService.login(credentials)
-    setUser(u)
-  }
-
-  function logout() {
-    authService.logout()
-    setUser(null)
-  }
-
-  return (
-    <AuthContext.Provider value={{ user, login, logout }}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <>{children}</>
 }
 
-/** Returns the current authenticated user and auth actions; must be inside AuthProvider. */
-export function useAuth(): AuthContextValue {
-  const ctx = useContext(AuthContext)
-  if (!ctx) throw new Error('useAuth must be used inside AuthProvider')
-  return ctx
+/** Returns the current authenticated user and auth actions. Delegates to useAuthStore. */
+export function useAuth() {
+  return useAuthStore()
 }
