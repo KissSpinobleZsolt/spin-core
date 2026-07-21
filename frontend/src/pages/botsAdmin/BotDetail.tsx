@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useQueryClient } from '@tanstack/react-query'
 import { botsService, settingsService, type Bot, type BotPayload, type BotType, type ModuleConfig } from '@services'
 import { useGet } from '@hooks'
 import { Btn } from '@components/ui/button'
@@ -14,6 +15,7 @@ import { BotLogsDrawer } from './BotLogsDrawer'
 export default function BotDetail() {
   const { id } = useParams<{ id: string }>()           // bot UUID from URL
   const navigate = useNavigate()
+  const qc = useQueryClient()
 
   const { data: bot, isLoading, isError, refetch } = useGet<Bot>(
     ['bot-detail', id ?? ''],
@@ -62,6 +64,7 @@ export default function BotDetail() {
     if (!confirm(`Delete "${bot!.name}"? This cannot be undone.`)) return
     try {
       await botsService.deleteBot(bot!.id)
+      await qc.invalidateQueries({ queryKey: ['bots-admin'] })  // flush cache so the list page reflects the deletion immediately
       navigate('/admin/bots')
     } catch (err) {
       setError(String(err))
