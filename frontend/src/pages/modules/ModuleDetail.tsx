@@ -49,7 +49,8 @@ export default function ModuleDetail() {
     if (!confirm(`Delete "${module!.name}"? This cannot be undone.`)) return
     try {
       await settingsService.deleteModule(module!.id)
-      navigate('/admin/modules')  // return to list after deletion
+      await refreshModules()  // invalidate cache so the list page shows the updated state immediately
+      navigate('/admin/modules')
     } catch (err) {
       setError(String(err))
     }
