@@ -32,7 +32,7 @@ RO: dict = {  # Romanian translation strings; deep-merged into PostgreSQL transl
         "guest": "Vizitator",
     },
     "footer": {
-        "copyright": "© {{year}} AI. Toate drepturile rezervate.",
+        "copyright": "© {{year}} Accenture. Toate drepturile rezervate.",
         "status": "Toate sistemele funcționează",
     },
     "login": {

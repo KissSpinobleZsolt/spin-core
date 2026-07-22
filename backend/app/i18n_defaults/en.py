@@ -32,7 +32,7 @@ EN: dict = {  # English translation strings; deep-merged into PostgreSQL transla
         "guest": "Guest",
     },
     "footer": {
-        "copyright": "© {{year}} AI. All rights reserved.",
+        "copyright": "© {{year}} Accenture. All rights reserved.",
         "status": "All systems operational",
     },
     "login": {
