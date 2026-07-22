@@ -3,34 +3,36 @@ import React from 'react'
 import ReactDOM from 'react-dom'
 import type { FederationContainer } from './FederationContainer.type'
 
-// Tracks which remote scopes have already had their script injected — prevents double-loading.
-const loadedScripts = new Set<string>()
+// Keyed by remoteEntry URL — stores the in-flight or already-resolved Promise.
+// Sharing the same Promise across concurrent callers (e.g. React StrictMode
+// double-invocation) ensures the second caller waits for the real onload event
+// instead of resolving immediately against a script tag that is still loading.
+const pendingScripts = new Map<string, Promise<void>>()
 
 /** Inject a remote entry script into document.head, resolving when loaded. */
 function injectScript(url: string): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const existing = document.querySelector(`script[src="${url}"]`)
-    if (existing) {
-      // Only reuse the tag if the scope is already in window — a failed previous
-      // load leaves a stale tag in the DOM without setting the container global.
-      resolve()
-      return
-    }
+  if (pendingScripts.has(url)) {
+    return pendingScripts.get(url)! // return same promise to any concurrent caller
+  }
+  const p = new Promise<void>((resolve, reject) => {
     const script = document.createElement('script')
     script.src = url
     script.type = 'text/javascript'
     // async=false keeps document.currentScript set while remoteEntry.js runs so
-    // webpack's publicPath: 'auto' detects the correct host (localhost:3001) rather
+    // webpack's publicPath: 'auto' detects the correct host (localhost:300x) rather
     // than the spin-core origin.  The load is still non-blocking — the Promise
     // only resolves after the script has executed.
     script.async = false
     script.onload = () => resolve()
     script.onerror = () => {
       script.remove() // remove stale tag so the next attempt injects a fresh one
+      pendingScripts.delete(url) // allow retry after failure
       reject(new Error(`Failed to load remote entry: ${url}`))
     }
     document.head.appendChild(script)
   })
+  pendingScripts.set(url, p)
+  return p
 }
 
 /** Load a federated component from a Webpack Module Federation remote. */
@@ -45,10 +47,7 @@ export async function loadFederatedModule(
   window.React = React
   window.ReactDOM = ReactDOM
 
-  if (!loadedScripts.has(scope)) {
-    await injectScript(remoteUrl)
-    loadedScripts.add(scope)
-  }
+  await injectScript(remoteUrl) // deduplication via pendingScripts Map
 
   const container = window[scope] as FederationContainer | undefined
   if (!container) {
