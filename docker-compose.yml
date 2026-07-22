@@ -93,6 +93,7 @@ services:
       YOLO_MODELS_DIR: /app/anomascan-models
     volumes:
       - anomascan_yolo_weights:/app/anomascan-models
+      - anomascan_bot_configs:/app/data
     restart: unless-stopped
   # ────── Module AnomaScan service FE
   anomascan:
@@ -136,6 +137,8 @@ services:
       CLICKHOUSE_USER: core-ch
       CLICKHOUSE_PASSWORD: core-ch
       CLICKHOUSE_DB: core
+    volumes:
+      - cloud_insight_ai_bot_configs:/app/data
     restart: unless-stopped
 
  # ── Spin Docs module (architecture diagrams + dev docs, system role only) ────────────
@@ -221,4 +224,6 @@ volumes:
   app_data:
   ollama_data:
   anomascan_yolo_weights:
+  anomascan_bot_configs:
+  cloud_insight_ai_bot_configs:
   frontend_node_modules:
