@@ -20,8 +20,9 @@ export function ModuleBotPanel({ moduleId }: Props) {
   useEffect(() => {
     botsService.getBotsForModule(moduleId)
       .then(list => {
-        setBots(list)
-        if (list.length > 0) setSelectedBotId(list[0].id) // Auto-select first available bot
+        const communicators = list.filter(b => b.type === 'communicator') // Only show chat-capable bots
+        setBots(communicators)
+        if (communicators.length > 0) setSelectedBotId(communicators[0].id) // Auto-select first communicator
       })
       .catch(() => setBots([]))
   }, [moduleId])
