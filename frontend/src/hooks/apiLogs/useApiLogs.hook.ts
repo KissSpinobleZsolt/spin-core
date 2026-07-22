@@ -9,9 +9,10 @@ export function useApiLogs(
   timeRange: TimeRange,
   eventTypeFilter: string,
   ownerFilter: string,
+  levelFilter: string,
 ) {
   const { data, isLoading, isError } = useQuery<ApiLogsResult>({
-    queryKey: ['api-logs', page, timeRange, eventTypeFilter, ownerFilter],
+    queryKey: ['api-logs', page, timeRange, eventTypeFilter, ownerFilter, levelFilter],
     queryFn: async () => {
       const [logsResult, summaryResult] = await Promise.all([
         logsService.getLogs({
@@ -19,6 +20,7 @@ export function useApiLogs(
           offset: (page - 1) * PAGE_SIZE, // Convert 1-indexed page to offset
           event_type: eventTypeFilter || undefined,
           owner: ownerFilter || undefined,
+          level: levelFilter || undefined,
           from: timeRange.from,
           to: timeRange.to,
         }),

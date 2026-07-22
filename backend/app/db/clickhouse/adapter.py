@@ -171,6 +171,7 @@ class ClickHouseLogAdapter:
         offset: int = 0,
         event_type: str | None = None,
         owner: str | None = None,
+        level: str | None = None,
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
@@ -182,6 +183,9 @@ class ClickHouseLogAdapter:
         if owner:  # narrow to a specific user/owner when the caller filters by it
             extra_filters.append("owner = %(owner)s")
             extra_params["owner"] = owner
+        if level:  # narrow to a specific severity level (INFO, WARN, ERROR) when requested
+            extra_filters.append("level = %(level)s")
+            extra_params["level"] = level
         rows, total = self._paginated_query(
             "api_logs",
             "event_time, level, event_type, owner, path, method, status_code, duration_ms, message",
@@ -262,6 +266,7 @@ class ClickHouseLogAdapter:
         offset: int = 0,
         event_type: str | None = None,
         owner: str | None = None,
+        level: str | None = None,
         from_dt: datetime | None = None,
         to_dt: datetime | None = None,
     ) -> dict:
@@ -273,6 +278,9 @@ class ClickHouseLogAdapter:
         if owner:  # narrow to a specific user when the caller filters by it
             extra_filters.append("owner = %(owner)s")
             extra_params["owner"] = owner
+        if level:  # narrow to a specific severity level (INFO, WARN, ERROR) when requested
+            extra_filters.append("level = %(level)s")
+            extra_params["level"] = level
         rows, total = self._paginated_query(
             "user_logs",
             "event_time, level, event_type, owner, message, name, details",

@@ -4,6 +4,7 @@ export interface LogsParams {
   offset?: number
   event_type?: string
   owner?: string
+  level?: string // INFO | WARN | ERROR — filters by log severity
   from?: string
   to?: string
 }
