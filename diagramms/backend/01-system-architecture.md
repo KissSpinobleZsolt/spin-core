@@ -26,7 +26,7 @@ graph TB
 
     subgraph Modules["Module Backends (plugin pattern)"]
         MB1["data-ingestion-backend\nport 8002"]
-        MB2["vision-watch-backend\nport 8003"]
+        MB2["anomascan-backend\nport 8003"]
     end
 
     Browser -->|"REST / SSE / WebSocket"| MW

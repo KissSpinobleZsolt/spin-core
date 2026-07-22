@@ -26,10 +26,10 @@ spec:
                   name: spin-core-secrets
                   key: JWT_SECRET_KEY
             - name: YOLO_MODELS_DIR  # mounted volume for YOLO weight files
-              value: /app/vision-models
+              value: /app/anomascan-models
           volumeMounts:
             - name: yolo-models
-              mountPath: /app/vision-models
+              mountPath: /app/anomascan-models
           readinessProbe:
             httpGet:
               path: /health

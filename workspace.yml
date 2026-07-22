@@ -14,7 +14,7 @@ modules:
     backend_port: 8002
 
   - name: anomascan
-    repo: https://github.com/KissSpinobleZsolt/spi-module-vision-watch.git
-    path: modules/vision-watch
+    repo: https://github.com/KissSpinobleZsolt/spi-module-anomascan.git
+    path: modules/anomascan
     port: 3003
     backend_port: 8003

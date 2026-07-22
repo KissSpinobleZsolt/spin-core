@@ -90,9 +90,9 @@ services:
       CLICKHOUSE_USER: core-ch
       CLICKHOUSE_PASSWORD: core-ch
       CLICKHOUSE_DB: core
-      YOLO_MODELS_DIR: /app/vision-models
+      YOLO_MODELS_DIR: /app/anomascan-models
     volumes:
-      - anomascan_yolo_weights:/app/vision-models
+      - anomascan_yolo_weights:/app/anomascan-models
     restart: unless-stopped
   # ────── Module AnomaScan service FE
   anomascan:
