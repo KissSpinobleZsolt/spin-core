@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react' // filter and page state
 import { type LogEntry } from '@services' // API log entry shape
 import { Btn } from '@components/ui/button' // filter + clear buttons
 import { Input } from '@components/ui/input' // filter inputs
+import { Select } from '@components/ui/Select' // level dropdown filter
 import { StatCard } from '@components/ui/statCard' // metric cards
 import { Spinner } from '@components/ui/spinner' // loading indicator
 import { ErrorBanner } from '@components/ui/ErrorBanner' // error display
@@ -19,13 +20,15 @@ export function ApiLogsTab() { // paginated, filterable API request log table
   const [page, setPage] = useState(1)
   const [draftEvent, setDraftEvent] = useState('') // unstaged event type filter
   const [draftOwner, setDraftOwner] = useState('') // unstaged owner filter
+  const [draftLevel, setDraftLevel] = useState('') // unstaged log level filter
   const [eventTypeFilter, setEventTypeFilter] = useState('') // applied event type filter
   const [ownerFilter, setOwnerFilter] = useState('') // applied owner filter
+  const [levelFilter, setLevelFilter] = useState('') // applied log level filter
 
   // TQ refetches automatically when queryKey (timeRange) changes, but page is local state and won't reset on its own
   useEffect(() => { setPage(1) }, [timeRange])
 
-  const { logs, total, summary, isLoading, isError } = useApiLogs(page, timeRange, eventTypeFilter, ownerFilter)
+  const { logs, total, summary, isLoading, isError } = useApiLogs(page, timeRange, eventTypeFilter, ownerFilter, levelFilter)
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const totalRequests = summary.reduce((s, r) => s + r.request_count, 0) // aggregate across all hourly buckets
@@ -35,9 +38,9 @@ export function ApiLogsTab() { // paginated, filterable API request log table
     : '—'
   const errorRate = totalRequests ? ((totalErrors / totalRequests) * 100).toFixed(1) + '%' : '—'
 
-  function applyFilters() { setPage(1); setEventTypeFilter(draftEvent); setOwnerFilter(draftOwner) } // apply staged filter values
+  function applyFilters() { setPage(1); setEventTypeFilter(draftEvent); setOwnerFilter(draftOwner); setLevelFilter(draftLevel) } // apply staged filter values
   function clearFilters() { // reset all filter state
-    setDraftEvent(''); setDraftOwner(''); setPage(1); setEventTypeFilter(''); setOwnerFilter('')
+    setDraftEvent(''); setDraftOwner(''); setDraftLevel(''); setPage(1); setEventTypeFilter(''); setOwnerFilter(''); setLevelFilter('')
   }
 
   const columns: TableColumn<LogEntry>[] = [
@@ -70,6 +73,16 @@ export function ApiLogsTab() { // paginated, filterable API request log table
           onChange={e => setDraftOwner(e.target.value)}
           onKeyDown={e => e.key === 'Enter' && applyFilters()}
           placeholder="user@example.com" className="w-44" />
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-500 dark:text-slate-400 font-medium">Log type</label>{/* severity level selector */}
+          <Select value={draftLevel} onChange={setDraftLevel}
+            className="h-9 rounded-lg border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 text-sm px-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <option value="">All</option>
+            <option value="INFO">INFO</option>
+            <option value="WARN">WARN</option>
+            <option value="ERROR">ERROR</option>
+          </Select>
+        </div>
         <Btn onClick={applyFilters}>Filter</Btn>
         <Btn variant="secondary" onClick={clearFilters}>Clear</Btn>
         <span className="ml-auto text-xs text-slate-400">{total.toLocaleString()} rows · {PAGE_SIZE} per page</span>

@@ -24,6 +24,7 @@ export const logsService = {
       offset: params.offset,
       event_type: params.event_type,
       owner: params.owner,
+      level: params.level,
       from: params.from,
       to: params.to,
     })
@@ -36,6 +37,7 @@ export const logsService = {
       offset: params.offset,
       event_type: params.event_type,
       owner: params.owner,
+      level: params.level,
       from: params.from,
       to: params.to,
     })

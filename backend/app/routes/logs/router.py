@@ -16,15 +16,17 @@ async def get_logs(
     offset: int = Query(default=0, ge=0),
     event_type: Optional[str] = Query(default=None),
     owner: Optional[str] = Query(default=None),
+    level: Optional[str] = Query(default=None),
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
 ):
-    """Return paginated API request logs from ClickHouse filtered by time range, event type, and owner."""
+    """Return paginated API request logs from ClickHouse filtered by time range, event type, owner, and level."""
     return get_ch().query_api_logs(  # delegate filtering and pagination to the ClickHouse adapter
         limit=limit,
         offset=offset,
         event_type=event_type,
         owner=owner,
+        level=level,
         from_dt=from_dt,
         to_dt=to_dt,
     )
@@ -37,15 +39,17 @@ async def get_user_logs(
     offset: int = Query(default=0, ge=0),
     event_type: Optional[str] = Query(default=None),
     owner: Optional[str] = Query(default=None),
+    level: Optional[str] = Query(default=None),
     from_dt: Optional[datetime] = Query(default=None, alias="from"),
     to_dt: Optional[datetime] = Query(default=None, alias="to"),
 ):
-    """Return paginated user lifecycle logs from ClickHouse."""
+    """Return paginated user lifecycle logs from ClickHouse filtered by level."""
     return get_ch().query_user_logs(  # delegate to the ClickHouse adapter for user_logs table
         limit=limit,
         offset=offset,
         event_type=event_type,
         owner=owner,
+        level=level,
         from_dt=from_dt,
         to_dt=to_dt,
     )
