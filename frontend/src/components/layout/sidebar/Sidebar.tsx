@@ -4,6 +4,25 @@ import { ChevronLeftIcon } from './ChevronLeftIcon'
 import { ChevronRightIcon } from './ChevronRightIcon'
 import { NavItem } from './NavItem'
 import { OfflineModuleItem } from './OfflineModuleItem'
+const IMAGE_ICON_RE = /\.(webp|png|svg|jpg|jpeg|ico)$/i // extensions that indicate a file-based icon
+
+/**
+ * Renders a module icon as an <img> when the icon field is a filename or URL,
+ * or as a plain emoji <span> for backward-compatible text icons.
+ * Relative filenames are resolved against the module's remote_url base so the
+ * icon stays correct across dev / prod deployments without hardcoding a host.
+ */
+function ModuleIcon({ icon, remoteUrl }: { icon: string; remoteUrl: string }) {
+  let src: string | null = null
+  if (IMAGE_ICON_RE.test(icon) && !icon.startsWith('http') && !icon.startsWith('/')) {
+    const base = remoteUrl.replace(/\/remoteEntry\.js.*$/, '') // strip filename, keep origin + path
+    src = `${base}/${icon}`
+  } else if (icon.startsWith('http') || icon.startsWith('/')) {
+    src = icon // already a fully-qualified or root-relative URL
+  }
+  if (src) return <img src={src} alt="" className="w-5 h-5 object-contain rounded-sm" />
+  return <span className="text-base leading-none">{icon}</span> // emoji / text fallback
+}
 
 export default function Sidebar() {
   const { logout, user } = useAuth()
@@ -16,7 +35,7 @@ export default function Sidebar() {
   const systemModule = modules.find(m => m.scope === 'system') // the built-in Dashboard entry
 
   const dashboardIcon = systemModule ? (
-    <span className="text-base leading-none">{systemModule.icon}</span>
+    <ModuleIcon icon={systemModule.icon} remoteUrl={systemModule.remote_url} />
   ) : (
     <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.8}
@@ -68,12 +87,17 @@ export default function Sidebar() {
   const renderModuleGroup = (mods: typeof visibleModules) =>
     mods.map(m =>
       moduleReachability[m.id] === false ? (
-        <OfflineModuleItem key={m.id} icon={m.icon} label={m.name} collapsed={collapsed} />
+        <OfflineModuleItem
+          key={m.id}
+          icon={<ModuleIcon icon={m.icon} remoteUrl={m.remote_url} />}
+          label={m.name}
+          collapsed={collapsed}
+        />
       ) : (
         <NavItem
           key={m.id}
           to={`/modules/${m.id}`}
-          icon={<span className="text-base leading-none">{m.icon}</span>}
+          icon={<ModuleIcon icon={m.icon} remoteUrl={m.remote_url} />}
           label={m.name}
           collapsed={collapsed}
         />

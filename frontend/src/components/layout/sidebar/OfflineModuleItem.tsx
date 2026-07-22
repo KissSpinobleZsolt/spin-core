@@ -1,5 +1,7 @@
+import type { ReactNode } from 'react'
+
 /** Sidebar item rendered for a module whose remote container is unreachable. */
-export function OfflineModuleItem({ icon, label, collapsed }: { icon: string; label: string; collapsed: boolean }) {
+export function OfflineModuleItem({ icon, label, collapsed }: { icon: ReactNode; label: string; collapsed: boolean }) {
   return (
     <div
       title={collapsed ? `${label} (offline)` : undefined}
@@ -7,7 +9,7 @@ export function OfflineModuleItem({ icon, label, collapsed }: { icon: string; la
         collapsed ? 'px-0 py-2.5 justify-center' : 'px-3 py-2.5'
       } text-slate-500`}
     >
-      <span className="shrink-0 text-base leading-none">{icon}</span>
+      <span className="shrink-0 w-5 h-5 flex items-center justify-center text-base leading-none">{icon}</span>
       {!collapsed && (
         <>
           <span className="truncate flex-1">{label}</span>
