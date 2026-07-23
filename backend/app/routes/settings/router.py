@@ -63,6 +63,14 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
             module = pg.update_module(module["id"], {"presets": updated_presets}) or module
             for lang, translations in i18n_data.items():
                 pg.merge_i18n_data(lang, translations)  # deep-merge each language's translations into the DB
+        bots_data = _conf.get("bots") or manifest.get("bots") or []  # support both nested and top-level bots layout
+        if bots_data:
+            new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email)  # idempotent; bots start inactive until admin activates
+            for bot in new_bots:
+                get_logger().bot(
+                    BotEvent.INIT, bot.name, email,
+                    {"bot_id": bot.id, "module_id": module["id"], "module_scope": module["scope"]},
+                )
     except Exception as exc:
         manifest_warning = str(exc)  # surface to caller — module row is committed regardless
     return {**module, "manifest_warning": manifest_warning}
@@ -98,10 +106,14 @@ async def reseed_module_bots(module_id: str, payload: ReseedBotsPayload = Reseed
     if payload.bots is not None:
         # Step 1: caller forwarded bots from a browser-side manifest fetch (avoids Docker localhost issues)
         bots_data = payload.bots
-    elif module.get("configuration_raw") and module["configuration_raw"].get("bots"):
-        # Step 2: use the manifest snapshot stored at registration time — no network needed
-        bots_data = module["configuration_raw"]["bots"]
     else:
+        # Step 2: try the manifest snapshot stored at registration time — no network needed
+        bots_data = []
+        if module.get("configuration_raw"):
+            _raw = module["configuration_raw"]
+            _raw_conf = _raw.get("configurations") or {}  # support both nested and top-level bots layout
+            bots_data = _raw_conf.get("bots") or _raw.get("bots") or []
+    if not bots_data and payload.bots is None:
         # Step 3: server-side fallback fetch (works when module runs on the same Docker network)
         if not module.get("remote_url"):
             raise HTTPException(status_code=400, detail="Module has no remote_url — cannot fetch manifest")

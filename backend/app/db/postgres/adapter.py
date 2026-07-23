@@ -246,7 +246,7 @@ class PostgresAdapter:
                 model=bot.get("model", ""),
                 system_prompt=bot.get("system_prompt", ""),
                 icon=bot.get("icon", "🤖"),
-                active=bot.get("active", True),
+                active=False,  # manifest bots always start inactive; admin must explicitly activate
                 restricted=bot.get("restricted", "user"),
                 modules=[module_id],
                 created_by=created_by,
