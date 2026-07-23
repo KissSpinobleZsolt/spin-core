@@ -1,305 +1,68 @@
 # spin-core
 
-Full-stack platform shell with a fixed tri-database architecture, env-var-seeded admin, webpack module federation, and Kubernetes / minikube support.
+**spin-core** is a self-hosted AI platform you can run entirely on your own machine — no cloud accounts, no API keys, no data leaving your network.
 
-## Stack
-
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, TypeScript, Vite 8, Tailwind CSS v4, React Query, React Router v7, i18next |
-| Backend | FastAPI, Python 3.12, uvicorn |
-| Primary DB | PostgreSQL 16 — users, auth, modules, i18n translations, module data |
-| Log DB | ClickHouse 24 — append-only event log, 30-day TTL |
-| AI | Ollama (`qwen2.5:7b`) — local LLM, no external API keys |
-| Containers | Docker Compose (dev/prod) · Kubernetes / minikube |
-
-## Services
-
-| Service | Port | Description |
-|---------|------|-------------|
-| `frontend` | 3000 | React SPA (nginx, proxies `/api/*` to backend) |
-| `frontend-dev` | 3000 | Vite dev server with HMR |
-| `backend` | 8000 | FastAPI REST API — core platform only (no module-specific logic) |
-| `postgres` | 5432 | PostgreSQL |
-| `clickhouse` | 8123/9000 | ClickHouse HTTP + native |
-| `ollama` | 11434 | Self-hosted LLM server — pure `ollama serve`, GPU-accelerated |
-| `model-downloader` | — | One-shot job: pulls `qwen2.5:7b` + `nomic-embed-text` via Ollama API, then exits |
-| `spin-docs` | 3001 | Architecture diagrams + developer docs (system role) |
-
-All services expose Docker healthchecks. Startup order is fully enforced — dependent services wait for `service_healthy`.
-
-## WSL2 + Docker + GPU setup guide
-
-New to running Docker with an NVIDIA GPU on Windows? See **[GUIDE.md](GUIDE.md)** for a complete step-by-step walkthrough:
-
-- Part 1 — Enable WSL2
-- Part 2 — Install Docker Engine inside WSL2
-- Part 3 — NVIDIA Container Toolkit (GPU passthrough)
-- Part 4 — Run Ollama and download models
-- Part 5 — VS Code + Continue extension (free Copilot alternative)
-
-> If you already have Docker + GPU working, skip straight to Quick start below.
-
-## First-time setup
-
-### Prerequisites
-
-You do not need every tool listed below — install only what matches your chosen run mode.
-
-| Tool | Min version | Install | Required for |
-|------|------------|---------|--------------|
-| **Git** | 2.x | [git-scm.com](https://git-scm.com) | All modes |
-| **Docker + Compose** | 24 + v2 plugin | [docs.docker.com](https://docs.docker.com/get-docker/) | Docker · Prod |
-| **nvm** | — | [github.com/nvm-sh/nvm](https://github.com/nvm-sh/nvm) | Dev (frontend) |
-| **Node.js** | 20 LTS | via nvm: `nvm install 20` | Dev (frontend) |
-| **pnpm** | 9 | `npm i -g pnpm` | Dev (frontend) |
-| **Python** | 3.12 | [python.org](https://www.python.org/downloads/) | Dev (backend) |
-| **kubectl** | 1.28 | [kubernetes.io/docs/tasks/tools](https://kubernetes.io/docs/tasks/tools/) | Prod (k8s) |
-| **minikube** | 1.32 | [minikube.sigs.k8s.io](https://minikube.sigs.k8s.io/docs/start/) | Prod (local cluster) |
-
-> **GPU (optional):** Ollama runs on CPU but is significantly faster with an NVIDIA GPU. See [GUIDE.md](GUIDE.md) for WSL2 + NVIDIA Container Toolkit setup.
+It gives your team a shared space to chat with AI assistants, analyse data, and run specialised AI tools, all through a clean web interface.
 
 ---
 
-### Step 1 — Clone
+## What can you do with it?
+
+### Talk to AI bots
+Chat with AI assistants directly in the browser. Each bot can have its own personality, focus area, and role restrictions. The AI runs locally via [Ollama](https://ollama.com) — your conversations stay on your machine.
+
+### Run specialised AI modules
+Extend the platform with purpose-built modules:
+
+| Module | What it does |
+|--------|--------------|
+| **AnomaScan** | Upload images or video — YOLO object detection flags anomalies in real time |
+| **CloudInsight AI** | Upload and explore datasets; AI-assisted data analysis and management |
+| **spin-docs** | In-app architecture diagrams and developer documentation |
+
+Modules are plug-and-play — they appear in the sidebar as soon as they are registered.
+
+### Manage your team
+Create and manage users with role-based access. Control who can see which bots and modules.
+
+### See what's happening
+A live admin dashboard shows system health, running services, and AI model status. Detailed logs track every request and chat interaction.
+
+### Speak your language
+The interface supports English and Romanian out of the box, with a live translation editor so you can adjust any label without redeploying.
+
+---
+
+## Quick start
+
+> Requires Docker. One command — no other installs needed.
 
 ```bash
 git clone --recurse-submodules https://github.com/KissSpinobleZsolt/spin-core.git
 cd spin-core
-```
-
-If you already cloned without `--recurse-submodules`:
-
-```bash
-bash scripts/setup-workspace.sh
-```
-
----
-
-### Step 2 — Configure
-
-Open `docker-compose.yml` and set these values before the first run:
-
-```yaml
-ADMIN_EMAIL:    admin@spin.local   # login email
-ADMIN_PASSWORD: change-me          # login password — change before deploying
-JWT_SECRET_KEY: change-me-in-production
-```
-
-> Default credentials are intentionally weak. Change them before exposing the app on any network.
-
-To customise the seeded bots, dashboard content, or default theme, edit [`data/seed.json`](data/seed.json) before running. Changes only apply on first start (or after `docker compose down -v`).
-
----
-
-### Step 3 — Run
-
-Pick **one** of the three modes below. You do not need to run all three.
-
----
-
-#### 🐳 Docker (recommended — one command, no local installs needed)
-
-Builds and starts every service. Best for trying the full platform or running all modules.
-
-```bash
 docker compose up --build
 ```
 
-> On first run Ollama downloads `qwen2.5:7b` (~4.7 GB). This takes 15–60 min depending on your connection. Subsequent starts are instant — the model is cached in the `ollama_data` Docker volume.
+Then open **http://localhost:3000** and log in with the credentials set in `docker-compose.yml` (default: `admin@spin.local` / `change-me`).
 
-All services start in dependency order. Open **http://localhost:3000** and log in.
-
-To run a single module alongside the core (without rebuilding everything):
-
-```bash
-# Terminal 1 — core backend + infra
-docker compose up --build backend
-
-# Terminal 2 — frontend dev server
-docker compose up --build frontend-dev
-
-# Terminal 3 — one module (example: CloudInsight AI)
-cd modules/spin-docs && npm install && npm start
-```
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the full 3-terminal module dev workflow and the VSCode task shortcuts.
+On first run, Ollama downloads the default AI model (~4.7 GB). This takes 15–60 minutes depending on your connection. Subsequent starts are instant.
 
 ---
 
-#### 💻 Dev — native Python + pnpm (fastest iteration, no Docker for core)
+## Who is this for?
 
-Run each service directly on the host. Best for active backend or frontend development with instant restarts.
-
-You still need Docker for the databases and Ollama:
-
-```bash
-# Start only the infrastructure services
-docker compose up postgres clickhouse ollama
-```
-
-**Backend:**
-
-```bash
-cd backend
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8000
-```
-
-**Frontend** (in a second terminal):
-
-```bash
-cd frontend
-pnpm install
-pnpm dev        # Vite dev server on http://localhost:3000
-```
-
-The backend reads `POSTGRES_URL`, `CLICKHOUSE_URL`, and `OLLAMA_URL` from the environment. When running natively they default to `localhost` — no extra config needed if you used the docker compose infra step above.
+- **Teams** that want a private, on-premise AI assistant without sending data to external services.
+- **Developers** who want a ready-made platform shell to build and deploy custom AI modules.
+- **Organisations** with data-sensitivity requirements — everything runs inside your own infrastructure.
 
 ---
 
-#### ☸️ Prod — Kubernetes / minikube
+## Going further
 
-Deploy to a local cluster. Best for testing the production manifest before a real deployment.
-
-```bash
-# Start minikube
-minikube start --driver=docker
-
-# Copy and fill in credentials
-cp k8s/.env.example k8s/.env
-
-# Deploy
-bash scripts/k8s-deploy.sh
-```
-
-See [k8s/README.md](k8s/README.md) for the full deploy guide, secrets management, day-to-day ops, and pulling Ollama models inside the cluster.
-
----
-
-### First-time login
-
-There is no setup wizard — the admin user is seeded automatically on first backend startup.
-
-Default credentials (set in `docker-compose.yml`):
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `ADMIN_EMAIL` | `admin@spin.local` | Login email |
-| `ADMIN_PASSWORD` | `change-me` | Login password |
-
-Go to **http://localhost:3000/login** and sign in with the above credentials.
-
-To start completely fresh (wipe all data and re-seed):
-
-```bash
-docker compose down -v
-docker compose up --build
-```
-
-## Package documentation
-
-| Package | README | Description |
-|---------|--------|-------------|
-| — | [GUIDE.md](GUIDE.md) | Step-by-step: WSL2, Docker, GPU, Ollama, VS Code Continue |
-| `backend/` | [backend/README.md](backend/README.md) | API routes, env vars, architecture, local dev |
-| `frontend/` | [frontend/README.md](frontend/README.md) | Pages, context providers, module federation loader, build |
-| `data/` | [data/README.md](data/README.md) | seed.json format, fields, first-run customisation |
-| `modules/` | [modules/README.md](modules/README.md) | Module federation overview, manifest format, React singleton contract, submodule workflow |
-| `modules/spin-docs/` | [modules/README.md](modules/README.md) | Bundled MF remote — architecture diagrams + developer docs (system role) |
-| `workspace.yml` | — | Multi-repo workspace manifest (shell + module repos, ports) |
-| `k8s/` | [k8s/README.md](k8s/README.md) | Kubernetes deploy guide, secrets, day-to-day ops |
-| `scripts/` | [scripts/README.md](scripts/README.md) | restart.sh, k8s-deploy.sh usage |
-
-## Architecture overview
-
-```
-Browser
-  └─ Frontend (React 19 + Vite)
-       ├─ ChatBubble — floating widget; bot + model selectable, history in localStorage
-       ├─ /bots      — user card grid (launch any available bot into full-page chat)
-       ├─ /bots-admin — admin CRUD for bots (name, type, model, system prompt, roles)
-       ├─ /admin/llms     — pull / list / delete Ollama models
-       ├─ /admin/users    — user listing (stub)
-       ├─ /admin/modules  — module CRUD (register, edit, scan, inline log drawer)
-       ├─ /admin/status   — live system overview with clickable navigation
-       ├─ /api/*  ──►  Backend (FastAPI)
-       │                  ├─ PostgreSQL  — users, pages, bots, modules, i18n, module data
-       │                  ├─ ClickHouse  — HTTP request log (api_logs, app_logs, user_logs)
-       │                  │               per-module log table (module_logs)
-       │                  │               chat completion log (bot_logs)
-       │                  └─ Ollama      — streaming LLM proxy (/api/chat)
-       │                                  bot system prompt injected per request
-       │                                  each completion persisted to module_chatbot_logs
-       └─ Module Federation remotes
-            ├─ spin-docs (port 3001)                 — bundled: architecture diagrams + dev docs (system role)
-            ├─ cloud-insight-ai (port 3002)          — CloudInsight AI: data upload and management
-            │    └─ cloud-insight-ai-backend (8002)  — plugin backend (REST + WebSocket)
-            └─ anomascan (port 3003)                 — AnomaScan: YOLO object detection
-                 └─ anomascan-backend (8003)          — plugin backend (PyTorch, ultralytics)
-
-Plugin backend pattern:
-  core backend (/api/plugin/{scope}/…) ──► module backend (backend_url from modules table)
-  Each module that needs server-side logic runs its own FastAPI service and declares
-  "backend_url" in its manifest.json — no module-specific code lives in the core backend.
-
-Ollama stack:
-  ollama (pure server)  ◄──  model-downloader (HTTP client via OLLAMA_HOST)
-```
-
-## Useful commands
-
-```bash
-# Restart all core services (no rebuild — picks up config/env changes)
-bash scripts/restart.sh
-
-# Restart a specific service
-bash scripts/restart.sh backend
-bash scripts/restart.sh backend clickhouse
-
-# Rebuild an image then restart (after code changes)
-bash scripts/restart.sh --rebuild backend
-bash scripts/restart.sh --rebuild frontend
-
-# Wipe all data and restart fresh
-docker compose down -v
-
-# Tail logs for a service
-docker compose logs -f backend
-
-# Rebuild a single service
-docker compose up --build backend
-
-# Rebuild frontend after code changes
-bash scripts/restart.sh --rebuild frontend
-
-# Check health status of all running services
-docker compose ps
-
-# Check downloaded AI models
-docker exec spin-core-ollama-1 ollama list
-
-# Watch model download progress (in-app banner appears automatically on the frontend)
-curl -N http://localhost:8000/api/model-status/stream
-
-# Query the ClickHouse logs summary for the current month (admin token required)
-curl -s "http://localhost:8000/api/logs/summary?from=$(date -u +%Y-%m-01T00:00:00)" \
-  -H "Authorization: Bearer <token>" | python3 -m json.tool
-```
-
-## Project structure
-
-```
-spin-core/
-├── backend/          # FastAPI app — see backend/README.md
-├── frontend/         # React SPA — see frontend/README.md
-├── data/             # seed.json (first-run defaults) — see data/README.md
-├── modules/
-|   ├── AnomaScan/            # MF remote — see modules/AnomaScan/README.md
-|   ├── cloud-insight-ai/     # MF remote — see modules/cloud-insight-ai/README.md
-│   └── spin-docs/            # Bundled MF remote — architecture diagrams + dev docs (system role)
-├── k8s/              # Kubernetes manifests — see k8s/README.md
-├── scripts/          # Utility scripts — see scripts/README.md
-└── docker-compose.yml
-```
+| I want to… | Go here |
+|------------|---------|
+| Set up Docker + GPU on Windows/WSL2 | [GUIDE.md](GUIDE.md) |
+| Understand how it works technically | [TECH_SPEC.md](TECH_SPEC.md) |
+| Build or integrate a new module | [CONTRIBUTING.md](CONTRIBUTING.md) · [modules/README.md](modules/README.md) |
+| Deploy to Kubernetes | [k8s/README.md](k8s/README.md) |
+| Read the full API reference | [backend/README.md](backend/README.md) |
