@@ -116,7 +116,7 @@ Every module must serve a `manifest.json` at its root (copied to `dist/` at buil
 
 `i18n` is **optional** — declare per-language translation keys under your module's i18n namespace. On registration (auto-discovery or manual create) the backend stores this as `module.presets.i18n` and merges it into the translations table. Admins can re-apply it at any time via **Admin → Modules → Reset i18n to defaults**.
 
-`bots` is **optional** — declare companion bots that the platform provisions automatically when the module is registered. Bot records are stored in PostgreSQL and ClickHouse log tables are created for each one. Registration is idempotent (keyed on `name + module_id`).
+`bots` is **optional** — declare companion bots for this module. They are **not** seeded automatically on registration. After registering the module go to **Admin → Modules → Reseed bots** (or call `POST /api/settings/modules/{id}/reseed-bots`) to provision them. Provisioning is idempotent — bots already present (matched on `name + module_id`) are skipped.
 
 `presets.layout` and `presets.settings` are **not** part of `manifest.json` — they are set by admins in the platform UI and stored in PostgreSQL, then injected as `props.presets` into the remote component at load time.
 
@@ -140,10 +140,56 @@ Browser
 1. Create `your-module/backend/` — a standalone FastAPI app.
 2. Add `your-module/backend/Dockerfile` — install only what your module needs (e.g. PyTorch, ultralytics).
 3. Add `"backend_url": "http://your-module-backend:8000"` to `manifest.json`.
-4. Add the backend service to `docker-compose.yml` (expose DB credentials via env vars — the module backend shares the same PostgreSQL and ClickHouse instance as the core).
+4. Add the backend service to `docker-compose.yml`. Required environment variables:
+
+   | Variable | Value | Purpose |
+   |----------|-------|---------|
+   | `JWT_SECRET_KEY` | same as core | shared secret for verifying forwarded tokens |
+   | `CORE_API_URL` | `http://backend:8000` | platform log endpoint base URL |
+
 5. Register or re-scan the module in Admin → Modules — the core will store `backend_url` and start proxying.
 
 The `Authorization` header is forwarded verbatim from the proxy to the module backend. Module backends validate the same `JWT_SECRET_KEY` env var.
+
+## Platform logging from a module backend
+
+Plugin backends can write structured events to the platform's log store using the forwarded Bearer token. Two endpoints are available — both accept scope strings as well as UUIDs, so no DB lookup is needed.
+
+**Module-level events** (`POST /api/module-logs/{scope}`):
+
+```python
+import httpx, os
+
+CORE_API_URL = os.getenv("CORE_API_URL", "http://backend:8000")
+
+async def log_module_event(authorization: str, scope: str, event_type: str, details: dict) -> None:
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{CORE_API_URL}/api/module-logs/{scope}",
+                json={"event_type": event_type, "details": details},
+                headers={"Authorization": authorization},
+            )
+    except Exception:
+        pass  # best-effort — never fail a user request due to a log error
+```
+
+**Bot-level events** (`POST /api/bot-logs/custom/{bot_uuid}`):
+
+```python
+async def log_bot_event(authorization: str, bot_uuid: str, event_type: str, details: dict, message: str = "") -> None:
+    try:
+        async with httpx.AsyncClient(timeout=3.0) as client:
+            await client.post(
+                f"{CORE_API_URL}/api/bot-logs/custom/{bot_uuid}",
+                json={"event_type": event_type, "details": details, "message": message},
+                headers={"Authorization": authorization},
+            )
+    except Exception:
+        pass
+```
+
+Both calls use `asyncio.ensure_future` in practice to be fully non-blocking. See `AnomaScan/backend/spin_logger.py` for the reference implementation.
 
 ## React singleton contract
 

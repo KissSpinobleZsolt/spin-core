@@ -45,10 +45,10 @@ export default function Modules() {
   async function handleSave(data: Omit<ModuleConfig, 'id'>) {
     try {
       if (modal === 'add' || (modal !== null && typeof modal === 'object' && 'prefill' in modal)) {
-        const result = await settingsService.createModule(data) as ModuleConfig & { bots_seeded?: number; manifest_warning?: string | null }
-        // Surface a warning when the backend could not reach the manifest (bots/i18n not seeded)
+        const result = await settingsService.createModule(data) as ModuleConfig & { manifest_warning?: string | null }
+        // Surface a warning when the backend could not reach the manifest (i18n not seeded)
         if (result.manifest_warning) {
-          setError(`Module saved, but manifest fetch failed — bots and i18n were not seeded. Use "Reseed bots" once the module server is running. (${result.manifest_warning})`)
+          setError(`Module saved, but manifest fetch failed — i18n was not seeded. (${result.manifest_warning})`)
         }
       } else if (modal !== null && typeof modal === 'object' && 'id' in modal) {
         await settingsService.updateModule(modal.id, data)  // update an existing module; modal.id is the DB uuid
@@ -91,7 +91,7 @@ export default function Modules() {
         roles:       d.roles       ?? ['user', 'admin'],
         presets:     { i18n: {}, layout: {}, settings: {} },
         configuration_raw: manifest,               // forward the full manifest snapshot to the backend
-      }) as ModuleConfig & { bots_seeded?: number; manifest_warning?: string | null }
+      }) as ModuleConfig & { manifest_warning?: string | null }
 
       await refreshModules()
       // Optimistically mark as already_registered so the Add button disappears
@@ -102,8 +102,7 @@ export default function Modules() {
       if (result.manifest_warning) {
         setError(`Module registered (inactive). Manifest warning: ${result.manifest_warning}`)
       } else {
-        const botCount = result.bots_seeded ?? 0
-        setError(`✓ "${result.name}" registered as inactive.${botCount > 0 ? ` ${botCount} bot(s) seeded.` : ''}`)
+        setError(`✓ "${result.name}" registered as inactive.`)
       }
     } catch (err) {
       setError(String(err))
