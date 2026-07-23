@@ -106,8 +106,7 @@ There is no setup wizard. The lifespan hook seeds the following on first run (al
 | Modules (seed) | `modules` table is empty after migration | seeded from `data/seed.json` |
 | Modules (discovery) | `MODULE_REGISTRY_URLS` is set | new scopes inserted; existing admin edits never overwritten |
 | Module i18n (discovery / manual create) | manifest contains `i18n` key | stored in `module.presets.i18n` snapshot; merged into `translations` table immediately |
-| Module bots (discovery) | new scope registered via discovery and manifest contains `bots` | `[spin-core] Provisioned bot '…' for module …` (idempotent — name+module_id guard) |
-| Module bots (manual create) | `POST /api/settings/modules` — backend fetches manifest from `remote_url` | same idempotent provisioning + i18n merge; failure does not fail the create response but `manifest_warning` is set in the response body so the frontend can surface it. Use `POST /api/settings/modules/{id}/reseed-bots` to retry. |
+| Module bots | admin calls `POST /api/settings/modules/{id}/reseed-bots` explicitly | idempotent provisioning — skips bots already present (name + module_id guard); returns `{ bots_seeded, message }` |
 | Bot ClickHouse tables | bot provisioned from manifest (discovery or manual create) | `bot_logs` table ensured (shared table; `bot_name` column scopes rows per bot); also ensured for all existing bots at every startup |
 | Settings file | `settings.json` absent | _(silent)_ |
 | i18n translations (EN + RO) | deep-merged into PostgreSQL every startup (new keys added, existing preserved) | _(silent)_ |
@@ -170,7 +169,7 @@ Modules are stored in PostgreSQL. `settings.json` holds only the `theme` config.
 |--------|------|-------------|
 | `PATCH` | `/api/settings/theme` | Update default theme |
 | `GET` | `/api/settings/modules` | List registered modules (from PostgreSQL) |
-| `POST` | `/api/settings/modules` | Create a module (provisions ClickHouse log tables; fetches manifest to auto-create module bots, load `i18n`, and set `backend_url`) |
+| `POST` | `/api/settings/modules` | Create a module (provisions ClickHouse log tables; fetches manifest to load `i18n` and set `backend_url`; does **not** seed bots — use `reseed-bots` for that) |
 | `POST` | `/api/settings/modules/{id}/reset-i18n` | Re-merge the i18n snapshot stored in `module.presets.i18n` back into the translations table |
 | `POST` | `/api/settings/modules/{id}/reseed-bots` | Re-fetch the module's `manifest.json` and seed any bots declared in it; skips already-provisioned bots (idempotent). Returns `{ bots_seeded, message }`. Raises 502 if the manifest is unreachable. |
 | `PUT` | `/api/settings/modules/{id}` | Update a module |
@@ -196,7 +195,7 @@ All log endpoints support `from` and `to` query params (ISO datetime, e.g. `2026
 | Method | Path | Auth | Description |
 |--------|------|------|-------------|
 | `POST` | `/api/module-logs/{moduleId}` | Bearer | Write a log entry to `module_{scope}_logs`. Body: `{event_type, details}`. |
-| `GET` | `/api/module-logs/{moduleId}` | Admin | Raw module log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
+| `GET` | `/api/module-logs/{moduleId}` | Bearer | Raw module log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
 | `GET` | `/api/module-logs/{moduleId}/summary` | Admin | Hourly aggregates. Params: `from`, `to`, `event_type`. Returns `{items, total}`. |
 
 Module log tables are created automatically when a module is registered via `POST /api/settings/modules`.
@@ -307,6 +306,8 @@ Per-bot event log stored in the `bot_logs` ClickHouse table (single table; `bot_
 |--------|------|------|-------------|
 | `GET` | `/api/bot-logs/{bot_id}` | Admin | Raw bot log rows. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
 | `GET` | `/api/bot-logs/{bot_id}/summary` | Admin | Hourly aggregates. Params: `from`, `to`, `event_type`, `limit`, `offset`. Returns `{items, total}`. |
+| `GET` | `/api/bot-logs/custom/{bot_id}` | Bearer | Module-facing: list custom log entries for a bot. Params: `limit`, `offset`, `event_type`, `from`, `to`. Returns `{items, total}`. |
+| `POST` | `/api/bot-logs/custom/{bot_id}` | Bearer | Module-facing: write a custom log entry. Body: `{event_type, message?, name?, level?, details?}`. Returns `{ok: true}`. |
 
 ### Pages (server-driven config)
 
@@ -387,7 +388,7 @@ backend/
 │   └── routes/
 │       ├── auth/           # POST /api/auth/login
 │       ├── bots/           # GET/POST /api/bots, GET/PUT/DELETE /api/bots/{id}, GET /api/bots/types
-│       ├── bot_logs/       # GET /api/bot-logs/{id}, GET /api/bot-logs/{id}/summary
+│       ├── bot_logs/       # GET /api/bot-logs/{id}, GET /api/bot-logs/{id}/summary, GET+POST /api/bot-logs/custom/{id}
 │       ├── chat/           # POST /api/chat, GET /api/chat/logs, GET /api/chat/logs/summary
 │       ├── dashboard/      # GET /api/dashboard, PATCH /api/user/theme
 │       ├── health/         # GET /api/health

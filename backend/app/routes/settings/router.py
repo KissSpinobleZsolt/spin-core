@@ -40,7 +40,6 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
         ModuleEvent.INIT, module["scope"], module["name"], email,
         {"module_id": module["id"], "scope": module["scope"]},
     )
-    bots_seeded = 0
     manifest_warning: str | None = None
     try:
         # Use the manifest forwarded by the browser when present (avoids Docker localhost issues);
@@ -56,14 +55,6 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
         # Persist the raw manifest so reseed and the config panel can use it without re-fetching
         module = pg.update_module(module["id"], {"configuration_raw": manifest}) or module
         _conf = manifest.get("configurations") or {}  # manifests may nest bots/i18n under a "configurations" key
-        bots_data = _conf.get("bots") or manifest.get("bots") or []  # support both nested and top-level layouts
-        new_bots = pg.seed_bots_for_module(module["id"], bots_data, created_by=email) if bots_data else []  # provision declared bots, skipping duplicates
-        bots_seeded = len(new_bots)
-        for bot in new_bots:
-            get_logger().bot(  # log each newly provisioned bot
-                BotEvent.INIT, bot.name, email,
-                {"bot_id": bot.id, "module_id": module["id"], "module_scope": module["scope"]},
-            )
         if not payload.backend_url and manifest.get("backend_url"):
             module = pg.update_module(module["id"], {"backend_url": manifest["backend_url"]}) or module  # auto-configure backend_url from manifest when not explicitly set
         i18n_data = _conf.get("i18n") or manifest.get("i18n") or {}  # support both nested and top-level layouts
@@ -74,8 +65,7 @@ async def create_module(payload: ModuleInput, email: str = Depends(admin_dep)):
                 pg.merge_i18n_data(lang, translations)  # deep-merge each language's translations into the DB
     except Exception as exc:
         manifest_warning = str(exc)  # surface to caller — module row is committed regardless
-    # Enrich the response so the frontend can warn the admin when manifest seeding was skipped
-    return {**module, "bots_seeded": bots_seeded, "manifest_warning": manifest_warning}
+    return {**module, "manifest_warning": manifest_warning}
 
 
 @router.post("/modules/{module_id}/reset-i18n", status_code=204)

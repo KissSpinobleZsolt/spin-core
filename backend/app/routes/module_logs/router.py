@@ -48,7 +48,7 @@ async def get_module_logs_summary(
 @router.get("/{module_id}")
 async def read_module_logs(
     module_id: str,
-    _: str = Depends(admin_dep),
+    _: str = Depends(token_dep),
     limit: int = Query(default=100, le=500),
     offset: int = Query(default=0, ge=0),
     event_type: Optional[str] = Query(default=None),
